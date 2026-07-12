@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 
 type Variant = 'orange' | 'blue';
 type LabelSize = 'xsm' | 'sm' | 'md';
-type LabelFormat = 'standard' | 'fragile';
+type LabelFormat = 'standard' | 'fragile' | 'normal_post';
 
 const getThemeClasses = (variant: Variant) => {
   if (variant === 'blue') {
@@ -87,6 +87,17 @@ export const BulkLabelModal = ({
                 />
                 <span>Fragile Sinhala label (A5 landscape)</span>
               </label>
+              <label className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  value="normal_post"
+                  checked={selectedFormat === 'normal_post'}
+                  onChange={(e) => setSelectedFormat(e.target.value as LabelFormat)}
+                  className={theme.radioInput}
+                  disabled={loading}
+                />
+                <span>Normal Post label (A4 — 8 per page)</span>
+              </label>
             </div>
           </div>
 
@@ -131,6 +142,11 @@ export const BulkLabelModal = ({
                 </label>
               </div>
             </div>
+          ) : selectedFormat === 'normal_post' ? (
+            <p className="text-sm text-gray-600 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              Prints 8 address labels per A4 sheet (2 columns × 4 rows), matching normal post sticker layout.
+              Tracking number is shown separately at the bottom (no barcode). A courier bill / manifest page is appended at the end.
+            </p>
           ) : (
             <p className="text-sm text-gray-600 rounded-lg border border-gray-200 bg-gray-50 p-3">
               Printed as one label per sheet: A5 landscape (210 × 148 mm). In the print dialog, choose paper size A5 and orientation Landscape if needed.

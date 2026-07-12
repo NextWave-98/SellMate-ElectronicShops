@@ -19,7 +19,7 @@ import useCourier, {
 } from '../../hooks/useCourier';
 import toast from 'react-hot-toast';
 import { printPdfBlob } from '@/utils/printPdf';
-import { CourierShipmentModal, TrackingModal, LabelDownloadModal, ScanBulkStatusModal } from '../../components/courier/modals';
+import { CourierShipmentModal, TrackingModal, LabelDownloadModal, BulkLabelModal, ScanBulkStatusModal } from '../../components/courier/modals';
 import { useCourierModalVariant } from '@/hooks/useCourierModalVariant';
 import PendingApprovalShipments from '../../components/courier/PendingApprovalShipments';
 
@@ -30,6 +30,7 @@ const CourierPage = () => {
   const [showShipmentModal, setShowShipmentModal] = useState(false);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const [showBulkLabelModal, setShowBulkLabelModal] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<CourierShipment | null>(null);
   const [editingShipment, setEditingShipment] = useState<CourierShipment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -139,7 +140,7 @@ const CourierPage = () => {
   const handlePrintLabel = async (
     shipment: CourierShipment,
     size: 'xsm' | 'sm' | 'md' = 'md',
-    format: 'standard' | 'fragile' = 'standard'
+    format: 'standard' | 'fragile' | 'normal_post' = 'standard'
   ) => {
     try {
       const labelIdentifier = encodeURIComponent(shipment.shipmentNumber || shipment.id);
@@ -234,14 +235,17 @@ const CourierPage = () => {
     });
   }, []);
 
-  const handleBulkDownload = async (size: 'xsm' | 'sm' | 'md' = 'md') => {
+  const handleBulkDownload = async (
+    size: 'xsm' | 'sm' | 'md' = 'md',
+    format: 'standard' | 'fragile' | 'normal_post' = 'fragile',
+  ) => {
     if (selectedIds.size === 0) return;
     setBulkLoading(true);
     try {
       const response = await fetchData({
         endpoint: `/courier/shipments/bulk-labels/download`,
         method: 'POST',
-        data: { shipmentIds: Array.from(selectedIds), size },
+        data: { shipmentIds: Array.from(selectedIds), size, format },
         responseType: 'blob'
       });
       if (response) {
@@ -249,12 +253,13 @@ const CourierPage = () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `bulk-labels-${selectedIds.size}-${size}.pdf`;
+        a.download = `bulk-labels-${selectedIds.size}-${format}-${size}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         toast.success(`Downloaded ${selectedIds.size} labels`);
+        setShowBulkLabelModal(false);
       }
     } catch {
       toast.error('Failed to download bulk labels');
@@ -263,28 +268,26 @@ const CourierPage = () => {
     }
   };
 
-  const handleBulkPrint = async (size: 'xsm' | 'sm' | 'md' = 'md') => {
+  const handleBulkPrint = async (
+    size: 'xsm' | 'sm' | 'md' = 'md',
+    format: 'standard' | 'fragile' | 'normal_post' = 'fragile',
+  ) => {
     if (selectedIds.size === 0) return;
     setBulkLoading(true);
     try {
       const response = await fetchData({
         endpoint: `/courier/shipments/bulk-labels/print`,
         method: 'POST',
-        data: { shipmentIds: Array.from(selectedIds), size },
+        data: { shipmentIds: Array.from(selectedIds), size, format },
         responseType: 'blob'
       });
       if (response) {
         const blob = (response as unknown) as Blob;
-        const blobUrl = window.URL.createObjectURL(blob);
-        const newWindow = window.open(blobUrl, '_blank');
-        if (newWindow) {
-          newWindow.onload = () => {
-            newWindow.print();
-            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
-          };
-        } else {
+        try {
+          printPdfBlob(blob, format === 'fragile' ? { pageSize: 'A5-landscape' } : undefined);
+          setShowBulkLabelModal(false);
+        } catch {
           toast.error('Please allow popups to print labels');
-          window.URL.revokeObjectURL(blobUrl);
         }
       }
     } catch {
@@ -566,21 +569,12 @@ const CourierPage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleBulkPrint('md')}
+                onClick={() => setShowBulkLabelModal(true)}
                 disabled={bulkLoading}
                 className="border-orange-300 text-orange-700 hover:bg-orange-100"
               >
                 <Printer className="w-3.5 h-3.5" />
-                {bulkLoading ? 'Processing...' : 'Bulk Print'}
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleBulkDownload('md')}
-                disabled={bulkLoading}
-                className="bg-orange-600 hover:bg-orange-700"
-              >
-                <Download className="w-3.5 h-3.5" />
-                {bulkLoading ? 'Processing...' : 'Bulk Download'}
+                Bulk Labels
               </Button>
             </div>
           </div>
@@ -783,6 +777,17 @@ const CourierPage = () => {
           onClose={() => setShowLabelModal(false)}
           onPrint={(size, format) => handlePrintLabel(selectedShipment, size, format)}
           variant={courierVariant}
+        />
+      )}
+
+      {showBulkLabelModal && (
+        <BulkLabelModal
+          shipmentCount={selectedIds.size}
+          onClose={() => { if (!bulkLoading) setShowBulkLabelModal(false); }}
+          onPrint={handleBulkPrint}
+          onDownload={handleBulkDownload}
+          variant={courierVariant}
+          loading={bulkLoading}
         />
       )}
 

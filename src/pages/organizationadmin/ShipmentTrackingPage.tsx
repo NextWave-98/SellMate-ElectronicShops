@@ -364,7 +364,7 @@ const ShipmentTrackingPage = () => {
   const handlePrintLabel = async (
     shipment: CourierShipment,
     size: 'xsm' | 'sm' | 'md' = 'md',
-    format: 'standard' | 'fragile' = 'standard'
+    format: 'standard' | 'fragile' | 'normal_post' = 'standard'
   ) => {
     try {
       const labelIdentifier = encodeURIComponent(shipment.shipmentNumber || shipment.id);
@@ -544,7 +544,7 @@ const ShipmentTrackingPage = () => {
 
   const handleBulkDownload = async (
     size: 'xsm' | 'sm' | 'md' = 'md',
-    format: 'standard' | 'fragile' = 'fragile'
+    format: 'standard' | 'fragile' | 'normal_post' = 'fragile'
   ) => {
     if (selectedIds.size === 0) return;
     setBulkLoading(true);
@@ -577,7 +577,7 @@ const ShipmentTrackingPage = () => {
 
   const handleBulkPrint = async (
     size: 'xsm' | 'sm' | 'md' = 'md',
-    format: 'standard' | 'fragile' = 'fragile'
+    format: 'standard' | 'fragile' | 'normal_post' = 'fragile'
   ) => {
     if (selectedIds.size === 0) return;
     setBulkLoading(true);

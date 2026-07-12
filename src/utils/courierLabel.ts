@@ -1,5 +1,5 @@
 type LabelSize = 'xsm' | 'sm' | 'md';
-type LabelFormat = 'standard' | 'fragile';
+type LabelFormat = 'standard' | 'fragile' | 'normal_post';
 
 type FetchLabelMeta = (options: {
   endpoint?: string;
