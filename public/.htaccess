@@ -1,0 +1,50 @@
+# Ensure Apache Rewrite Module is Enabled
+RewriteOptions inherit
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Base URL for the app; update if deployed in a subdirectory
+    RewriteBase /
+
+    # Prevent direct access to index.html
+    RewriteRule ^index\.html$ - [L]
+
+    # Redirect all unmatched requests to index.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . /index.html [L]
+</IfModule>
+
+# Caching for Better Performance
+<IfModule mod_headers.c>
+    # Cache static assets for 1 year
+    <FilesMatch "\.(ico|jpg|jpeg|png|gif|js|css|svg|woff|woff2|ttf|otf|eot|webp)$">
+        Header set Cache-Control "max-age=31536000, public"
+    </FilesMatch>
+
+    # Prevent caching for index.html and other dynamic files
+    <FilesMatch "\.(html|htm|json)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires 0
+    </FilesMatch>
+</IfModule>
+
+# Error Handling
+ErrorDocument 404 /index.html
+
+# Security Headers
+<IfModule mod_headers.c>
+    # Prevent MIME sniffing
+    Header set X-Content-Type-Options "nosniff"
+
+    # Prevent clickjacking
+    Header set X-Frame-Options "DENY"
+
+    # Enable cross-site scripting protection
+    Header set X-XSS-Protection "1; mode=block"
+
+    # Disable server signature
+    Header unset Server
+</IfModule>

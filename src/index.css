@@ -1,0 +1,505 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0 / 0.55);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0 / 0.8);
+  --popover-foreground: oklch(0.145 0 0);
+  /* SellMate Electronics — blue primary */
+  --primary: oklch(0.546 0.245 262.881);            /* blue-600 */
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.951 0.026 236.824);          /* light blue tint */
+  --secondary-foreground: oklch(0.379 0.146 265.522);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.932 0.032 255.585);             /* blue-100 */
+  --accent-foreground: oklch(0.379 0.146 265.522);  /* blue-900 */
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.623 0.214 259.815);               /* blue-500 */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.546 0.245 262.881);   /* blue-600 */
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.932 0.032 255.585);    /* blue-100 */
+  --sidebar-accent-foreground: oklch(0.379 0.146 265.522);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
+  /* Themed glass fields + modals (default: blue — SellMate Electronics) */
+  --field-accent-rgb: 37, 99, 235;
+  --field-focus-ring: rgba(37, 99, 235, 0.4);
+  --modal-accent: 37, 99, 235;
+  --modal-scroll-thumb-top: 147, 197, 253;
+  --modal-scroll-thumb-bottom: 37, 99, 235;
+  --modal-scroll-thumb-hover-top: 191, 219, 254;
+  --modal-scroll-thumb-hover-bottom: 29, 78, 216;
+  --modal-scroll-track: 96, 165, 250;
+  --modal-scroll-border: 147, 197, 253;
+}
+
+/* Organization admin — blue (SellMate Electronics brand) */
+html[data-theme="organization"] {
+  --field-accent-rgb: 37, 99, 235;
+  --field-focus-ring: rgba(37, 99, 235, 0.4);
+  --modal-accent: 37, 99, 235;
+  --modal-scroll-thumb-top: 147, 197, 253;
+  --modal-scroll-thumb-bottom: 37, 99, 235;
+  --modal-scroll-thumb-hover-top: 191, 219, 254;
+  --modal-scroll-thumb-hover-bottom: 29, 78, 216;
+  --modal-scroll-track: 96, 165, 250;
+  --modal-scroll-border: 147, 197, 253;
+}
+
+/* Branch portal — blue */
+html[data-theme="branch"] {
+  --field-accent-rgb: 37, 99, 235;
+  --field-focus-ring: rgba(37, 99, 235, 0.4);
+  --modal-accent: 37, 99, 235;
+  --modal-scroll-thumb-top: 147, 197, 253;
+  --modal-scroll-thumb-bottom: 37, 99, 235;
+  --modal-scroll-thumb-hover-top: 191, 219, 254;
+  --modal-scroll-thumb-hover-bottom: 29, 78, 216;
+  --modal-scroll-track: 96, 165, 250;
+  --modal-scroll-border: 147, 197, 253;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.623 0.214 259.815);            /* blue-500 */
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.282 0.066 265.755);             /* deep blue tint */
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.546 0.245 262.881);               /* blue-600 */
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+ * SellMate Electronics brand override:
+ * The app was originally styled with orange accents in 100+ files.
+ * Instead of editing every file, we remap the entire Tailwind `orange`
+ * palette to the blue palette here — every bg-orange-*, text-orange-*,
+ * border-orange-*, ring-orange-* etc. instantly renders as blue.
+ * (True warnings mostly use amber/yellow/red, which stay untouched.)
+ */
+@theme {
+  --color-orange-50: oklch(0.97 0.014 254.604);   /* = blue-50  */
+  --color-orange-100: oklch(0.932 0.032 255.585); /* = blue-100 */
+  --color-orange-200: oklch(0.882 0.059 254.128); /* = blue-200 */
+  --color-orange-300: oklch(0.809 0.105 251.813); /* = blue-300 */
+  --color-orange-400: oklch(0.707 0.165 254.624); /* = blue-400 */
+  --color-orange-500: oklch(0.623 0.214 259.815); /* = blue-500 */
+  --color-orange-600: oklch(0.546 0.245 262.881); /* = blue-600 */
+  --color-orange-700: oklch(0.488 0.243 264.376); /* = blue-700 */
+  --color-orange-800: oklch(0.424 0.199 265.638); /* = blue-800 */
+  --color-orange-900: oklch(0.379 0.146 265.522); /* = blue-900 */
+  --color-orange-950: oklch(0.282 0.091 267.935); /* = blue-950 */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom animations for Phase 5 & 6 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Blob animations for hero section */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+table {
+  min-height:100px ;
+}
+
+/* Glassmorphism utilities — use across modals, cards, tables */
+@layer utilities {
+  .glass-modal-overlay {
+    @apply fixed w-full h-full inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-2xl backdrop-saturate-150;
+    background-image: linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.45) 0%,
+      rgba(var(--modal-accent), 0.12) 45%,
+      rgba(15, 23, 42, 0.5) 100%
+    );
+  }
+
+  [data-slot="dialog-overlay"] {
+    background-image: linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.45) 0%,
+      rgba(var(--modal-accent), 0.12) 45%,
+      rgba(15, 23, 42, 0.5) 100%
+    );
+  }
+
+  .glass-modal-panel {
+    @apply flex max-h-[min(90vh,100dvh)] w-full  flex-col overflow-hidden rounded-2xl border border-white/40 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_20px_60px_0_rgba(15,23,42,0.2)] ring-1 ring-inset ring-white/50;
+  }
+
+  /* Themed modal scrollbar (orange default, blue on branch) */
+  .glass-modal-scroll,
+  .glass-modal-panel > form:not([class*="overflow-hidden"]),
+  [data-slot="dialog-content"] > form:not([class*="overflow-hidden"]),
+  [data-slot="dialog-content"] > [data-slot="dialog-body"],
+  .glass-modal-panel > div.p-6:not(.glass-modal-header):not(.glass-modal-footer),
+  .theme-branch .glass-modal-scroll,
+  .theme-branch [data-slot="dialog-body"] {
+    @apply min-h-0 flex-1 overflow-y-auto overscroll-contain bg-transparent;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--modal-scroll-thumb-bottom), 0.65)
+      rgba(var(--modal-scroll-track), 0.12);
+  }
+
+  .glass-modal-scroll::-webkit-scrollbar,
+  .glass-modal-panel > form:not([class*="overflow-hidden"])::-webkit-scrollbar,
+  [data-slot="dialog-content"] > form:not([class*="overflow-hidden"])::-webkit-scrollbar,
+  [data-slot="dialog-content"] > [data-slot="dialog-body"]::-webkit-scrollbar,
+  .glass-modal-panel > div.p-6:not(.glass-modal-header):not(.glass-modal-footer)::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .glass-modal-scroll::-webkit-scrollbar-track,
+  .glass-modal-panel > form:not([class*="overflow-hidden"])::-webkit-scrollbar-track,
+  [data-slot="dialog-content"] > form:not([class*="overflow-hidden"])::-webkit-scrollbar-track,
+  [data-slot="dialog-content"] > [data-slot="dialog-body"]::-webkit-scrollbar-track,
+  .glass-modal-panel > div.p-6:not(.glass-modal-header):not(.glass-modal-footer)::-webkit-scrollbar-track,
+  .theme-branch .glass-modal-scroll::-webkit-scrollbar-track,
+  .theme-branch [data-slot="dialog-body"]::-webkit-scrollbar-track {
+    margin: 4px 0;
+    background: rgba(var(--modal-scroll-track), 0.1);
+    border-radius: 9999px;
+  }
+
+  .glass-modal-scroll::-webkit-scrollbar-thumb,
+  .glass-modal-panel > form:not([class*="overflow-hidden"])::-webkit-scrollbar-thumb,
+  [data-slot="dialog-content"] > form:not([class*="overflow-hidden"])::-webkit-scrollbar-thumb,
+  [data-slot="dialog-content"] > [data-slot="dialog-body"]::-webkit-scrollbar-thumb,
+  .glass-modal-panel > div.p-6:not(.glass-modal-header):not(.glass-modal-footer)::-webkit-scrollbar-thumb,
+  .theme-branch .glass-modal-scroll::-webkit-scrollbar-thumb,
+  .theme-branch [data-slot="dialog-body"]::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: linear-gradient(
+      180deg,
+      rgba(var(--modal-scroll-thumb-top), 0.9) 0%,
+      rgba(var(--modal-scroll-thumb-bottom), 0.75) 100%
+    );
+    border: 1px solid rgba(var(--modal-scroll-border), 0.45);
+  }
+
+  .glass-modal-scroll::-webkit-scrollbar-thumb:hover,
+  .glass-modal-panel > form:not([class*="overflow-hidden"])::-webkit-scrollbar-thumb:hover,
+  [data-slot="dialog-content"] > form:not([class*="overflow-hidden"])::-webkit-scrollbar-thumb:hover,
+  [data-slot="dialog-content"] > [data-slot="dialog-body"]::-webkit-scrollbar-thumb:hover,
+  .glass-modal-panel > div.p-6:not(.glass-modal-header):not(.glass-modal-footer)::-webkit-scrollbar-thumb:hover,
+  .theme-branch .glass-modal-scroll::-webkit-scrollbar-thumb:hover,
+  .theme-branch [data-slot="dialog-body"]::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(var(--modal-scroll-thumb-hover-top), 1) 0%,
+      rgba(var(--modal-scroll-thumb-hover-bottom), 0.9) 100%
+    );
+  }
+
+  /* Radix ScrollArea glass thumb (DialogBody etc.) */
+  [data-slot="scroll-area"][data-glass] [data-slot="scroll-area-scrollbar"][data-orientation="vertical"] {
+    border-left-color: rgba(var(--modal-scroll-border), 0.35);
+  }
+
+  [data-slot="scroll-area"][data-glass] [data-slot="scroll-area-thumb"] {
+    border: 1px solid rgba(var(--modal-scroll-border), 0.45);
+    background: linear-gradient(
+      180deg,
+      rgba(var(--modal-scroll-thumb-top), 0.9) 0%,
+      rgba(var(--modal-scroll-thumb-bottom), 0.75) 100%
+    );
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(4px);
+  }
+
+  [data-slot="scroll-area"][data-glass] [data-slot="scroll-area-thumb"]:hover,
+  .modal-glass-scroll-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(var(--modal-scroll-thumb-hover-top), 1) 0%,
+      rgba(var(--modal-scroll-thumb-hover-bottom), 0.9) 100%
+    );
+  }
+
+  .modal-glass-scroll-thumb {
+    border: 1px solid rgba(var(--modal-scroll-border), 0.45);
+    background: linear-gradient(
+      180deg,
+      rgba(var(--modal-scroll-thumb-top), 0.9) 0%,
+      rgba(var(--modal-scroll-thumb-bottom), 0.75) 100%
+    );
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(4px);
+  }
+
+  /* Glass panel: scrollable middle (forms / body) */
+  .glass-modal-panel > .glass-modal-header,
+  .glass-modal-panel > div[class*="sticky"][class*="top-0"] {
+    @apply shrink-0;
+  }
+
+  .glass-modal-panel > .glass-modal-footer,
+  .glass-modal-panel > div[class*="sticky"][class*="bottom-0"] {
+    @apply shrink-0;
+  }
+
+  .glass-modal-panel > form[class*="overflow-hidden"] {
+    @apply flex min-h-0 flex-1 flex-col overflow-hidden;
+  }
+
+  /* shadcn Dialog: scrollable body, fixed chrome */
+  [data-slot="dialog-content"] {
+    @apply flex max-h-[min(90vh,100dvh)] flex-col overflow-hidden;
+  }
+
+  [data-slot="dialog-content"] > [data-slot="dialog-header"],
+  [data-slot="dialog-content"] > [data-slot="dialog-footer"],
+  [data-slot="dialog-content"] > .glass-modal-footer,
+  [data-slot="dialog-content"] > div[class*="sticky"][class*="top-0"]:first-child {
+    @apply shrink-0;
+  }
+
+  [data-slot="dialog-content"] > form[class*="overflow-hidden"] {
+    @apply flex min-h-0 flex-1 flex-col overflow-hidden;
+  }
+
+  .glass-modal-header {
+    @apply relative z-20 shrink-0 border-b border-white/30 bg-transparent px-6 py-4;
+  }
+
+  .glass-modal-footer {
+    @apply relative z-20 shrink-0 border-t border-white/30 bg-transparent px-6 py-4;
+  }
+
+  .glass-card {
+    @apply rounded-xl border border-white/30 bg-white/40 backdrop-blur-sm shadow-sm;
+  }
+
+  /* Public marketing + auth — orange & white glass */
+  .landing-glass-nav {
+    @apply border border-white/50 bg-white/60 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_rgba(15,23,42,0.06)] ring-1 ring-inset ring-white/60;
+  }
+
+  .landing-glass-nav-transparent {
+    @apply border border-white/40 bg-white/45 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_rgba(15,23,42,0.05)] ring-1 ring-inset ring-white/50;
+  }
+
+  .landing-glass-pill {
+    @apply rounded-2xl border border-white/50 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_rgba(15,23,42,0.06)] ring-1 ring-inset ring-white/60;
+  }
+
+  .landing-glass-pill-dark {
+    @apply rounded-2xl border border-white/15 bg-gray-900/40 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_rgba(0,0,0,0.2)] ring-1 ring-inset ring-white/10;
+  }
+
+  .landing-glass-hero-panel {
+    @apply rounded-3xl border border-white/50 bg-white/50 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_20px_60px_rgba(234,88,12,0.1)] ring-1 ring-inset ring-white/60;
+  }
+
+  .landing-glass-card {
+    @apply rounded-2xl border border-gray-200/60 bg-white/55 backdrop-blur-xl backdrop-saturate-150 shadow-[0_12px_40px_rgba(15,23,42,0.05)] ring-1 ring-inset ring-white/60 transition-all duration-300;
+  }
+
+  .landing-glass-card:hover {
+    @apply border-orange-200/60 bg-white/75 shadow-[0_20px_50px_rgba(234,88,12,0.1)];
+  }
+
+  .landing-glass-stat {
+    @apply rounded-2xl border border-white/50 bg-white/70 backdrop-blur-xl backdrop-saturate-150 shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-inset ring-white/60;
+  }
+
+  .landing-hero-glow {
+    background: radial-gradient(ellipse 80% 60% at 70% 40%, rgba(251, 146, 60, 0.18) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 40% at 20% 80%, rgba(251, 146, 60, 0.08) 0%, transparent 60%),
+                linear-gradient(180deg, #f9fafb 0%, #ffffff 50%, #fff7ed 100%);
+  }
+
+  .landing-section-bg {
+    @apply relative overflow-hidden bg-gray-50;
+  }
+
+  .landing-glass-badge {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-white/50 bg-white/60 px-5 py-2 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_24px_rgba(15,23,42,0.05)] ring-1 ring-inset ring-white/60;
+  }
+
+  .landing-glass-badge-dark {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-5 py-2 backdrop-blur-2xl backdrop-saturate-150 ring-1 ring-inset ring-white/10;
+  }
+
+  .landing-check-icon {
+    @apply flex shrink-0 items-center justify-center rounded-full bg-orange-600 shadow-sm ring-2 ring-orange-600/20;
+  }
+
+  .landing-icon-box {
+    @apply flex items-center justify-center rounded-xl bg-orange-600 text-white shadow-md shadow-orange-600/20;
+  }
+
+  .auth-split-screen {
+    @apply bg-gradient-to-br from-orange-50 via-white to-orange-100/80;
+  }
+
+  .glass-table-wrap {
+    @apply overflow-x-auto rounded-2xl border border-white/30 bg-white/40 backdrop-blur-sm shadow-sm;
+  }
+
+  .app-page-shell {
+    @apply w-full min-w-0 max-w-full;
+  }
+
+  /* Legacy native fields in modals → glass + themed focus (org orange / branch blue) */
+  .glass-modal-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([data-slot="input"]),
+  .glass-modal-panel select:not([data-slot="select-trigger"]),
+  .glass-modal-panel textarea:not([data-slot="textarea"]),
+  [data-slot="dialog-content"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([data-slot="input"]),
+  [data-slot="dialog-content"] select:not([data-slot="select-trigger"]),
+  [data-slot="dialog-content"] textarea:not([data-slot="textarea"]) {
+    @apply min-w-0 rounded-xl border border-white/40 bg-white/30 px-3 text-sm shadow-xs backdrop-blur-sm outline-none transition-[color,box-shadow] dark:border-white/20 dark:bg-white/10;
+  }
+
+  .glass-modal-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([data-slot="input"]),
+  [data-slot="dialog-content"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([data-slot="input"]) {
+    @apply h-9 w-full py-1;
+  }
+
+  .glass-modal-panel select:not([data-slot="select-trigger"]),
+  [data-slot="dialog-content"] select:not([data-slot="select-trigger"]) {
+    @apply h-9 w-full py-2;
+  }
+
+  .glass-modal-panel textarea:not([data-slot="textarea"]),
+  [data-slot="dialog-content"] textarea:not([data-slot="textarea"]) {
+    @apply min-h-16 w-full py-2;
+  }
+
+  .glass-modal-panel input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([data-slot="input"]):focus,
+  .glass-modal-panel select:not([data-slot="select-trigger"]):focus,
+  .glass-modal-panel textarea:not([data-slot="textarea"]):focus,
+  [data-slot="dialog-content"] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([data-slot="input"]):focus,
+  [data-slot="dialog-content"] select:not([data-slot="select-trigger"]):focus,
+  [data-slot="dialog-content"] textarea:not([data-slot="textarea"]):focus {
+    border-color: rgb(var(--field-accent-rgb));
+    box-shadow: 0 0 0 3px var(--field-focus-ring);
+  }
+}

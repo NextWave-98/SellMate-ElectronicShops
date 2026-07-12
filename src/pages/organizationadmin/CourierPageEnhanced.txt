@@ -1,0 +1,552 @@
+// Enhanced Courier Shipment Modal Form - Insert this into CourierPage.tsx
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">Create New Shipment</h2>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            
+            {/* Organization Selection */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Select Organization *
+              </label>
+              <select
+                value={selectedOrganization?.id || ''}
+                onChange={(e) => {
+                  const org = organizations.find(o => o.id === e.target.value);
+                  setSelectedOrganization(org || null);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              >
+                <option value="">Select an organization</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} - {org.city}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Courier Service Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Courier Service * {selectedOrganization && <span className="text-xs text-gray-500">(Auto-select if default set)</span>}
+              </label>
+              <select
+                value={formData.courierServiceId}
+                onChange={(e) => setFormData({ ...formData, courierServiceId: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              >
+                <option value="">Select courier service</option>
+                {courierServices.filter(s => s.isActive).map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name} ({service.provider})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Delivery Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Delivery Method * <span className="text-xs text-green-600">(Auto: Standard)</span>
+              </label>
+              <select
+                value={formData.deliveryMethod}
+                onChange={(e) => setFormData({ ...formData, deliveryMethod: e.target.value as DeliveryMethod })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              >
+                <option value={DeliveryMethod.STANDARD}>Standard Delivery</option>
+                <option value={DeliveryMethod.EXPRESS}>Express Delivery</option>
+                <option value={DeliveryMethod.SAME_DAY}>Same Day Delivery</option>
+                <option value={DeliveryMethod.OVERNIGHT}>Overnight Delivery</option>
+              </select>
+            </div>
+
+            {/* Product Selection Section */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Package className="w-5 h-5 text-orange-600" />
+                Product Selection
+              </h3>
+              
+              <div className="mb-3 relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search & Add Products</label>
+                <input
+                  type="text"
+                  value={productSearchTerm}
+                  onChange={(e) => {
+                    setProductSearchTerm(e.target.value);
+                    setShowProductDropdown(true);
+                  }}
+                  onFocus={() => setShowProductDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowProductDropdown(false), 200)}
+                  placeholder="Search by product name or SKU..."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                  disabled={!selectedOrganization}
+                />
+                
+                {showProductDropdown && productSearchTerm && filteredProducts.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredProducts.map((product) => (
+                      <div
+                        key={product.id}
+                        onClick={() => handleAddProduct(product)}
+                        className="px-4 py-3 hover:bg-orange-50 cursor-pointer border-b last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{product.name}</div>
+                        <div className="text-sm text-gray-600">
+                          SKU: {product.sku} | Price: Rs. {product.price.toLocaleString()} | Stock: {product.stock}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Products */}
+              {selectedProducts.length > 0 && (
+                <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Selected Products</h4>
+                  {selectedProducts.map((product) => (
+                    <div key={product.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-gray-900">{product.name}</div>
+                        <div className="text-xs text-gray-600">SKU: {product.sku}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-gray-600">Qty:</div>
+                        <input
+                          type="number"
+                          min="1"
+                          value={product.quantity}
+                          onChange={(e) => handleProductQuantityChange(product.id, parseInt(e.target.value) || 1)}
+                          className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center"
+                        />
+                        <div className="text-xs text-gray-600">Price:</div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={product.price}
+                          onChange={(e) => handleProductPriceChange(product.id, parseFloat(e.target.value) || 0)}
+                          className="w-28 border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="Rs."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveProduct(product.id)}
+                          className="text-red-600 hover:text-red-800 ml-2"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-3 mt-2 flex justify-between items-center bg-orange-50 px-3 py-2 rounded">
+                    <span className="text-sm font-semibold text-gray-900">Total Product Value:</span>
+                    <span className="text-lg font-bold text-orange-600">Rs. {getTotalProductValue().toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sender Information */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-orange-600" />
+                  Sender Information
+                </h3>
+                {selectedOrganization && (
+                  <div className="flex items-center gap-2">
+                    {!manualSenderEdit && (
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Auto-filled from Organization
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setManualSenderEdit(!manualSenderEdit)}
+                      className="text-xs text-orange-600 hover:text-orange-800 font-medium"
+                    >
+                      {manualSenderEdit ? '↻ Use Organization Details' : '✎ Edit Manually'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sender Name *</label>
+              <input
+                type="text"
+                value={formData.senderName}
+                onChange={(e) => {
+                  setFormData({ ...formData, senderName: e.target.value });
+                  setManualSenderEdit(true);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sender Phone</label>
+              <input
+                type="tel"
+                value={formData.senderPhone}
+                onChange={(e) => {
+                  setFormData({ ...formData, senderPhone: e.target.value });
+                  setManualSenderEdit(true);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sender Address *</label>
+              <textarea
+                value={formData.senderAddress}
+                onChange={(e) => {
+                  setFormData({ ...formData, senderAddress: e.target.value });
+                  setManualSenderEdit(true);
+                }}
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sender City</label>
+              <input
+                type="text"
+                value={formData.senderCity}
+                onChange={(e) => {
+                  setFormData({ ...formData, senderCity: e.target.value });
+                  setManualSenderEdit(true);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+              <input
+                type="text"
+                value={formData.senderPostalCode}
+                onChange={(e) => {
+                  setFormData({ ...formData, senderPostalCode: e.target.value });
+                  setManualSenderEdit(true);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            {/* Recipient Information */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-orange-600" />
+                Recipient Information
+              </h3>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Name *</label>
+              <input
+                type="text"
+                value={formData.recipientName}
+                onChange={(e) => setFormData({ ...formData, recipientName: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Phone *</label>
+              <input
+                type="tel"
+                value={formData.recipientPhone}
+                onChange={(e) => setFormData({ ...formData, recipientPhone: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
+              <input
+                type="email"
+                value={formData.recipientEmail}
+                onChange={(e) => setFormData({ ...formData, recipientEmail: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Address *</label>
+              <textarea
+                value={formData.recipientAddress}
+                onChange={(e) => setFormData({ ...formData, recipientAddress: e.target.value })}
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+              <input
+                type="text"
+                value={formData.recipientCity}
+                onChange={(e) => setFormData({ ...formData, recipientCity: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+              <input
+                type="text"
+                value={formData.recipientDistrict}
+                onChange={(e) => setFormData({ ...formData, recipientDistrict: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+              <input
+                type="text"
+                value={formData.recipientPostalCode}
+                onChange={(e) => setFormData({ ...formData, recipientPostalCode: e.target.value })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            {/* Package Details */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Package className="w-5 h-5 text-orange-600" />
+                Package Details
+              </h3>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.weight}
+                onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Number of Pieces *</label>
+              <input
+                type="number"
+                min="1"
+                value={formData.numberOfPieces}
+                onChange={(e) => setFormData({ ...formData, numberOfPieces: parseInt(e.target.value) || 1 })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                placeholder="Describe the package contents"
+              />
+            </div>
+
+            {/* Payment Method */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-orange-600" />
+                Payment Method
+              </h3>
+            </div>
+
+            <div className="col-span-2">
+              <div className="grid grid-cols-3 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('bank')}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    paymentMethod === 'bank'
+                      ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-md'
+                      : 'border-gray-300 hover:border-gray-400 bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-base">Bank Transfer</div>
+                  <div className="text-xs mt-1 text-gray-600">No COD charges</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('online')}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    paymentMethod === 'online'
+                      ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-md'
+                      : 'border-gray-300 hover:border-gray-400 bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-base">Online Transfer</div>
+                  <div className="text-xs mt-1 text-gray-600">No COD charges</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('cod')}
+                  className={`p-4 border-2 rounded-lg text-center transition-all ${
+                    paymentMethod === 'cod'
+                      ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-md'
+                      : 'border-gray-300 hover:border-gray-400 bg-white'
+                  }`}
+                >
+                  <div className="font-semibold text-base">Cash on Delivery</div>
+                  <div className="text-xs mt-1 text-gray-600">Includes total prices</div>
+                </button>
+              </div>
+              {paymentMethod !== 'cod' && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  <strong>Note:</strong> Pricing details will NOT be passed to courier for bank/online payments.
+                </div>
+              )}
+            </div>
+
+            {/* Charges & Payment */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-orange-600" />
+                Charges & Payment <span className="text-xs text-green-600 font-normal">(Auto-calculated, Editable)</span>
+              </h3>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Shipping Charge (Rs) * {selectedProducts.length > 0 && <span className="text-xs text-green-600">(Auto-calculated)</span>}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.shippingCharge}
+                onChange={(e) => setFormData({ ...formData, shippingCharge: parseFloat(e.target.value) || 0 })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Insurance Charge (Rs)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.insuranceCharge}
+                onChange={(e) => setFormData({ ...formData, insuranceCharge: parseFloat(e.target.value) || 0 })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Additional Charges (Rs)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.additionalCharges}
+                onChange={(e) => setFormData({ ...formData, additionalCharges: parseFloat(e.target.value) || 0 })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            {/* Total Summary */}
+            {paymentMethod === 'cod' && selectedProducts.length > 0 && (
+              <div className="col-span-2 p-4 bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-300 rounded-lg shadow-sm">
+                <h4 className="font-semibold text-gray-900 mb-3 text-base">Shipment Summary</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="flex justify-between p-2 bg-white rounded">
+                    <span className="text-gray-700">Product Value:</span>
+                    <span className="font-semibold text-gray-900">Rs. {getTotalProductValue().toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-white rounded">
+                    <span className="text-gray-700">Shipping Charge:</span>
+                    <span className="font-semibold text-gray-900">Rs. {(formData.shippingCharge || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-white rounded">
+                    <span className="text-gray-700">Insurance:</span>
+                    <span className="font-semibold text-gray-900">Rs. {(formData.insuranceCharge || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-white rounded">
+                    <span className="text-gray-700">Additional:</span>
+                    <span className="font-semibold text-gray-900">Rs. {(formData.additionalCharges || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="col-span-2 border-t-2 border-orange-300 pt-3 mt-2 flex justify-between p-3 bg-white rounded-lg shadow">
+                    <span className="font-bold text-gray-900 text-base">COD Amount to Collect:</span>
+                    <span className="font-bold text-orange-600 text-xl">Rs. {getTotalProductValue().toLocaleString()}</span>
+                  </div>
+                  <div className="col-span-2 flex justify-between p-2 bg-white rounded">
+                    <span className="font-medium text-gray-700">Total Charges (Courier):</span>
+                    <span className="font-semibold text-gray-900">Rs. {getTotalCharges().toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                placeholder="Any additional notes for the shipment"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Instructions</label>
+              <textarea
+                value={formData.deliveryInstructions}
+                onChange={(e) => setFormData({ ...formData, deliveryInstructions: e.target.value })}
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
+                placeholder="Special delivery instructions"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium transition-colors shadow-sm"
+            >
+              Create Shipment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
