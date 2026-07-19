@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, UserPlus, Search, Eye, Edit, Trash2, MessageSquare } from 'lucide-react';
 import type { Customer, CustomerStats } from '../../types/customer.types';
 import CustomerStatsCards from '../../components/superadmin/customers/CustomerStatsCards';
@@ -22,7 +22,6 @@ export default function CustomersPage() {
     getCustomers,
     getCustomerStats,
     deleteCustomer,
-    searchCustomers,
     createCustomer,
     updateCustomer,
   } = useCustomer();
@@ -60,12 +59,6 @@ export default function CustomersPage() {
 
   const mapApiCustomersToLocal = (apiCustomers: ApiCustomer[]): Customer[] => {
     return apiCustomers.map((customer) => {
-      console.log('Mapping customer:', {
-        apiId: customer.id,
-        apiIdType: typeof customer.id,
-        customerId: customer.customerId
-      });
-
       return {
         id: customer.id || "",
         customerId: customer.customerId,
@@ -110,12 +103,27 @@ export default function CustomersPage() {
     }
   };
 
-  const loadCustomers = async () => {
+  /**
+   * Load customers with server-side pagination AND server-side search.
+   * The /customers/all endpoint searches ID/name/email/phone/NIC (with smart
+   * phone-number variants), so search results paginate exactly like the
+   * normal list — no 100-result cap, no stale pagination bar.
+   *
+   * `background` = true keeps the page (and the focused search input) mounted
+   * and shows the small spinner inside the search box instead.
+   */
+  const loadCustomers = async (
+    page: number = currentPage,
+    search: string = searchQuery.trim(),
+    background = false
+  ) => {
     try {
-      setLoading(true);
+      if (background) setSearchLoading(true);
+      else setLoading(true);
       const response = await getCustomers({
-        page: currentPage,
+        page,
         limit: itemsPerPage,
+        search: search || undefined,
       });
 
       if (response?.success && response?.data) {
@@ -123,7 +131,7 @@ export default function CustomersPage() {
         const apiCustomers = responseData.customers || [];
         const mappedCustomers = mapApiCustomersToLocal(apiCustomers);
         setFilteredCustomers(mappedCustomers);
-        
+
         if (responseData.pagination) {
           setTotalPages(responseData.pagination.totalPages);
           setTotalCustomers(responseData.pagination.total);
@@ -133,14 +141,14 @@ export default function CustomersPage() {
       toast.error('Failed to load customers');
       console.error(error);
     } finally {
-      setLoading(false);
+      if (background) setSearchLoading(false);
+      else setLoading(false);
     }
   };
 
   const loadStats = async () => {
     try {
       const response = await getCustomerStats();
-        console.log(response)
       if (response?.success && response?.data) {
         const apiStats = response.data as ApiCustomerStats;
       
@@ -160,41 +168,33 @@ export default function CustomersPage() {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      loadCustomers();
-      return;
-    }
-
-    try {
-      setSearchLoading(true);
-      const response = await searchCustomers(searchQuery, 100);
-      
-      if (response?.success && response?.data) {
-        const apiCustomers = Array.isArray(response.data) ? response.data : [];
-        const mappedCustomers = mapApiCustomersToLocal(apiCustomers);
-        setFilteredCustomers(mappedCustomers);
-      }
-    } catch (error) {
-      toast.error('Search failed');
-      console.error(error);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
+  // Load stats ONCE on mount — they don't change when flipping pages,
+  // so reloading them on every page change was wasted aggregate queries.
   useEffect(() => {
-    loadCustomers();
     loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reload the list when pagination changes (search term is included).
+  // Skip the full-page spinner while a search term is active so the
+  // search input stays mounted and focused.
+  useEffect(() => {
+    loadCustomers(currentPage, searchQuery.trim(), !!searchQuery.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, itemsPerPage]);
 
+  // Debounced server-side search — resets to page 1 and reloads.
+  const searchMountedRef = useRef(false);
   useEffect(() => {
+    if (!searchMountedRef.current) {
+      searchMountedRef.current = true; // initial load handled by the effect above
+      return;
+    }
     const delaySearch = setTimeout(() => {
-      if (searchQuery.trim()) {
-        handleSearch();
+      if (currentPage !== 1) {
+        setCurrentPage(1); // pagination effect reloads with the new search term
       } else {
-        loadCustomers();
+        loadCustomers(1, searchQuery.trim(), true);
       }
     }, 300);
 

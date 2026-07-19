@@ -9,6 +9,7 @@ import StockMovementsModal from '../../components/superadmin/inventory/StockMove
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { RefreshCw, History, Download } from 'lucide-react';
 import LocationSelector from '../../components/common/LocationSelector';
+import SearchSelect from '../../components/common/SearchSelect';
 import toast from 'react-hot-toast';
 import DataRawModal from '../../components/common/DataRawModal';
 import { useInventory } from '../../hooks/useInventory';
@@ -134,13 +135,18 @@ export default function InventoryPage() {
         sortBy: 'name',
         sortOrder: 'asc',
       });
-      if (response?.data) {
+      if (response) {
         setCategories(toCategoryOptions(response.data));
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
     }
   }, [categoryHook]);
+
+  const resolveCategoryName = useCallback(
+    (categoryId: string) => categories.find((c) => c.id === categoryId)?.name,
+    [categories],
+  );
 
   // Load branches for dropdowns
   const loadBranches = useCallback(async () => {
@@ -167,19 +173,17 @@ export default function InventoryPage() {
       const filters: Record<string, unknown> = {
         page: currentPage,
         limit: itemsPerPage,
+        exactLocation: true,
       };
 
       if (debouncedSearchQuery) filters.search = debouncedSearchQuery;
       const locationFilter = normalizeLocationFilter(selectedLocation);
       if (locationFilter) filters.locationId = locationFilter;
-      if (selectedCategory) {
-        const categoryName = categories.find((c) => c.id === selectedCategory)?.name;
-        if (categoryName) filters.category = categoryName;
-      }
+      const categoryName = resolveCategoryName(selectedCategory);
+      if (categoryName) filters.category = categoryName;
       if (selectedStatus) filters.status = selectedStatus;
 
       const response = await inventoryHook.getAllInventory(filters);
-      console.log(response);
 
       // Normalize various possible response shapes from the API.
       // The API may return either:
@@ -233,7 +237,7 @@ export default function InventoryPage() {
       hasLoadedRef.current = true;
       setIsInitialLoad(false);
     }
-  }, [inventoryHook, currentPage, itemsPerPage, debouncedSearchQuery, selectedLocation, selectedCategory, selectedStatus, categories]);
+  }, [inventoryHook, currentPage, itemsPerPage, debouncedSearchQuery, selectedLocation, selectedCategory, selectedStatus, resolveCategoryName]);
 
   const loadDashboardStats = useCallback(async () => {
     try {
@@ -313,7 +317,7 @@ export default function InventoryPage() {
   useEffect(() => {
     loadInventory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, debouncedSearchQuery, selectedStatus, selectedLocation, selectedCategory]);
+  }, [currentPage, itemsPerPage, debouncedSearchQuery, selectedStatus, selectedLocation, selectedCategory, resolveCategoryName]);
 
   // Load branches, categories, and initial stats once on mount
   useEffect(() => {
@@ -352,14 +356,12 @@ export default function InventoryPage() {
   const handleExportCSV = useCallback(async () => {
     setExporting(true);
     try {
-      const filters: Record<string, unknown> = { page: 1, limit: 10000 };
+      const filters: Record<string, unknown> = { page: 1, limit: 10000, exactLocation: true };
       if (searchQuery) filters.search = searchQuery;
       const locationFilter = normalizeLocationFilter(selectedLocation);
       if (locationFilter) filters.locationId = locationFilter;
-      if (selectedCategory) {
-        const categoryName = categories.find((c) => c.id === selectedCategory)?.name;
-        if (categoryName) filters.category = categoryName;
-      }
+      const categoryName = resolveCategoryName(selectedCategory);
+      if (categoryName) filters.category = categoryName;
       if (selectedStatus) filters.status = selectedStatus;
 
       const response = await inventoryHook.getAllInventory(filters);
@@ -407,7 +409,7 @@ export default function InventoryPage() {
     } finally {
       setExporting(false);
     }
-  }, [inventoryHook, searchQuery, selectedLocation, selectedCategory, selectedStatus, categories]);
+  }, [inventoryHook, searchQuery, selectedLocation, selectedCategory, selectedStatus, resolveCategoryName]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -636,19 +638,15 @@ export default function InventoryPage() {
           {/* Category Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <select
+            <SearchSelect
+              options={categories.map((cat) => ({ value: cat.id, label: cat.name }))}
               value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
+              onChange={(value) => {
+                setSelectedCategory(value);
                 setCurrentPage(1);
               }}
-              className="form-control w-full"
-            >
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
+              placeholder="All Categories"
+            />
           </div>
           
           {/* Status Filter */}

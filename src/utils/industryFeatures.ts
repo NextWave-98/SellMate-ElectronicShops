@@ -8,6 +8,9 @@ export type IndustryFeature =
   | 'carwash'
   | 'garage'
   | 'tradein'
+  | 'appointment'
+  | 'towing'
+  | 'accounting'
   | 'retail'; // POS / products / inventory / sales
 
 /**
@@ -40,6 +43,12 @@ export function industryAllowsFeature(
       return industryType === 'CAR_WASH';
     case 'garage':
       return industryType === 'GARAGE';
+    case 'appointment':
+      return industryType === 'GARAGE' || industryType === 'CAR_WASH' || industryType === 'VEHICLE_RENTAL';
+    case 'towing':
+      return industryType === 'GARAGE' || industryType === 'VEHICLE_RENTAL';
+    case 'accounting':
+      return true; // available to every industry
     case 'retail':
       return industryType === 'ELECTRONICS' || industryType === 'CLOTHING';
     default:

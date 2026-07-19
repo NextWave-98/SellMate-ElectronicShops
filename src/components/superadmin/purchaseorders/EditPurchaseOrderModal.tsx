@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import usePurchaseOrder from '../../../hooks/usePurchaseOrder';
 import useSupplier from '../../../hooks/useSupplier';
 import useProduct from '../../../hooks/useProduct';
+import AsyncSearchSelect from '../../common/AsyncSearchSelect';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 
@@ -45,8 +46,9 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
   const productHook = useProduct();
   
   const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<Array<{id: string; name: string; supplierCode: string}>>([]);
-  const [products, setProducts] = useState<Array<{id: string; name: string; productCode: string; unitPrice: number; costPrice?: number}>>([]);
+  // Supplier & product are picked via server-backed search selects (no 1000-row prefetch)
+  const [selectedSupplier, setSelectedSupplier] = useState<{id: string; name: string; supplierCode: string} | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<{id: string; name: string; productCode: string; unitPrice: number; costPrice?: number} | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [currentItem, setCurrentItem] = useState<OrderItem>({
     productId: '',
@@ -109,8 +111,22 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
 
   useEffect(() => {
     if (isOpen && purchaseOrder) {
-      loadSuppliers();
-      loadProducts();
+      // Resolve the supplier object so the search-select shows its name.
+      // Prefer the object already on the PO; fall back to fetching by id.
+      if (purchaseOrder.supplier?.id) {
+        setSelectedSupplier({
+          id: purchaseOrder.supplier.id,
+          name: purchaseOrder.supplier.name,
+          supplierCode: purchaseOrder.supplier.supplierCode || '',
+        });
+      } else if (purchaseOrder.supplierId) {
+        supplierHook.getSupplierById(purchaseOrder.supplierId).then((res: any) => {
+          const s = res?.data;
+          if (s?.id) setSelectedSupplier({ id: s.id, name: s.name, supplierCode: s.supplierCode || '' });
+        }).catch(() => {/* non-fatal */});
+      } else {
+        setSelectedSupplier(null);
+      }
       // Populate form from the passed purchaseOrder prop. If the prop is a lightweight
       // object coming from the list (without `items`), fetch full details by id so
       // that `items` are available and displayed in the modal.
@@ -205,31 +221,30 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
     }
   };
 
-  const loadSuppliers = async () => {
-    try {
-      const response = await supplierHook.getAllSuppliers({ limit: 1000, status: 'ACTIVE' });
-      if (response?.data && Array.isArray(response.data)) {
-        setSuppliers(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to load suppliers', error);
-    }
+  // Server-backed searches — top 20 matches instead of 1000-row prefetches
+  const searchSuppliers = async (search: string) => {
+    const response = await supplierHook.getAllSuppliers({
+      search: search || undefined,
+      limit: 20,
+      status: 'ACTIVE',
+    });
+    return (response?.data && Array.isArray(response.data) ? response.data : []) as Array<{id: string; name: string; supplierCode: string}>;
   };
 
-  const loadProducts = async () => {
-    try {
-      const response = await productHook.getAllProducts({ limit: 1000, isActive: true });
-      if (response?.data && Array.isArray(response.data)) {
-        setProducts(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to load products', error);
-    }
+  const searchProducts = async (search: string) => {
+    const response = await productHook.getAllProducts({
+      search: search || undefined,
+      limit: 20,
+      isActive: true,
+    } as any);
+    return (response?.data && Array.isArray(response.data) ? response.data : []) as Array<{id: string; name: string; productCode: string; unitPrice: number; costPrice?: number}>;
   };
 
   const handleClose = () => {
     formik.resetForm();
     setItems([]);
+    setSelectedSupplier(null);
+    setSelectedProduct(null);
     setCurrentItem({
       productId: '',
       quantity: 1,
@@ -240,15 +255,17 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
     onClose();
   };
 
-  const handleProductChange = (productId: string) => {
-    const product = products.find(p => p.id === productId);
+  const handleProductSelect = (product: {id: string; name: string; productCode: string; unitPrice: number; costPrice?: number} | null) => {
+    setSelectedProduct(product);
     if (product) {
       setCurrentItem({
         ...currentItem,
-        productId,
+        productId: product.id,
         productName: product.name,
         unitPrice: toNumber(product.costPrice ?? product.unitPrice, 0),
       });
+    } else {
+      setCurrentItem({ ...currentItem, productId: '', productName: undefined, unitPrice: 0 });
     }
   };
 
@@ -299,6 +316,7 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
         discountPercent: 0,
         taxPercent: 0,
       });
+      setSelectedProduct(null);
       toast.success('Item added successfully');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to add item';
@@ -370,21 +388,21 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Supplier <span className="text-red-500">*</span>
               </label>
-              <select
+              <AsyncSearchSelect<{id: string; name: string; supplierCode: string}>
                 name="supplierId"
-                value={formik.values.supplierId}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
+                value={selectedSupplier}
                 disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 disabled:bg-gray-100"
-              >
-                <option value="">Select Supplier</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name} ({supplier.supplierCode})
-                  </option>
-                ))}
-              </select>
+                onSelect={(s) => {
+                  setSelectedSupplier(s);
+                  formik.setFieldValue('supplierId', s?.id ?? '');
+                }}
+                onBlur={() => formik.setFieldTouched('supplierId', true)}
+                fetcher={searchSuppliers}
+                getOptionLabel={(s) => s.name}
+                getOptionSublabel={(s) => s.supplierCode}
+                getOptionKey={(s) => s.id}
+                placeholder="Search supplier by name or code..."
+              />
               {formik.touched.supplierId && formik.errors.supplierId && (
                 <p className="text-red-500 text-sm mt-1">{formik.errors.supplierId}</p>
               )}
@@ -474,18 +492,15 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-                    <select
-                      value={currentItem.productId}
-                      onChange={(e) => handleProductChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400"
-                    >
-                      <option value="">Select Product</option>
-                      {products.map(product => (
-                        <option key={product.id} value={product.id}>
-                          {product.name} - {product.productCode}
-                        </option>
-                      ))}
-                    </select>
+                    <AsyncSearchSelect<{id: string; name: string; productCode: string; unitPrice: number; costPrice?: number}>
+                      value={selectedProduct}
+                      onSelect={handleProductSelect}
+                      fetcher={searchProducts}
+                      getOptionLabel={(p) => p.name}
+                      getOptionSublabel={(p) => p.productCode}
+                      getOptionKey={(p) => p.id}
+                      placeholder="Search product by name or code..."
+                    />
                   </div>
 
                   <div>
@@ -566,10 +581,9 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {items.map((item, index) => {
-                      const product = products.find(p => p.id === item.productId);
                       return (
                         <tr key={index}>
-                          <td className="px-4 py-3 text-sm">{product?.name || item.productName}</td>
+                          <td className="px-4 py-3 text-sm">{item.productName || item.productId}</td>
                           <td className="px-4 py-3 text-sm text-right">{item.quantity}</td>
                           <td className="px-4 py-3 text-sm text-right">Rs. {item.unitPrice}</td>
                           <td className="px-4 py-3 text-sm text-right">{item.discountPercent}%</td>

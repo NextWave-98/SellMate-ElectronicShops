@@ -70,7 +70,7 @@ import BulkImportCustomerReview, {
   buildImportExclusionPayload,
 } from '../../components/courier/BulkImportCustomerReview';
 
-type DatePeriod = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
+type DatePeriod = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 const getColomboDateString = () => todayColombo();
 
@@ -86,13 +86,15 @@ const formatColomboDateTime = (value?: string | Date | null) => {
   });
 };
 
+/** Stable identity — must not be recreated each render. */
+const ORG_SHIPMENT_SCOPE = { scope: 'org' as const };
+
 const ShipmentTrackingPage = () => {
   const { fetchData } = useFetch('');
   const { getAllLocations } = useLocation();
   const courierVariant = useCourierModalVariant();
   const { user } = useAppSelector((state) => state.auth);
   const showBranchFilter = true;
-  const orgShipmentScope = { scope: 'org' as const };
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [showShipmentModal, setShowShipmentModal] = useState(false);
@@ -193,9 +195,10 @@ const ShipmentTrackingPage = () => {
       filters.period = 'custom';
       if (appliedSearch.customStartDate) filters.startDate = appliedSearch.customStartDate;
       if (appliedSearch.customEndDate) filters.endDate = appliedSearch.customEndDate;
-    } else {
+    } else if (datePeriod !== 'all') {
       filters.period = datePeriod;
     }
+    // datePeriod === 'all' → no period/date constraint: every shipment (paginated)
 
     if (hasUpdated) {
       if (appliedSearch.updatedFrom) filters.updatedAtFrom = appliedSearch.updatedFrom;
@@ -236,6 +239,41 @@ const ShipmentTrackingPage = () => {
       updatedTo: filterUpdatedTo,
       customStartDate,
       customEndDate,
+    });
+    setCurrentPage(1);
+  };
+
+  // "All Shipments": clear EVERY filter (search boxes, ranges, status, branch,
+  // tracking, dates, times) and list all shipments with pagination only.
+  const handleShowAllShipments = () => {
+    // Draft inputs
+    setShipmentSearch('');
+    setShipmentNumberFrom('');
+    setShipmentNumberTo('');
+    setTrackingSearch('');
+    setFilterCreatedFrom('');
+    setFilterCreatedTo('');
+    setFilterUpdatedFrom('');
+    setFilterUpdatedTo('');
+    // Instant filters
+    setStatusFilter('');
+    setBranchFilter('');
+    setTrackingFilter('all');
+    setTimeFrom('');
+    setTimeTo('');
+    setDatePeriod('all');
+    // Applied (committed) search
+    setAppliedSearch({
+      shipmentSearch: '',
+      shipmentNumberFrom: '',
+      shipmentNumberTo: '',
+      trackingSearch: '',
+      createdFrom: '',
+      createdTo: '',
+      updatedFrom: '',
+      updatedTo: '',
+      customStartDate: getColomboDateString(),
+      customEndDate: getColomboDateString(),
     });
     setCurrentPage(1);
   };
@@ -291,7 +329,7 @@ const ShipmentTrackingPage = () => {
   // Fetch from API when a live filter, the applied search, or the page changes.
   // Draft text/date edits are held until the user clicks "Search".
   useEffect(() => {
-    fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+    fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
   }, [statusFilter, datePeriod, appliedSearch, timeFrom, timeTo, trackingFilter, currentPage, pageSize, branchFilter, buildShipmentFilters]);
 
   useEffect(() => {
@@ -335,7 +373,7 @@ const ShipmentTrackingPage = () => {
       if (res?.success || res === null || res === undefined) {
         toast.success('Shipment deleted successfully');
         setDeleteConfirm(null);
-        fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+        fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
       } else {
         toast.error(res?.message || 'Failed to delete shipment');
       }
@@ -502,7 +540,7 @@ const ShipmentTrackingPage = () => {
         ].filter(Boolean);
         toast.success(`Fardar sync: ${parts.join(', ') || 'done'}`);
         setSelectedIds(new Set());
-        fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+        fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
       } else {
         toast.error(response?.message || 'Fardar sync failed');
       }
@@ -531,7 +569,7 @@ const ShipmentTrackingPage = () => {
         ].filter(Boolean);
         toast.success(parts.join(', ') || 'Location sync done');
         setSelectedIds(new Set());
-        fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+        fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
       } else {
         toast.error(response?.message || 'Failed to sync sale location');
       }
@@ -927,6 +965,18 @@ const ShipmentTrackingPage = () => {
           </div>
 
           <div className="flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={handleShowAllShipments}
+              title="Clear every filter and show all shipments"
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                datePeriod === 'all'
+                  ? 'bg-orange-500 text-white shadow-[0_2px_8px_0_rgba(249,115,22,0.35)]'
+                  : 'bg-white/40 border border-orange-300/60 text-orange-600 hover:bg-orange-50'
+              }`}
+            >
+              All Shipments
+            </button>
             {([
               { value: 'today' as DatePeriod, label: 'Today' },
               { value: 'yesterday' as DatePeriod, label: 'Yesterday' },
@@ -1540,7 +1590,7 @@ const ShipmentTrackingPage = () => {
             try {
               await updateShipmentStatus(selectedShipment.id, status, remarks);
               setShowStatusModal(false);
-              fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+              fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
             } catch (error) {
               console.error('Error updating status:', error);
             }
@@ -1552,7 +1602,7 @@ const ShipmentTrackingPage = () => {
         <ScanBulkStatusModal
           courierSettings={courierSettings}
           onClose={() => setShowScanBulkModal(false)}
-          onComplete={() => fetchCourierShipments(buildShipmentFilters(), orgShipmentScope)}
+          onComplete={() => fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE)}
         />
       )}
 
@@ -1562,7 +1612,7 @@ const ShipmentTrackingPage = () => {
           onClose={() => setShowCsvModal(false)}
           onImported={() => {
             setShowCsvModal(false);
-            fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+            fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
           }}
           fetchData={fetchData}
         />
@@ -1573,7 +1623,7 @@ const ShipmentTrackingPage = () => {
           onClose={() => setShowExcelModal(false)}
           onImported={() => {
             setShowExcelModal(false);
-            fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+            fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
           }}
           fetchData={fetchData}
         />

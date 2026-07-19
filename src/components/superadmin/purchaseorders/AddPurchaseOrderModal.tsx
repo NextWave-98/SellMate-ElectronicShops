@@ -5,6 +5,7 @@ import usePurchaseOrder from '../../../hooks/usePurchaseOrder';
 import useSupplier from '../../../hooks/useSupplier';
 import useProduct from '../../../hooks/useProduct';
 import QuickProductModal, { type QuickProduct } from './QuickProductModal';
+import AsyncSearchSelect from '../../common/AsyncSearchSelect';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
@@ -47,7 +48,8 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
   const productHook = useProduct();
   
   const [loading, setLoading] = useState(false);
-  const [suppliers, setSuppliers] = useState<Array<{id: string; name: string; supplierCode: string}>>([]);
+  // Supplier is picked via a server-backed search select (no 1000-row prefetch)
+  const [selectedSupplier, setSelectedSupplier] = useState<{id: string; name: string; supplierCode: string} | null>(null);
   const [products, setProducts] = useState<Array<{id: string; name: string; productCode: string; unitPrice: number; costPrice?: number}>>([]);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [productSearch, setProductSearch] = useState('');
@@ -122,32 +124,44 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
     if (isOpen) {
       // set the supplierId in the form to the provided initial value (or empty string)
       formik.setFieldValue('supplierId', initialSupplierId || '');
+      if (initialSupplierId) {
+        // Resolve the supplier object so the search-select can display its name
+        supplierHook.getSupplierById(initialSupplierId).then((res: any) => {
+          const s = res?.data;
+          if (s?.id) setSelectedSupplier({ id: s.id, name: s.name, supplierCode: s.supplierCode || '' });
+        }).catch(() => {/* non-fatal — user can still search manually */});
+      } else {
+        setSelectedSupplier(null);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSupplierId, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
-      loadSuppliers();
-      loadProducts();
+      loadProducts('');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const loadSuppliers = async () => {
-    try {
-      const response = await supplierHook.getAllSuppliers({ limit: 1000, status: 'ACTIVE' });
-      if (response?.data && Array.isArray(response.data)) {
-        setSuppliers(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to load suppliers', error);
-    }
+  // Server-backed supplier search — top 20 matches instead of a 1000-row prefetch
+  const searchSuppliers = async (search: string) => {
+    const response = await supplierHook.getAllSuppliers({
+      search: search || undefined,
+      limit: 20,
+      status: 'ACTIVE',
+    });
+    return (response?.data && Array.isArray(response.data) ? response.data : []) as Array<{id: string; name: string; supplierCode: string}>;
   };
 
-  const loadProducts = async () => {
+  // Server-backed product search — top 20 matches instead of a 1000-row prefetch
+  const loadProducts = async (search: string) => {
     try {
-      const response = await productHook.getAllProducts({ limit: 1000, isActive: true });
+      const response = await productHook.getAllProducts({
+        search: search || undefined,
+        limit: 20,
+        isActive: true,
+      } as any);
       if (response?.data && Array.isArray(response.data)) {
         setProducts(response.data);
       }
@@ -156,10 +170,26 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
     }
   };
 
+  // Debounced server search while the product dropdown is open.
+  // Skipped when the box shows the picked product's label ("Name — CODE").
+  const productSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!isOpen || !showProductDropdown) return;
+    if (productSearchDebounceRef.current) clearTimeout(productSearchDebounceRef.current);
+    productSearchDebounceRef.current = setTimeout(() => {
+      loadProducts(productSearch.trim());
+    }, 300);
+    return () => {
+      if (productSearchDebounceRef.current) clearTimeout(productSearchDebounceRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSearch, showProductDropdown, isOpen]);
+
   const handleClose = () => {
     formik.resetForm();
     setItems([]);
     setProductSearch('');
+    setSelectedSupplier(null);
     setShowProductDropdown(false);
     setCurrentItem({
       productId: '',
@@ -320,20 +350,20 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Supplier <span className="text-red-500">*</span>
               </label>
-              <select
+              <AsyncSearchSelect<{id: string; name: string; supplierCode: string}>
                 name="supplierId"
-                value={formik.values.supplierId}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400"
-              >
-                <option value="">Select Supplier</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name} ({supplier.supplierCode})
-                  </option>
-                ))}
-              </select>
+                value={selectedSupplier}
+                onSelect={(s) => {
+                  setSelectedSupplier(s);
+                  formik.setFieldValue('supplierId', s?.id ?? '');
+                }}
+                onBlur={() => formik.setFieldTouched('supplierId', true)}
+                fetcher={searchSuppliers}
+                getOptionLabel={(s) => s.name}
+                getOptionSublabel={(s) => s.supplierCode}
+                getOptionKey={(s) => s.id}
+                placeholder="Search supplier by name or code..."
+              />
               {formik.touched.supplierId && formik.errors.supplierId && (
                 <p className="text-red-500 text-sm mt-1">{formik.errors.supplierId}</p>
               )}

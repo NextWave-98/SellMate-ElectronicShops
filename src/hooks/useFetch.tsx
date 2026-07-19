@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // useFetch.tsx
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import alert from '../utils/alert';
 import { useLocation } from 'react-router-dom';
@@ -54,6 +54,8 @@ interface FetchOptions {
   noRedirect?: boolean;
 }
 
+const EMPTY_FETCH_OPTIONS: FetchOptions = {};
+
 interface UseFetchReturn<T = unknown> {
   data: ApiResponse<T> | null;
   loading: boolean;
@@ -66,13 +68,16 @@ interface UseFetchReturn<T = unknown> {
 
 const useFetch = <T = unknown>(
   initialEndpoint = '',
-  options: FetchOptions = {}
+  options: FetchOptions = EMPTY_FETCH_OPTIONS
 ): UseFetchReturn<T> => {
   const [data, setData] = useState<ApiResponse<T> | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [responseCode, setResponseCode] = useState<number | null>(null);
   const location = useLocation();
+  // Avoid options identity churn regenerating fetchData every render
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   
   const reset = useCallback(() => {
     setData(null);
@@ -159,7 +164,7 @@ const useFetch = <T = unknown>(
       headers: optionHeaders,
       responseType = 'json',
       noRedirect = false,
-    } = { ...options, ...overrideOptions };
+    } = { ...optionsRef.current, ...overrideOptions };
 
     // Auto-get accessToken from sessionStorage if not provided
     const accessToken = providedToken || getAccessToken() || undefined;
@@ -405,7 +410,7 @@ const useFetch = <T = unknown>(
     } finally {
       setLoading(false);
     }
-  }, [initialEndpoint, options, handleError, location.pathname]);
+  }, [initialEndpoint, handleError, location.pathname]);
 
   const execute = useCallback(
     (endpoint: string, overrideOptions: FetchOptions = {}) =>

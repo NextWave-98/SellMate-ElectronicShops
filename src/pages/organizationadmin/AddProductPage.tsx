@@ -26,7 +26,9 @@ import {
 import { useProduct } from '../../hooks/useProduct';
 import useBarcode from '../../hooks/useBarcode';
 import BarcodeScannerModal from '../../components/common/BarcodeScannerModal';
+import AsyncSearchSelect from '../../components/common/AsyncSearchSelect';
 import { useProductCategory } from '../../hooks/useProductCategory';
+import { toCategoryOptions } from '../../utils/productListFilters';
 import { useProductVariantType } from '../../hooks/useProductVariantType';
 import { useLocation } from '../../hooks/useLocation';
 import type { ProductVariantType } from '../../hooks/useProductVariantType';
@@ -157,7 +159,7 @@ export default function AddProductPage() {
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   // ── Reference data ──────────────────────────────────────────────────────────
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [variantTypes, setVariantTypes] = useState<ProductVariantType[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
 
@@ -213,12 +215,10 @@ export default function AddProductPage() {
   // ── Load reference data ──────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
-      const [catRes, vtRes, locRes] = await Promise.all([
-        categoryHook.getAllCategories({ isActive: true }),
+      const [vtRes, locRes] = await Promise.all([
         variantTypeHook.getAllVariantTypes({ isActive: true }),
         locationHook.getAllLocations(),
       ]);
-      if (catRes?.data) setCategories(Array.isArray(catRes.data) ? (catRes.data as Category[]) : []);
       if (vtRes?.data)  setVariantTypes(Array.isArray(vtRes.data) ? (vtRes.data as ProductVariantType[]) : []);
       if (locRes?.data) {
         const raw = locRes.data as unknown;
@@ -241,6 +241,17 @@ export default function AddProductPage() {
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const selectedTypes = variantTypes.filter(vt => selectedTypeIds.includes(vt.id));
+
+  const searchCategories = useCallback(async (search: string) => {
+    const response = await categoryHook.getAllCategories({
+      search: search || undefined,
+      limit: 20,
+      isActive: true,
+      sortBy: 'name',
+      sortOrder: 'asc',
+    });
+    return toCategoryOptions(response?.data);
+  }, [categoryHook]);
 
   // ─── Section helpers ─────────────────────────────────────────────────────────
   const toggle = (id: SectionId) =>
@@ -768,16 +779,18 @@ export default function AddProductPage() {
                 </Field>
               </div>
               <Field label="Category" required error={errors.categoryId}>
-                <select
-                  value={categoryId}
-                  onChange={e => setCategoryId(e.target.value)}
-                  className={inputCls + (errors.categoryId ? ' border-red-400' : '')}
-                >
-                  <option value="">Select category</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <AsyncSearchSelect<Category>
+                  value={selectedCategory}
+                  onSelect={(cat) => {
+                    setSelectedCategory(cat);
+                    setCategoryId(cat?.id ?? '');
+                  }}
+                  fetcher={searchCategories}
+                  getOptionLabel={(c) => c.name}
+                  getOptionKey={(c) => c.id}
+                  placeholder="Type to search category..."
+                  inputClassName={errors.categoryId ? 'border-red-400' : ''}
+                />
               </Field>
               <Field label="Brand">
                 <input
@@ -1523,7 +1536,7 @@ export default function AddProductPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-500">Category</span>
                   <span className="font-medium text-gray-800 text-right max-w-35 truncate">
-                    {categories.find(c => c.id === categoryId)?.name || '—'}
+                    {selectedCategory?.name || '—'}
                   </span>
                 </div>
               )}

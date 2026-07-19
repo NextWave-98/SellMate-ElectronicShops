@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { JobSheet, JobSheetStatus, JobPriority } from '../../types/jobsheet.types';
@@ -88,6 +88,9 @@ export default function JobSheetsPage() {
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  // Debounced copy of searchQuery — API calls react to THIS, so typing doesn't
+  // fire a request (plus a stats request) on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [selectedStatus, setSelectedStatus] = useState<JobSheetStatus | ''>(searchParams.get('status') as JobSheetStatus || '');
   const [selectedPriority, setSelectedPriority] = useState<JobPriority | ''>(searchParams.get('priority') as JobPriority || '');
   const [dateFilter, setDateFilter] = useState<DateFilter>(searchParams.get('dateFilter') as DateFilter || 'today');
@@ -112,9 +115,9 @@ export default function JobSheetsPage() {
         limit: actualLimit,
       };
 
-      // Add search filter if present
-      if (searchQuery) {
-        queryParams.search = searchQuery;
+      // Add search filter if present (debounced — server-side search)
+      if (debouncedSearch) {
+        queryParams.search = debouncedSearch;
       }
 
       // Add status filter if present
@@ -249,7 +252,7 @@ export default function JobSheetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, itemsPerPage, totalPages, dateFilter, startDate, endDate, searchQuery, selectedStatus, selectedPriority, myJobsOnly, fetchJobSheets]);
+  }, [currentPage, itemsPerPage, totalPages, dateFilter, startDate, endDate, debouncedSearch, selectedStatus, selectedPriority, myJobsOnly, fetchJobSheets]);
 
   const updateURLParams = useCallback(() => {
     const params = new URLSearchParams();
@@ -274,19 +277,41 @@ export default function JobSheetsPage() {
     updateURLParams();
   }, [updateURLParams]);
 
-  // Fetch initial data
+  // Fetch initial data (list + stats are loaded by the effects below, which
+  // also run on mount — calling them here too would double-load everything)
   useEffect(() => {
-    loadJobSheets();
-    loadStats();
     loadSummary();
   }, []);
 
-  // Reload data when filter states change
+  // Debounce the search input (350ms) so we don't hit the API per keystroke
   useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filters change
-    loadJobSheets(1, itemsPerPage); // Load first page with current filters
-    loadStats(); // Reload stats with new filters
-  }, [searchQuery, selectedStatus, selectedPriority, dateFilter, startDate, endDate, myJobsOnly]);
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Reload the LIST when filters change (search is debounced).
+  // Skipped on mount — the pagination effect below does the initial load and
+  // honours the page number restored from the URL.
+  const filtersMountedRef = useRef(false);
+  useEffect(() => {
+    if (!filtersMountedRef.current) {
+      filtersMountedRef.current = true;
+      return;
+    }
+    // Reset to first page; if we're already on page 1 the pagination effect
+    // won't re-fire, so load explicitly. (Avoids double API calls either way.)
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      loadJobSheets(1, itemsPerPage);
+    }
+  }, [debouncedSearch, selectedStatus, selectedPriority, dateFilter, startDate, endDate, myJobsOnly]);
+
+  // Reload STATS only when the date scope changes — stats ignore text search,
+  // so reloading them per keystroke was pure waste (2 aggregate calls per key).
+  useEffect(() => {
+    loadStats();
+  }, [dateFilter, startDate, endDate]);
 
   // Reload data when pagination changes
   useEffect(() => {
@@ -409,54 +434,10 @@ export default function JobSheetsPage() {
   };
 
 
-  const applyFilters = () => {
-    // Ensure we always work with an array. API responses sometimes wrap data.
-    const source: JobSheet[] = Array.isArray(jobSheets)
-      ? jobSheets
-      : Array.isArray((jobSheets as any)?.data)
-      ? (jobSheets as any).data
-      : [];
-
-    let filtered = [...source];
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((job) => {
-        return (
-          String(job.jobNumber || '').toLowerCase().includes(query) ||
-          String(job.customerName || '').toLowerCase().includes(query) ||
-          String(job.customerPhone || '').includes(query) ||
-          String(job.deviceBrand || '').toLowerCase().includes(query) ||
-          String(job.deviceModel || '').toLowerCase().includes(query) ||
-          String(job.location?.name || '').toLowerCase().includes(query) ||
-          String(job.location?.locationCode || '').toLowerCase().includes(query)
-        );
-      });
-    }
-
-    // Status filter
-    if (selectedStatus) {
-      filtered = filtered.filter((job) => job.status === selectedStatus);
-    }
-
-    // Priority filter
-    if (selectedPriority) {
-      filtered = filtered.filter((job) => job.priority === selectedPriority);
-    }
-
-    // Date range filter - only apply frontend filtering for custom range
-    if (dateFilter === 'custom') {
-      if (startDate) {
-        filtered = filtered.filter((job) => (job.receivedDate || '') >= startDate);
-      }
-      if (endDate) {
-        filtered = filtered.filter((job) => (job.receivedDate || '') <= endDate);
-      }
-    }
-
-    setFilteredJobSheets(filtered);
-  };
+  // NOTE: search/status/priority/date filtering is done SERVER-SIDE in
+  // loadJobSheets. The old client-side applyFilters() was dead code (never
+  // called, referenced an undefined setter) and re-filtering the current page
+  // would hide rows the server matched on fields the client doesn't check.
 
   const handleRefresh = async () => {
     setRefreshing(true);

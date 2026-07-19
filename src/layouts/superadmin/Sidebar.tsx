@@ -25,7 +25,7 @@ import {
   Shield,
   FolderTree,
   PackagePlus,
-  Truck,
+  // Truck,
   Key,
   CreditCard,
   MessageSquare,
@@ -36,12 +36,26 @@ import {
   QrCode,
   Settings2,
   Clock,
+  CalendarDays,
+  Truck,
+  Globe,
+  ListChecks,
+  GraduationCap,
   Banknote,
   BookOpen,
   Facebook,
   Car,
   Droplets,
   Smartphone,
+  Fuel,
+  ShieldAlert,
+  Tags,
+  FileText,
+  BellRing,
+  BarChart3,
+  Newspaper,
+  Star,
+  CircleHelp,
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { SUPERADMIN_SIDEBAR_PERMISSIONS, type SidebarPermissionConfig } from '../../config/permissions.config';
@@ -82,6 +96,7 @@ const menuItems: MenuItem[] = [
   { id: 'shops',     label: 'Shops',          path: '/superadmin/shops/management',     icon: Store,        section: 'people' },
   { id: 'staff',      label: 'Staff',           path: '/superadmin/staff/management',  icon: Users,        section: 'people' },
   { id: 'attendance', label: 'Attendance',      path: '/superadmin/attendance',        icon: Clock,        section: 'people' },
+  { id: 'staff-skills', label: 'Technician Skills', path: '/superadmin/staff-skills',   icon: GraduationCap, section: 'people' },
   { id: 'payroll',    label: 'Payroll',         path: '/superadmin/payroll',           icon: Banknote,     section: 'people' },
   { id: 'roles',     label: 'Role Management', path: '/superadmin/roles/management',  icon: Shield,       section: 'people' },
   { id: 'customer',  label: 'Customers',      path: '/superadmin/customers/management', icon: Contact,      section: 'people' },
@@ -100,10 +115,62 @@ const menuItems: MenuItem[] = [
   { id: 'returns',      label: 'Returns',       path: '/superadmin/returns',             icon: PackageCheck,section: 'operations' },
 
   // ── New verticals (industry-gated) ──────────────────
-  { id: 'rental',    label: 'Vehicle Rental',     path: '/superadmin/rental',    icon: Car,        section: 'operations' },
-  { id: 'carwash',   label: 'Car Wash',           path: '/superadmin/carwash',   icon: Droplets,   section: 'operations' },
-  { id: 'garage',    label: 'Garage / Workshop',  path: '/superadmin/garage',    icon: Wrench,     section: 'operations' },
-  { id: 'trade-ins', label: 'Trade-In / Buyback', path: '/superadmin/trade-ins', icon: Smartphone, section: 'operations' },
+  {
+    id: 'rental', label: 'Vehicle Rental', path: '/superadmin/rental', icon: Car, section: 'operations',
+    children: [
+      { id: 'rental-dashboard',   label: 'Dashboard',        path: '/superadmin/rental',             icon: LayoutDashboard },
+      { id: 'rental-fleet',       label: 'Fleet',            path: '/superadmin/rental/fleet',       icon: Car },
+      { id: 'rental-bookings',    label: 'Bookings',         path: '/superadmin/rental/bookings',    icon: CalendarDays },
+      { id: 'rental-maintenance', label: 'Maintenance',      path: '/superadmin/rental/maintenance', icon: Wrench },
+      { id: 'rental-fuel',        label: 'Fuel Logs',        path: '/superadmin/rental/fuel',        icon: Fuel },
+      { id: 'rental-claims',      label: 'Insurance Claims', path: '/superadmin/rental/claims',      icon: ShieldAlert },
+      { id: 'rental-pricing',     label: 'Pricing & Coupons', path: '/superadmin/rental/pricing',    icon: Tags },
+    ],
+  },
+  {
+    id: 'carwash', label: 'Car Wash', path: '/superadmin/carwash', icon: Droplets, section: 'operations',
+    children: [
+      { id: 'carwash-queue',       label: 'Queue',             path: '/superadmin/carwash',             icon: ListChecks },
+      { id: 'carwash-services',    label: 'Services',          path: '/superadmin/carwash/services',    icon: Droplets },
+      { id: 'carwash-memberships', label: 'Memberships',       path: '/superadmin/carwash/memberships', icon: CreditCard },
+      { id: 'carwash-performance', label: 'Staff Performance', path: '/superadmin/carwash/performance', icon: Users },
+    ],
+  },
+  {
+    id: 'garage', label: 'Garage / Workshop', path: '/superadmin/garage', icon: Wrench, section: 'operations',
+    children: [
+      { id: 'garage-estimates', label: 'Estimates',         path: '/superadmin/garage',           icon: FileText },
+      { id: 'garage-vehicles',  label: 'Customer Vehicles', path: '/superadmin/garage/vehicles',  icon: Car },
+      { id: 'garage-reminders', label: 'Reminders',         path: '/superadmin/garage/reminders', icon: BellRing },
+    ],
+  },
+  {
+    id: 'trade-ins', label: 'Trade-In / Buyback', path: '/superadmin/trade-ins', icon: Smartphone, section: 'operations',
+    children: [
+      { id: 'trade-ins-list',  label: 'Trade-Ins',   path: '/superadmin/trade-ins',       icon: Smartphone },
+      { id: 'trade-ins-rules', label: 'Price Rules', path: '/superadmin/trade-ins/rules', icon: Tags },
+    ],
+  },
+  { id: 'appointments', label: 'Appointments', path: '/superadmin/appointments', icon: CalendarDays, section: 'operations' },
+  { id: 'towing', label: 'Towing / Roadside', path: '/superadmin/towing', icon: Truck, section: 'operations' },
+  {
+    id: 'accounting', label: 'Accounting', path: '/superadmin/accounting', icon: BookOpen, section: 'operations',
+    children: [
+      { id: 'accounting-accounts', label: 'Chart of Accounts', path: '/superadmin/accounting',          icon: FileText },
+      { id: 'accounting-journals', label: 'Journal Entries',   path: '/superadmin/accounting/journals', icon: BookOpen },
+      { id: 'accounting-reports',  label: 'Reports',           path: '/superadmin/accounting/reports',  icon: BarChart3 },
+    ],
+  },
+  {
+    id: 'website', label: 'Website / CMS', path: '/superadmin/website', icon: Globe, section: 'operations',
+    children: [
+      { id: 'website-settings',     label: 'Site Settings',      path: '/superadmin/website',              icon: Settings2 },
+      { id: 'website-pages',        label: 'Pages',              path: '/superadmin/website/pages',        icon: FileText },
+      { id: 'website-blog',         label: 'Blog / Promotions',  path: '/superadmin/website/blog',         icon: Newspaper },
+      { id: 'website-testimonials', label: 'Testimonials',       path: '/superadmin/website/testimonials', icon: Star },
+    ],
+  },
+  { id: 'crm-tasks', label: 'CRM Tasks', path: '/superadmin/crm-tasks', icon: ListChecks, section: 'operations' },
 
   // ── Inventory ───────────────────────────────────────
   {
@@ -161,7 +228,7 @@ const menuItems: MenuItem[] = [
   },
   { id: 'pos-settings', label: 'POS Settings', path: '/superadmin/pos/settings', icon: Settings2, section: 'admin' },
   { id: 'subscription-checkout', label: 'Subscription Checkout', path: '/superadmin/subscription/checkout', icon: CreditCard, section: 'admin' },
-
+  { id: 'system-usage', label: 'System Usage', path: '/superadmin/system-usage', icon: CircleHelp, section: 'admin' },
 ];
 
 interface SidebarProps {
@@ -204,6 +271,8 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
         if (item.id === 'carwash' && !industryAllowsFeature(industryType, 'carwash')) return null;
         if (item.id === 'garage' && !industryAllowsFeature(industryType, 'garage')) return null;
         if (item.id === 'trade-ins' && !industryAllowsFeature(industryType, 'tradein')) return null;
+        if (item.id === 'appointments' && !industryAllowsFeature(industryType, 'appointment')) return null;
+        if (item.id === 'towing' && !industryAllowsFeature(industryType, 'towing')) return null;
         // Retail-only modules hidden for rental / car wash / garage orgs
         const retailOnlyIds = [
           'quick-pos', 'advance-payments', 'sales', 'orders', 'sale-jobs', 'installments', 'returns',

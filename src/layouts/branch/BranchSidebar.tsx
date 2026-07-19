@@ -22,6 +22,9 @@ import {
   Wallet,
   ShoppingBag,
   Clock,
+  CalendarDays,
+  Globe,
+  ListChecks,
   Wrench,
   X,
   BaggageClaim,
@@ -29,6 +32,7 @@ import {
   Car,
   Droplets,
   Smartphone,
+  CircleHelp,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -92,6 +96,12 @@ const BranchSidebar = ({
     { id: 'carwash',   name: 'Car Wash',           path: `/${branchCode}/carwash`,   icon: Droplets },
     { id: 'garage',    name: 'Garage',             path: `/${branchCode}/garage`,    icon: Wrench },
     { id: 'trade-ins', name: 'Trade-In / Buyback', path: `/${branchCode}/trade-ins`, icon: Smartphone },
+    { id: 'appointments', name: 'Appointments', path: `/${branchCode}/appointments`, icon: CalendarDays },
+    { id: 'towing', name: 'Towing / Roadside', path: `/${branchCode}/towing`, icon: Truck },
+    { id: 'accounting', name: 'Accounting', path: `/${branchCode}/accounting`, icon: BookOpen },
+    { id: 'website', name: 'Website / CMS', path: `/${branchCode}/website`, icon: Globe },
+    { id: 'crm-tasks', name: 'CRM Tasks', path: `/${branchCode}/crm-tasks`, icon: ListChecks },
+    { id: 'system-usage', name: 'System Usage', path: `/${branchCode}/system-usage`, icon: CircleHelp },
   ];
 
   const menuItems = useMemo(() => {
@@ -120,6 +130,8 @@ const BranchSidebar = ({
       if (item.id === 'carwash' && !industryAllowsFeature(industryType, 'carwash')) return false;
       if (item.id === 'garage' && !industryAllowsFeature(industryType, 'garage')) return false;
       if (item.id === 'trade-ins' && !industryAllowsFeature(industryType, 'tradein')) return false;
+      if (item.id === 'appointments' && !industryAllowsFeature(industryType, 'appointment')) return false;
+      if (item.id === 'towing' && !industryAllowsFeature(industryType, 'towing')) return false;
       // Retail-only menus hidden for rental / car wash / garage orgs
       const branchRetailOnlyIds = [
         'pos', 'quick-pos', 'advance-payments', 'sales', 'orders', 'courier', 'products',

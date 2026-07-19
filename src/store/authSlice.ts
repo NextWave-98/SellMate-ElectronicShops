@@ -51,7 +51,7 @@ export const loginAsync = createAsyncThunk(
   'auth/login',
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      const response = await api.post('/auth/login', credentials);
+      const response = await api.post('/auth/login', { ...credentials, clientApp: 'sellmate' });
       
       if (response.data.success && response.data.data) {
         const { user } = response.data.data;
@@ -118,7 +118,7 @@ export const qrLoginAsync = createAsyncThunk(
   'auth/qrLogin',
   async (payload: { qrToken: string }, { rejectWithValue }) => {
     try {
-      const response = await api.post('/auth/qr-login', payload);
+      const response = await api.post('/auth/qr-login', { ...payload, clientApp: 'sellmate' });
 
       if (response.data.success && response.data.data) {
         const { user } = response.data.data;

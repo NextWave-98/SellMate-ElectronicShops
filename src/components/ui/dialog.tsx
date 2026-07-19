@@ -86,7 +86,9 @@ function DialogContent({
           onInteractOutside?.(event)
         }}
         className={cn(
-          "fixed z-30 top-[50%] left-[50%] glass-modal-panel   flex w-full md:min-w-3xl max-w-7xl max-h-[min(90vh,100dvh)] translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-y-auto rounded-2xl border border-white/40 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 p-6 shadow-[0_20px_60px_0_rgba(15,23,42,0.2)] ring-1 ring-inset ring-white/50 duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "fixed z-30 top-[50%] left-[50%] glass-modal-panel flex w-full md:min-w-3xl max-w-7xl max-h-[min(90vh,100dvh)] translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden rounded-2xl border border-white/40 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 p-0 shadow-[0_20px_60px_0_rgba(15,23,42,0.2)] ring-1 ring-inset ring-white/50 duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          // Legacy dialogs without DialogBody: middle children scroll + get padding
+          "[&>:not([data-slot])]:min-h-0 [&>:not([data-slot])]:flex-1 [&>:not([data-slot])]:overflow-y-auto [&>:not([data-slot])]:overscroll-contain [&>:not([data-slot])]:px-6 [&>:not([data-slot])]:py-4",
           className
         )}
         {...props}
@@ -111,7 +113,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-header"
       className={cn(
-        " z-50 shrink-0 bg-white/70 backdrop-blur-2xl rounded-2xl px-6 md:mx-6 md:mt-8 md:mb-4 pt-6 pb-4 overflow-hidden sticky top-0",
+        "z-50 shrink-0 border-b border-black/5 bg-white/80 backdrop-blur-2xl px-6 pt-6 pb-4",
         "flex flex-col gap-2 text-center sm:text-left",
         className
       )}
@@ -125,7 +127,7 @@ function DialogBody({ className, children, ...props }: React.ComponentProps<"div
     <div
       data-slot="dialog-body"
       className={cn(
-        "glass-modal-scroll min-h-0 flex-1 px-6 py-0",
+        "glass-modal-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4",
         className
       )}
       {...props}
@@ -147,7 +149,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        " z-20 shrink-0 bg-transparent px-6 pt-4 pb-6 overflow-hidden sticky bottom-0",
+        "z-20 shrink-0 border-t border-black/5 bg-white/80 backdrop-blur-2xl px-6 pt-4 pb-5",
         "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
         className
       )}

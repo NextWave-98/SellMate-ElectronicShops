@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import useFetch from './useFetch';
 
 export type WashJobStatus = 'WAITING' | 'IN_BAY' | 'DRYING' | 'READY' | 'DELIVERED' | 'CANCELLED';
@@ -145,14 +145,24 @@ export const useCarWash = () => {
     [fetchData]
   );
 
-  return {
-    getStats, getStaffPerformance, lookupPlate,
-    getServices, createService, updateService,
-    getBays, createBay,
-    getJobs, createJob, updateJob,
-    getPlans, createPlan, updatePlan,
-    getMemberships, sellMembership,
-  };
+  return useMemo(
+    () => ({
+      getStats, getStaffPerformance, lookupPlate,
+      getServices, createService, updateService,
+      getBays, createBay,
+      getJobs, createJob, updateJob,
+      getPlans, createPlan, updatePlan,
+      getMemberships, sellMembership,
+    }),
+    [
+      getStats, getStaffPerformance, lookupPlate,
+      getServices, createService, updateService,
+      getBays, createBay,
+      getJobs, createJob, updateJob,
+      getPlans, createPlan, updatePlan,
+      getMemberships, sellMembership,
+    ]
+  );
 };
 
 export default useCarWash;

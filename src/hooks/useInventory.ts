@@ -73,6 +73,8 @@ interface InventoryFilters {
   sortOrder?: 'asc' | 'desc';
   includeDiscount?: boolean;
   includeServices?: boolean;
+  /** When true, filter by the exact locationId (inventory monitor). Skips centralized-inventory remapping. */
+  exactLocation?: boolean;
 }
 
 interface InventoryStats {

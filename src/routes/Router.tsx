@@ -36,13 +36,46 @@ import OrganizationsPage from '../pages/organizationadmin/OrganizationsPage';
 import SubscriptionsPage from '../pages/organizationadmin/SubscriptionsPage';
 import SubscriptionCheckoutPage from '../pages/organizationadmin/SubscriptionCheckoutPage';
 import PlatformRoleManagementPage from '../pages/platformcontroladmin/PlatformRoleManagementPage';
-// New vertical pages: Vehicle Rental, Car Wash, Garage, Trade-In
-import RentalPage from '../pages/organizationadmin/RentalPage';
-import CarWashPage from '../pages/organizationadmin/CarWashPage';
-import GaragePage from '../pages/organizationadmin/GaragePage';
-import TradeInsPage from '../pages/organizationadmin/TradeInsPage';
+// New vertical pages: Vehicle Rental, Car Wash, Garage, Trade-In (split into sub-pages)
+import RentalLayout from '../pages/organizationadmin/rental/RentalLayout';
+import RentalDashboardPage from '../pages/organizationadmin/rental/RentalDashboardPage';
+import RentalFleetSubPage from '../pages/organizationadmin/rental/RentalFleetPage';
+import VehicleFormPage from '../pages/organizationadmin/rental/VehicleFormPage';
+import RentalBookingsPage from '../pages/organizationadmin/rental/RentalBookingsPage';
+import RentalMaintenancePage from '../pages/organizationadmin/rental/RentalMaintenancePage';
+import RentalFuelPage from '../pages/organizationadmin/rental/RentalFuelPage';
+import RentalClaimsPage from '../pages/organizationadmin/rental/RentalClaimsPage';
+import RentalPricingPage from '../pages/organizationadmin/rental/RentalPricingPage';
+import CarWashLayout from '../pages/organizationadmin/carwash/CarWashLayout';
+import CarWashQueuePage from '../pages/organizationadmin/carwash/CarWashQueuePage';
+import CarWashServicesPage from '../pages/organizationadmin/carwash/CarWashServicesPage';
+import CarWashMembershipsPage from '../pages/organizationadmin/carwash/CarWashMembershipsPage';
+import CarWashPerformancePage from '../pages/organizationadmin/carwash/CarWashPerformancePage';
+import GarageLayout from '../pages/organizationadmin/garage/GarageLayout';
+import GarageEstimatesPage from '../pages/organizationadmin/garage/GarageEstimatesPage';
+import GarageVehiclesPage from '../pages/organizationadmin/garage/GarageVehiclesPage';
+import GarageRemindersPage from '../pages/organizationadmin/garage/GarageRemindersPage';
+import TradeInLayout from '../pages/organizationadmin/tradein/TradeInLayout';
+import TradeInsListPage from '../pages/organizationadmin/tradein/TradeInsListPage';
+import TradeInRulesPage from '../pages/organizationadmin/tradein/TradeInRulesPage';
+import AccountingLayout from '../pages/organizationadmin/accounting/AccountingLayout';
+import AccountingAccountsPage from '../pages/organizationadmin/accounting/AccountingAccountsPage';
+import AccountingJournalsPage from '../pages/organizationadmin/accounting/AccountingJournalsPage';
+import AccountingReportsPage from '../pages/organizationadmin/accounting/AccountingReportsPage';
+import WebsiteCmsLayout from '../pages/organizationadmin/websitecms/WebsiteCmsLayout';
+import CmsSettingsPage from '../pages/organizationadmin/websitecms/CmsSettingsPage';
+import CmsPagesPage from '../pages/organizationadmin/websitecms/CmsPagesPage';
+import CmsBlogPage from '../pages/organizationadmin/websitecms/CmsBlogPage';
+import CmsTestimonialsPage from '../pages/organizationadmin/websitecms/CmsTestimonialsPage';
+import AppointmentsPage from '../pages/organizationadmin/AppointmentsPage';
+import TowingPage from '../pages/organizationadmin/TowingPage';
+import CrmTasksPage from '../pages/organizationadmin/CrmTasksPage';
+import StaffSkillsPage from '../pages/organizationadmin/StaffSkillsPage';
+import SystemUsagePage from '../pages/organizationadmin/SystemUsagePage';
 import EstimateApprovalPage from '../pages/home/EstimateApprovalPage';
 import RentalFleetPage from '../pages/home/RentalFleetPage';
+import AppointmentBookingPage from '../pages/home/AppointmentBookingPage';
+import PublicWebsitePage from '../pages/home/PublicWebsitePage';
 import ProtectedRoute from './ProtectedRouteRedux';
 import { PermissionRoute } from './PermissionRoute';
 import IndustryFeatureRoute from './IndustryFeatureRoute';
@@ -144,6 +177,8 @@ const AppRouter = () => (
 
       {/* PUBLIC: customer-facing rental fleet browse + booking request */}
       <Route path="/rent/:businessId" element={<RentalFleetPage />} />
+      <Route path="/book/:businessId" element={<AppointmentBookingPage />} />
+      <Route path="/site/:businessId" element={<PublicWebsitePage />} />
 
       {/* Supplier Portal Routes - Public (Login/Register) */}
       <Route path="/supplier/login" element={<AuthRedirect><SupplierLogin /></AuthRedirect>} />
@@ -185,6 +220,7 @@ const AppRouter = () => (
       >
         <Route index element={<Navigate to="/superadmin/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="system-usage" element={<SystemUsagePage />} />
         <Route path="quick-pos" element={
           <PermissionRoute permission={PERMISSIONS.SALES_CREATE}>
             <QuickPOSPage />
@@ -300,29 +336,94 @@ const AppRouter = () => (
         <Route path="rental" element={
           <PermissionRoute module="rental">
             <IndustryFeatureRoute feature="rental">
-              <RentalPage />
+              <RentalLayout />
             </IndustryFeatureRoute>
           </PermissionRoute>
-        } />
+        }>
+          <Route index element={<RentalDashboardPage />} />
+          <Route path="fleet" element={<RentalFleetSubPage />} />
+          <Route path="fleet/new" element={<VehicleFormPage />} />
+          <Route path="fleet/:vehicleId/edit" element={<VehicleFormPage />} />
+          <Route path="bookings" element={<RentalBookingsPage />} />
+          <Route path="maintenance" element={<RentalMaintenancePage />} />
+          <Route path="fuel" element={<RentalFuelPage />} />
+          <Route path="claims" element={<RentalClaimsPage />} />
+          <Route path="pricing" element={<RentalPricingPage />} />
+        </Route>
         <Route path="carwash" element={
           <PermissionRoute module="carwash">
             <IndustryFeatureRoute feature="carwash">
-              <CarWashPage />
+              <CarWashLayout />
             </IndustryFeatureRoute>
           </PermissionRoute>
-        } />
+        }>
+          <Route index element={<CarWashQueuePage />} />
+          <Route path="services" element={<CarWashServicesPage />} />
+          <Route path="memberships" element={<CarWashMembershipsPage />} />
+          <Route path="performance" element={<CarWashPerformancePage />} />
+        </Route>
         <Route path="garage" element={
           <PermissionRoute module="garage">
             <IndustryFeatureRoute feature="garage">
-              <GaragePage />
+              <GarageLayout />
             </IndustryFeatureRoute>
           </PermissionRoute>
-        } />
+        }>
+          <Route index element={<GarageEstimatesPage />} />
+          <Route path="vehicles" element={<GarageVehiclesPage />} />
+          <Route path="reminders" element={<GarageRemindersPage />} />
+        </Route>
         <Route path="trade-ins" element={
           <PermissionRoute module="tradein">
             <IndustryFeatureRoute feature="tradein">
-              <TradeInsPage />
+              <TradeInLayout />
             </IndustryFeatureRoute>
+          </PermissionRoute>
+        }>
+          <Route index element={<TradeInsListPage />} />
+          <Route path="rules" element={<TradeInRulesPage />} />
+        </Route>
+        <Route path="appointments" element={
+          <PermissionRoute module="appointment">
+            <IndustryFeatureRoute feature="appointment">
+              <AppointmentsPage />
+            </IndustryFeatureRoute>
+          </PermissionRoute>
+        } />
+        <Route path="towing" element={
+          <PermissionRoute module="towing">
+            <IndustryFeatureRoute feature="towing">
+              <TowingPage />
+            </IndustryFeatureRoute>
+          </PermissionRoute>
+        } />
+        <Route path="accounting" element={
+          <PermissionRoute module="accounting">
+            <AccountingLayout />
+          </PermissionRoute>
+        }>
+          <Route index element={<AccountingAccountsPage />} />
+          <Route path="journals" element={<AccountingJournalsPage />} />
+          <Route path="reports" element={<AccountingReportsPage />} />
+        </Route>
+        <Route path="website" element={
+          <PermissionRoute module="cms">
+            <WebsiteCmsLayout />
+          </PermissionRoute>
+        }>
+          <Route index element={<CmsSettingsPage />} />
+          <Route path="pages" element={<CmsPagesPage />} />
+          <Route path="blog" element={<CmsBlogPage />} />
+          <Route path="testimonials" element={<CmsTestimonialsPage />} />
+        </Route>
+        <Route path="crm-tasks" element={
+          <PermissionRoute module="crm">
+            <CrmTasksPage />
+          </PermissionRoute>
+        } />
+        <Route path="staff-skills" element={
+          <PermissionRoute module="staff">
+            <StaffSkillsPage />
           </PermissionRoute>
         } />
         <Route path="suppliers/management" element={
@@ -514,6 +615,7 @@ const AppRouter = () => (
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<BranchDashboardPage />} />
+        <Route path="system-usage" element={<SystemUsagePage />} />
         <Route path="pos" element={
           <PermissionRoute permission={PERMISSIONS.SALES_CREATE}>
             <POSPage />
@@ -605,29 +707,94 @@ const AppRouter = () => (
         <Route path="rental" element={
           <PermissionRoute module="rental">
             <IndustryFeatureRoute feature="rental">
-              <RentalPage />
+              <RentalLayout />
             </IndustryFeatureRoute>
           </PermissionRoute>
-        } />
+        }>
+          <Route index element={<RentalDashboardPage />} />
+          <Route path="fleet" element={<RentalFleetSubPage />} />
+          <Route path="fleet/new" element={<VehicleFormPage />} />
+          <Route path="fleet/:vehicleId/edit" element={<VehicleFormPage />} />
+          <Route path="bookings" element={<RentalBookingsPage />} />
+          <Route path="maintenance" element={<RentalMaintenancePage />} />
+          <Route path="fuel" element={<RentalFuelPage />} />
+          <Route path="claims" element={<RentalClaimsPage />} />
+          <Route path="pricing" element={<RentalPricingPage />} />
+        </Route>
         <Route path="carwash" element={
           <PermissionRoute module="carwash">
             <IndustryFeatureRoute feature="carwash">
-              <CarWashPage />
+              <CarWashLayout />
             </IndustryFeatureRoute>
           </PermissionRoute>
-        } />
+        }>
+          <Route index element={<CarWashQueuePage />} />
+          <Route path="services" element={<CarWashServicesPage />} />
+          <Route path="memberships" element={<CarWashMembershipsPage />} />
+          <Route path="performance" element={<CarWashPerformancePage />} />
+        </Route>
         <Route path="garage" element={
           <PermissionRoute module="garage">
             <IndustryFeatureRoute feature="garage">
-              <GaragePage />
+              <GarageLayout />
             </IndustryFeatureRoute>
           </PermissionRoute>
-        } />
+        }>
+          <Route index element={<GarageEstimatesPage />} />
+          <Route path="vehicles" element={<GarageVehiclesPage />} />
+          <Route path="reminders" element={<GarageRemindersPage />} />
+        </Route>
         <Route path="trade-ins" element={
           <PermissionRoute module="tradein">
             <IndustryFeatureRoute feature="tradein">
-              <TradeInsPage />
+              <TradeInLayout />
             </IndustryFeatureRoute>
+          </PermissionRoute>
+        }>
+          <Route index element={<TradeInsListPage />} />
+          <Route path="rules" element={<TradeInRulesPage />} />
+        </Route>
+        <Route path="appointments" element={
+          <PermissionRoute module="appointment">
+            <IndustryFeatureRoute feature="appointment">
+              <AppointmentsPage />
+            </IndustryFeatureRoute>
+          </PermissionRoute>
+        } />
+        <Route path="towing" element={
+          <PermissionRoute module="towing">
+            <IndustryFeatureRoute feature="towing">
+              <TowingPage />
+            </IndustryFeatureRoute>
+          </PermissionRoute>
+        } />
+        <Route path="accounting" element={
+          <PermissionRoute module="accounting">
+            <AccountingLayout />
+          </PermissionRoute>
+        }>
+          <Route index element={<AccountingAccountsPage />} />
+          <Route path="journals" element={<AccountingJournalsPage />} />
+          <Route path="reports" element={<AccountingReportsPage />} />
+        </Route>
+        <Route path="website" element={
+          <PermissionRoute module="cms">
+            <WebsiteCmsLayout />
+          </PermissionRoute>
+        }>
+          <Route index element={<CmsSettingsPage />} />
+          <Route path="pages" element={<CmsPagesPage />} />
+          <Route path="blog" element={<CmsBlogPage />} />
+          <Route path="testimonials" element={<CmsTestimonialsPage />} />
+        </Route>
+        <Route path="crm-tasks" element={
+          <PermissionRoute module="crm">
+            <CrmTasksPage />
+          </PermissionRoute>
+        } />
+        <Route path="staff-skills" element={
+          <PermissionRoute module="staff">
+            <StaffSkillsPage />
           </PermissionRoute>
         } />
         <Route path="installments" element={

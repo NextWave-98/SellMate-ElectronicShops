@@ -3,7 +3,14 @@ import { getAccessToken } from '../utils/tokenStorage';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://gadget-chain-manager-backend.vercel.app/api';
 
-export type UploadFolder = 'condition-reports' | 'trade-ins' | 'inspections' | 'verticals';
+export type UploadFolder =
+  | 'condition-reports'
+  | 'trade-ins'
+  | 'inspections'
+  | 'verticals'
+  | 'rental-vehicles'
+  | 'renter-identity'
+  | 'driver-licenses';
 
 /**
  * Upload photos for the vertical modules (condition reports, trade-ins, inspections).

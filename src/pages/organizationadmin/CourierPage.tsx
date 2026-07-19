@@ -23,9 +23,11 @@ import { CourierShipmentModal, TrackingModal, LabelDownloadModal, BulkLabelModal
 import { useCourierModalVariant } from '@/hooks/useCourierModalVariant';
 import PendingApprovalShipments from '../../components/courier/PendingApprovalShipments';
 
+/** Stable identity — must not be recreated each render. */
+const ORG_SHIPMENT_SCOPE = { scope: 'org' as const };
+
 const CourierPage = () => {
   const courierVariant = useCourierModalVariant();
-  const orgShipmentScope = { scope: 'org' as const };
   const [activeTab, setActiveTab] = useState<'shipments' | 'pending-approval'>('shipments');
   const [showShipmentModal, setShowShipmentModal] = useState(false);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
@@ -67,7 +69,7 @@ const CourierPage = () => {
   }, [page, pageSize, statusFilter, searchTerm]);
 
   const reloadShipments = useCallback(
-    () => fetchCourierShipments(buildShipmentFilters(), orgShipmentScope),
+    () => fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE),
     [fetchCourierShipments, buildShipmentFilters],
   );
 
@@ -77,7 +79,7 @@ const CourierPage = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchCourierShipments(buildShipmentFilters(), orgShipmentScope);
+      fetchCourierShipments(buildShipmentFilters(), ORG_SHIPMENT_SCOPE);
     }, searchTerm ? 400 : 0);
     return () => clearTimeout(timer);
   }, [page, pageSize, statusFilter, searchTerm]);

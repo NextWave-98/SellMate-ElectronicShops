@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import useFetch from './useFetch';
 
 export type RentalVehicleStatus = 'AVAILABLE' | 'RESERVED' | 'RENTED' | 'MAINTENANCE' | 'RETIRED';
@@ -47,6 +47,32 @@ export interface RentalBookingRecord {
   depositReleased: boolean;
   vehicle?: RentalVehicleRecord;
   customer?: { id: string; name: string; phone?: string };
+}
+
+export interface DriverLicenseRecord {
+  id: string;
+  customerId: string;
+  licenseNo: string;
+  licenseIssueDate?: string | null;
+  licenseExpiry?: string | null;
+  nicNo?: string | null;
+  dateOfBirth?: string | null;
+  yearsHeld?: number | null;
+  licenseFrontUrl?: string | null;
+  licenseBackUrl?: string | null;
+  nicFrontUrl?: string | null;
+  nicBackUrl?: string | null;
+  isVerified: boolean;
+  notes?: string | null;
+  customer?: { id: string; name: string; phone?: string };
+}
+
+/** A duration tier on a rate plan — maxDays null means "and above". */
+export interface RateDurationTier {
+  minDays: number;
+  maxDays: number | null;
+  rate: number;
+  withDriverRate?: number | null;
 }
 
 const toParams = (filters?: Record<string, any>) => {
@@ -106,6 +132,64 @@ export const useRental = () => {
   const deleteVehicle = useCallback(
     async (id: string) =>
       fetchData({ endpoint: `/rental/vehicles/${id}`, method: 'DELETE', successMessage: 'Vehicle retired' }),
+    [fetchData]
+  );
+
+  // Master data: makes & models
+  const getMakes = useCallback(
+    async () => fetchData({ endpoint: '/rental/makes', method: 'GET', silent: true }),
+    [fetchData]
+  );
+  const createMake = useCallback(
+    async (name: string) => fetchData({ endpoint: '/rental/makes', method: 'POST', data: { name }, successMessage: 'Make added' }),
+    [fetchData]
+  );
+  const deleteMake = useCallback(
+    async (id: string) => fetchData({ endpoint: `/rental/makes/${id}`, method: 'DELETE', successMessage: 'Make deleted' }),
+    [fetchData]
+  );
+  const createVehicleModel = useCallback(
+    async (makeId: string, name: string) => fetchData({ endpoint: `/rental/makes/${makeId}/models`, method: 'POST', data: { name }, successMessage: 'Model added' }),
+    [fetchData]
+  );
+  const deleteVehicleModel = useCallback(
+    async (id: string) => fetchData({ endpoint: `/rental/vehicle-models/${id}`, method: 'DELETE', successMessage: 'Model deleted' }),
+    [fetchData]
+  );
+
+  // Blocked days
+  const getBlockedDays = useCallback(
+    async () => fetchData({ endpoint: '/rental/blocked-days', method: 'GET', silent: true }),
+    [fetchData]
+  );
+  const createBlockedDay = useCallback(
+    async (date: string, reason?: string) => fetchData({ endpoint: '/rental/blocked-days', method: 'POST', data: { date, reason }, successMessage: 'Day blocked' }),
+    [fetchData]
+  );
+  const deleteBlockedDay = useCallback(
+    async (id: string) => fetchData({ endpoint: `/rental/blocked-days/${id}`, method: 'DELETE', successMessage: 'Day unblocked' }),
+    [fetchData]
+  );
+
+  // Driver licenses / NIC on file
+  const getDriverLicenses = useCallback(
+    async (filters?: { customerId?: string; expiringInDays?: number }) =>
+      fetchData({ endpoint: `/rental/driver-licenses${toParams(filters)}`, method: 'GET', silent: true }),
+    [fetchData]
+  );
+  const createDriverLicense = useCallback(
+    async (data: any) =>
+      fetchData({ endpoint: '/rental/driver-licenses', method: 'POST', data, successMessage: 'Driver license saved' }),
+    [fetchData]
+  );
+  const updateDriverLicense = useCallback(
+    async (id: string, data: any) =>
+      fetchData({ endpoint: `/rental/driver-licenses/${id}`, method: 'PUT', data, successMessage: 'Driver license updated' }),
+    [fetchData]
+  );
+  const deleteDriverLicense = useCallback(
+    async (id: string) =>
+      fetchData({ endpoint: `/rental/driver-licenses/${id}`, method: 'DELETE', successMessage: 'Driver license removed' }),
     [fetchData]
   );
 
@@ -195,12 +279,20 @@ export const useRental = () => {
     async (data: any) => fetchData({ endpoint: '/rental/extra-fees', method: 'POST', data, successMessage: 'Fee created' }),
     [fetchData]
   );
+  const updateExtraFee = useCallback(
+    async (id: string, data: any) => fetchData({ endpoint: `/rental/extra-fees/${id}`, method: 'PUT', data, successMessage: 'Fee updated' }),
+    [fetchData]
+  );
   const getCoupons = useCallback(
     async () => fetchData({ endpoint: '/rental/coupons', method: 'GET', silent: true }),
     [fetchData]
   );
   const createCoupon = useCallback(
     async (data: any) => fetchData({ endpoint: '/rental/coupons', method: 'POST', data, successMessage: 'Coupon created' }),
+    [fetchData]
+  );
+  const updateCoupon = useCallback(
+    async (id: string, data: any) => fetchData({ endpoint: `/rental/coupons/${id}`, method: 'PUT', data, successMessage: 'Coupon updated' }),
     [fetchData]
   );
   const getBookingQuote = useCallback(
@@ -270,19 +362,40 @@ export const useRental = () => {
     [fetchData]
   );
 
-  return {
-    getStats,
-    getVehicles, getVehicleById, getAvailability, createVehicle, updateVehicle, deleteVehicle,
-    getRatePlans, createRatePlan, updateRatePlan,
-    getBookings, getBookingById, createBooking, updateBooking, bookingAction, addCharge, generateAgreement,
-    getMaintenances, createMaintenance, updateMaintenance,
-    getFuelLogs, createFuelLog, deleteFuelLog,
-    getClaims, createClaim, updateClaim,
-    getPricingRules, createPricingRule, updatePricingRule,
-    getExtraFees, createExtraFee,
-    getCoupons, createCoupon,
-    getBookingQuote, sendAgreement,
-  };
+  return useMemo(
+    () => ({
+      getStats,
+      getVehicles, getVehicleById, getAvailability, createVehicle, updateVehicle, deleteVehicle,
+      getMakes, createMake, deleteMake, createVehicleModel, deleteVehicleModel,
+      getBlockedDays, createBlockedDay, deleteBlockedDay,
+      getDriverLicenses, createDriverLicense, updateDriverLicense, deleteDriverLicense,
+      getRatePlans, createRatePlan, updateRatePlan,
+      getBookings, getBookingById, createBooking, updateBooking, bookingAction, addCharge, generateAgreement,
+      getMaintenances, createMaintenance, updateMaintenance,
+      getFuelLogs, createFuelLog, deleteFuelLog,
+      getClaims, createClaim, updateClaim,
+      getPricingRules, createPricingRule, updatePricingRule,
+      getExtraFees, createExtraFee, updateExtraFee,
+      getCoupons, createCoupon, updateCoupon,
+      getBookingQuote, sendAgreement,
+    }),
+    [
+      getStats,
+      getVehicles, getVehicleById, getAvailability, createVehicle, updateVehicle, deleteVehicle,
+      getMakes, createMake, deleteMake, createVehicleModel, deleteVehicleModel,
+      getBlockedDays, createBlockedDay, deleteBlockedDay,
+      getDriverLicenses, createDriverLicense, updateDriverLicense, deleteDriverLicense,
+      getRatePlans, createRatePlan, updateRatePlan,
+      getBookings, getBookingById, createBooking, updateBooking, bookingAction, addCharge, generateAgreement,
+      getMaintenances, createMaintenance, updateMaintenance,
+      getFuelLogs, createFuelLog, deleteFuelLog,
+      getClaims, createClaim, updateClaim,
+      getPricingRules, createPricingRule, updatePricingRule,
+      getExtraFees, createExtraFee, updateExtraFee,
+      getCoupons, createCoupon, updateCoupon,
+      getBookingQuote, sendAgreement,
+    ]
+  );
 };
 
 export const VEHICLE_FEATURES = [

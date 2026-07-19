@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import useFetch from './useFetch';
 
 export type GarageEstimateStatus = 'DRAFT' | 'SENT' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED';
@@ -173,14 +173,24 @@ export const useGarage = () => {
     [fetchData]
   );
 
-  return {
-    getStats,
-    getVehicles, getVehicleById, createVehicle, updateVehicle,
-    getEstimates, getEstimateById, createEstimate, updateEstimate, setEstimateStatus, sendEstimate,
-    getLaborEntries, createLaborEntry,
-    getBays, createBay, assignJobToBay,
-    getReminders, createReminder, updateReminder,
-  };
+  return useMemo(
+    () => ({
+      getStats,
+      getVehicles, getVehicleById, createVehicle, updateVehicle,
+      getEstimates, getEstimateById, createEstimate, updateEstimate, setEstimateStatus, sendEstimate,
+      getLaborEntries, createLaborEntry,
+      getBays, createBay, assignJobToBay,
+      getReminders, createReminder, updateReminder,
+    }),
+    [
+      getStats,
+      getVehicles, getVehicleById, createVehicle, updateVehicle,
+      getEstimates, getEstimateById, createEstimate, updateEstimate, setEstimateStatus, sendEstimate,
+      getLaborEntries, createLaborEntry,
+      getBays, createBay, assignJobToBay,
+      getReminders, createReminder, updateReminder,
+    ]
+  );
 };
 
 export default useGarage;

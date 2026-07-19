@@ -32,13 +32,15 @@ import BulkImportCustomerReview, {
 } from '../../components/courier/BulkImportCustomerReview';
 import { useLocation as useLocationHook } from '../../hooks/useLocation';
 
-type DatePeriod = 'today' | 'yesterday' | 'week' | 'month' | 'custom';
+type DatePeriod = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 const getColomboDateString = () => todayColombo();
 
+/** Stable identity — must not be recreated each render (used in effect deps). */
+const BRANCH_SHIPMENT_SCOPE = { scope: 'branch' as const };
+
 const BranchCourierPage = () => {
   const { user } = useAppSelector((state) => state.auth);
-  const branchShipmentScope = { scope: 'branch' as const };
   const [showShipmentModal, setShowShipmentModal] = useState(false);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
@@ -126,9 +128,10 @@ const BranchCourierPage = () => {
       filters.period = 'custom';
       if (appliedSearch.customStartDate) filters.startDate = appliedSearch.customStartDate;
       if (appliedSearch.customEndDate) filters.endDate = appliedSearch.customEndDate;
-    } else {
+    } else if (datePeriod !== 'all') {
       filters.period = datePeriod;
     }
+    // datePeriod === 'all' → no period/date constraint: every shipment (paginated)
 
     if (hasUpdated) {
       if (appliedSearch.updatedFrom) filters.updatedAtFrom = appliedSearch.updatedFrom;
@@ -169,6 +172,35 @@ const BranchCourierPage = () => {
     setPage(1);
   };
 
+  // "All Shipments": clear EVERY filter and list all branch shipments (paginated only).
+  const handleShowAllShipments = () => {
+    setShipmentSearch('');
+    setShipmentNumberFrom('');
+    setShipmentNumberTo('');
+    setTrackingSearch('');
+    setFilterCreatedFrom('');
+    setFilterCreatedTo('');
+    setFilterUpdatedFrom('');
+    setFilterUpdatedTo('');
+    setStatusFilter('');
+    setTimeFrom('');
+    setTimeTo('');
+    setDatePeriod('all');
+    setAppliedSearch({
+      shipmentSearch: '',
+      shipmentNumberFrom: '',
+      shipmentNumberTo: '',
+      trackingSearch: '',
+      createdFrom: '',
+      createdTo: '',
+      updatedFrom: '',
+      updatedTo: '',
+      customStartDate: getColomboDateString(),
+      customEndDate: getColomboDateString(),
+    });
+    setPage(1);
+  };
+
   const handleDateRangeChange = (setter: (val: string) => void) => (val: string) => {
     setter(val);
     setDatePeriod('custom');
@@ -186,7 +218,7 @@ const BranchCourierPage = () => {
     (datePeriod === 'custom' && (customStartDate !== appliedSearch.customStartDate || customEndDate !== appliedSearch.customEndDate));
 
   const reloadShipments = useCallback(
-    () => fetchCourierShipments(buildShipmentFilters(), branchShipmentScope),
+    () => fetchCourierShipments(buildShipmentFilters(), BRANCH_SHIPMENT_SCOPE),
     [fetchCourierShipments, buildShipmentFilters],
   );
 
@@ -195,8 +227,8 @@ const BranchCourierPage = () => {
   }, [statusFilter, datePeriod, appliedSearch, timeFrom, timeTo, pageSize]);
 
   useEffect(() => {
-    fetchCourierShipments(buildShipmentFilters(), branchShipmentScope);
-  }, [statusFilter, datePeriod, appliedSearch, timeFrom, timeTo, page, pageSize, buildShipmentFilters, branchShipmentScope]);
+    fetchCourierShipments(buildShipmentFilters(), BRANCH_SHIPMENT_SCOPE);
+  }, [statusFilter, datePeriod, appliedSearch, timeFrom, timeTo, page, pageSize, buildShipmentFilters]);
 
   // Fetch courier services on component mount for shipment modal dropdown
   useEffect(() => {
@@ -419,7 +451,7 @@ const BranchCourierPage = () => {
         ].filter(Boolean);
         toast.success(`Fardar sync: ${parts.join(', ') || 'done'}`);
         setSelectedIds(new Set());
-        fetchCourierShipments(buildShipmentFilters(), branchShipmentScope);
+        fetchCourierShipments(buildShipmentFilters(), BRANCH_SHIPMENT_SCOPE);
       } else {
         toast.error(response?.message || 'Fardar sync failed');
       }
@@ -758,6 +790,18 @@ const BranchCourierPage = () => {
             </div>
 
             <div className="flex flex-wrap gap-2 items-center mt-2">
+              <button
+                type="button"
+                onClick={handleShowAllShipments}
+                title="Clear every filter and show all shipments"
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  datePeriod === 'all'
+                    ? 'bg-orange-500 text-white shadow-[0_2px_8px_0_rgba(249,115,22,0.35)]'
+                    : 'bg-white/40 border border-orange-300/60 text-orange-600 hover:bg-orange-50'
+                }`}
+              >
+                All Shipments
+              </button>
               {([
                 { value: 'today' as DatePeriod, label: 'Today' },
                 { value: 'yesterday' as DatePeriod, label: 'Yesterday' },

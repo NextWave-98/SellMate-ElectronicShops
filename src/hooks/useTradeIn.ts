@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import useFetch from './useFetch';
 
 export type TradeInStatus = 'QUOTED' | 'ACCEPTED' | 'REJECTED' | 'REFURBISHING' | 'READY_FOR_SALE' | 'SOLD';
@@ -110,11 +110,18 @@ export const useTradeIn = () => {
     [fetchData]
   );
 
-  return {
-    getStats, getQuote,
-    getTradeIns, getTradeInById, createTradeIn, updateTradeIn, relistTradeIn,
-    getRules, createRule, updateRule, deleteRule,
-  };
+  return useMemo(
+    () => ({
+      getStats, getQuote,
+      getTradeIns, getTradeInById, createTradeIn, updateTradeIn, relistTradeIn,
+      getRules, createRule, updateRule, deleteRule,
+    }),
+    [
+      getStats, getQuote,
+      getTradeIns, getTradeInById, createTradeIn, updateTradeIn, relistTradeIn,
+      getRules, createRule, updateRule, deleteRule,
+    ]
+  );
 };
 
 export default useTradeIn;

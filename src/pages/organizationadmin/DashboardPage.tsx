@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import OperationsWidgets from '../../components/superadmin/OperationsWidgets';
 import {
   Store,
   Users,
@@ -381,6 +382,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Operations (appointments · towing · CRM) ── */}
+      <OperationsWidgets />
 
       {/* ── Electronics Operations (repairs · warranty · trade-ins) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

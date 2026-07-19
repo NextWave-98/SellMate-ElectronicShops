@@ -1,8 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from '../../hooks/useLocation';
 import { LocationType } from '../../types/location.types';
 import type { Location } from '../../types/location.types';
+import SearchSelect from './SearchSelect';
 
 interface LocationSelectorProps {
   value?: string;
@@ -32,11 +33,17 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
 
   useEffect(() => {
     const loadLocations = async () => {
-      const result = await getAllLocations(filterType ? { type: filterType } : {});
+      const result = await getAllLocations({
+        ...(filterType ? { type: filterType } : {}),
+        limit: 1000,
+        isActive: true,
+      });
       if (result?.success) {
-        const responseData = result.data as unknown as { locations?: Location[] } | Location[];
-        const locations = Array.isArray(responseData) ? responseData : responseData?.locations || [];
-        setLocations(locations);
+        const responseData = result.data as unknown as { locations?: Location[]; data?: Location[] } | Location[];
+        const locs = Array.isArray(responseData)
+          ? responseData
+          : responseData?.locations ?? responseData?.data ?? [];
+        setLocations(locs);
       }
     };
     loadLocations();
@@ -52,29 +59,33 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
     }
   };
 
+  const options = useMemo(() => {
+    const items = locations.map((location) => ({
+      value: location.id,
+      label: `${getLocationTypeLabel(location.locationType)} ${location.name}`,
+      sublabel: location.locationCode,
+    }));
+    if (showAll) {
+      return [{ value: '', label: placeholder || 'All Locations' }, ...items];
+    }
+    return items;
+  }, [locations, showAll, placeholder]);
+
   return (
     <div className="form-group">
       {label && (
-        <label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
           {label} {required && <span className="text-danger">*</span>}
         </label>
       )}
-      <select
-        className={className}
+      <SearchSelect
+        options={options}
         value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
+        onChange={onChange}
+        placeholder={showAll ? (placeholder || 'All Locations') : (placeholder || `-- Select ${label} --`)}
         disabled={disabled || loading}
-      >
-        <option value="">
-          {showAll ? (placeholder || 'All Locations') : (placeholder || `-- Select ${label} --`)}
-        </option>
-        {locations.map((location) => (
-          <option key={location.id} value={location.id}>
-            {getLocationTypeLabel(location.locationType)} {location.name} ({location.locationCode})
-          </option>
-        ))}
-      </select>
+        inputClassName={className.replace('form-control', '').trim()}
+      />
       {loading && <small className="text-muted">Loading locations...</small>}
     </div>
   );
@@ -100,13 +111,22 @@ export const LocationCardSelector: React.FC<LocationCardSelectorProps> = ({
 
   useEffect(() => {
     const loadLocations = async () => {
-      const result = await getAllLocations(filterType ? { type: filterType } : {});
+      const result = await getAllLocations({
+        ...(filterType ? { type: filterType } : {}),
+        limit: 1000,
+        isActive: true,
+      });
       if (result?.success) {
-        setLocations((result.data as Location[]) || []);
+        const responseData = result.data as unknown as { locations?: Location[]; data?: Location[] } | Location[];
+        const locs = Array.isArray(responseData)
+          ? responseData
+          : responseData?.locations ?? responseData?.data ?? [];
+        setLocations(locs);
       }
     };
     loadLocations();
-  }, [filterType, getAllLocations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType]);
 
   const getLocationTypeBadge = (type: string) => {
     const badges: Record<string, { class: string; label: string }> = {
@@ -157,4 +177,3 @@ export const LocationCardSelector: React.FC<LocationCardSelectorProps> = ({
 };
 
 export default LocationSelector;
-

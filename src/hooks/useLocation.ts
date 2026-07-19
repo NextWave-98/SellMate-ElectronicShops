@@ -21,7 +21,8 @@ export const useLocation = () => {
         }
       });
     }
-    const endpoint = `/locations?branch=all`;
+    queryParams.set('branch', 'all');
+    const endpoint = `/locations${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return await fetchData({
       endpoint,
       method: 'GET',

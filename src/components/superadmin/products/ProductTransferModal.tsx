@@ -42,7 +42,6 @@ export default function ProductTransferModal({ isOpen, onClose, onSuccess, wareh
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
@@ -60,20 +59,24 @@ export default function ProductTransferModal({ isOpen, onClose, onSuccess, wareh
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  // Debounced SERVER-side product search (top 20 matches) — replaces the old
+  // 1000-product prefetch + client-side filtering.
   useEffect(() => {
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const filtered = products.filter(
-        (product) =>
-          product.name.toLowerCase().includes(query) ||
-          product.productCode.toLowerCase().includes(query) ||
-          product.categoryName?.toLowerCase().includes(query)
-      );
-      setFilteredProducts(filtered);
-    } else {
+    if (!searchQuery.trim()) {
       setFilteredProducts([]);
+      return;
     }
-  }, [searchQuery, products]);
+    const t = setTimeout(async () => {
+      try {
+        const res = await productHook.getAllProducts({ search: searchQuery.trim(), limit: 20 } as any);
+        setFilteredProducts(Array.isArray(res?.data) ? (res.data as Product[]) : []);
+      } catch {
+        setFilteredProducts([]);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const loadInitialData = async () => {
     setLoadingData(true);
@@ -95,11 +98,7 @@ export default function ProductTransferModal({ isOpen, onClose, onSuccess, wareh
         setBranches(locations as unknown as Branch[]);
       }
 
-      // Load products
-      const productResponse = await productHook.getAllProducts({ limit: 1000 });
-      if (productResponse?.data) {
-        setProducts(productResponse.data as Product[]);
-      }
+      // Products are now fetched on demand via the debounced server search above
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Failed to load data');
