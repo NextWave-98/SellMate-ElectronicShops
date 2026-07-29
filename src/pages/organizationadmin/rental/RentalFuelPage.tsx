@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogBody,
 } from '@/components/ui/dialog';
 import LoadingSpinner from '../../../components/common/LoadingSpinner';
 import { useRental } from '../../../hooks/useRental';
@@ -23,6 +23,7 @@ export default function RentalFuelPage() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [form, setForm] = useState<any>({ vehicleId: '', filledAt: '', odometer: '', liters: '', ratePerLiter: '', cost: '', station: '' });
 
   /** liters × rate → cost auto-calc (manual cost entry still allowed) */
@@ -101,7 +102,7 @@ export default function RentalFuelPage() {
                 <td className="p-3">Rs {Number(l.cost).toLocaleString()}</td>
                 <td className="p-3">{l.kmPerLiter != null ? <Badge className="bg-green-100 text-green-800">{l.kmPerLiter} km/L</Badge> : '—'}</td>
                 <td className="p-3">
-                  <Button size="sm" variant="ghost" onClick={async () => { await rental.deleteFuelLog(l.id); load(); }}>
+                  <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(l)}>
                     <Trash2 className="w-4 h-4 text-red-500" />
                   </Button>
                 </td>
@@ -142,6 +143,22 @@ export default function RentalFuelPage() {
             <Button onClick={submit} disabled={saving || !form.vehicleId || !form.filledAt || !form.odometer || !form.liters}>
               {saving ? 'Saving...' : 'Add Log'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Delete this fuel log?</DialogTitle></DialogHeader>
+          <DialogBody>
+            <p className="text-sm text-muted-foreground">
+              {deleteTarget?.vehicle?.registrationNo || 'Vehicle'} · {deleteTarget?.filledAt} · {deleteTarget?.liters} L — this cannot be undone.
+            </p>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={async () => { await rental.deleteFuelLog(deleteTarget.id); setDeleteTarget(null); load(); }}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

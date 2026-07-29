@@ -27,6 +27,7 @@ interface Product {
   model?: string;
   hasVariants?: boolean;
   variantAttributes?: Record<string, any>;
+  isReload?: boolean;
 }
 
 interface VariantEntry {
@@ -105,6 +106,7 @@ export default function ManualStockEntryModal({
             model: product.model,
             hasVariants: product.hasVariants || false,
             variantAttributes: product.variantAttributes,
+            isReload: product.isReload || false,
           }));
           setProducts(transformedProducts);
         } else {
@@ -448,7 +450,7 @@ export default function ManualStockEntryModal({
                             <div className="flex items-center gap-3">
                               <div>
                                 <label className="block text-xs text-gray-600 mb-1">
-                                  Quantity
+                                  {product.isReload ? 'Amount (LKR)' : 'Quantity'}
                                 </label>
                                 <input
                                   type="number"

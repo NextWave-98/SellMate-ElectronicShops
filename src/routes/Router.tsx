@@ -1,143 +1,156 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import SuperadminLayout from '../layouts/superadmin/SuperadminLayout';
-import DashboardPage from '../pages/organizationadmin/DashboardPage';
+
+// ─── Lazily-loaded route components ─────────────────────────────────────────
+// Each of these becomes its own chunk, fetched only when the route is visited.
+// Guards, layouts and the login/landing pages stay eagerly imported above.
+const DashboardPage = lazy(() => import('../pages/organizationadmin/DashboardPage'));
+const ShopPage = lazy(() => import('../pages/organizationadmin/ShopPage'));
+const StaffPage = lazy(() => import('../pages/organizationadmin/StaffPage'));
+const StockPage = lazy(() => import('../pages/organizationadmin/StockPage'));
+const CategoriesPage = lazy(() => import('../pages/organizationadmin/CategoriesPage'));
+const SalesPage = lazy(() => import('../pages/organizationadmin/SalesPage'));
+const JobSheetsPage = lazy(() => import('../pages/organizationadmin/JobSheetsPage'));
+const PartsPage = lazy(() => import('../pages/organizationadmin/PartsPage'));
+const InventoryPage = lazy(() => import('../pages/organizationadmin/InventoryPage'));
+const CustomersPage = lazy(() => import('../pages/organizationadmin/CustomersPage'));
+const WarrantyPage = lazy(() => import('../components/superadmin/warranty/WarrantyPage'));
+const SuppliersPage = lazy(() => import('../pages/organizationadmin/SuppliersPage'));
+const GoodsReceiptsPage = lazy(() => import('../pages/organizationadmin/GoodsReceiptsPage'));
+const StockTransfersPage = lazy(() => import('../pages/organizationadmin/StockTransfersPage'));
+const ReportsPage = lazy(() => import('../pages/organizationadmin/ReportsPage'));
+const AIAnalyticsPage = lazy(() => import('../pages/organizationadmin/AIAnalyticsPage'));
+const AddonRequestsPage = lazy(() => import('../pages/admin/AddonRequestsPage'));
+const StockDashboardPage = lazy(() => import('../pages/organizationadmin/StockDashboardPage'));
+const BarcodeGeneratorPage = lazy(() => import('../pages/organizationadmin/BarcodeGeneratorPage'));
+const PaymentsPage = lazy(() => import('../pages/organizationadmin/PaymentsPage'));
+const ReturnsPage = lazy(() => import('../pages/organizationadmin/ReturnsPage'));
+const NotificationSettings = lazy(() => import('../components/superadmin/notifications/NotificationSettings'));
+const NotificationDashboard = lazy(() => import('../components/superadmin/notifications/NotificationDashboard'));
+const CourierPage = lazy(() => import('../pages/home/CourierServicesPage'));
+const CourierServicesPage = lazy(() => import('../pages/home/CourierServicesPage'));
+const ShipmentTrackingPage = lazy(() => import('../pages/organizationadmin/ShipmentTrackingPage'));
+const PermissionsPage = lazy(() => import('../pages/organizationadmin/PermissionsPage'));
+const RoleManagementPage = lazy(() => import('../pages/organizationadmin/RoleManagementPage'));
+const OrganizationsPage = lazy(() => import('../pages/organizationadmin/OrganizationsPage'));
+const SubscriptionsPage = lazy(() => import('../pages/organizationadmin/SubscriptionsPage'));
+const SubscriptionCheckoutPage = lazy(() => import('../pages/organizationadmin/SubscriptionCheckoutPage'));
+const PlatformRoleManagementPage = lazy(() => import('../pages/platformcontroladmin/PlatformRoleManagementPage'));
+const RentalLayout = lazy(() => import('../pages/organizationadmin/rental/RentalLayout'));
+const RentalDashboardPage = lazy(() => import('../pages/organizationadmin/rental/RentalDashboardPage'));
+const RentalFleetSubPage = lazy(() => import('../pages/organizationadmin/rental/RentalFleetPage'));
+const VehicleFormPage = lazy(() => import('../pages/organizationadmin/rental/VehicleFormPage'));
+const RentalBookingsPage = lazy(() => import('../pages/organizationadmin/rental/RentalBookingsPage'));
+const RentalMaintenancePage = lazy(() => import('../pages/organizationadmin/rental/RentalMaintenancePage'));
+const RentalFuelPage = lazy(() => import('../pages/organizationadmin/rental/RentalFuelPage'));
+const RentalClaimsPage = lazy(() => import('../pages/organizationadmin/rental/RentalClaimsPage'));
+const RentalPricingPage = lazy(() => import('../pages/organizationadmin/rental/RentalPricingPage'));
+const RentalDriverLicensesPage = lazy(() => import('../pages/organizationadmin/rental/RentalDriverLicensesPage'));
+const CarWashLayout = lazy(() => import('../pages/organizationadmin/carwash/CarWashLayout'));
+const CarWashQueuePage = lazy(() => import('../pages/organizationadmin/carwash/CarWashQueuePage'));
+const CarWashServicesPage = lazy(() => import('../pages/organizationadmin/carwash/CarWashServicesPage'));
+const CarWashMembershipsPage = lazy(() => import('../pages/organizationadmin/carwash/CarWashMembershipsPage'));
+const CarWashPerformancePage = lazy(() => import('../pages/organizationadmin/carwash/CarWashPerformancePage'));
+const GarageLayout = lazy(() => import('../pages/organizationadmin/garage/GarageLayout'));
+const GarageEstimatesPage = lazy(() => import('../pages/organizationadmin/garage/GarageEstimatesPage'));
+const GarageVehiclesPage = lazy(() => import('../pages/organizationadmin/garage/GarageVehiclesPage'));
+const GarageRemindersPage = lazy(() => import('../pages/organizationadmin/garage/GarageRemindersPage'));
+const TradeInLayout = lazy(() => import('../pages/organizationadmin/tradein/TradeInLayout'));
+const TradeInsListPage = lazy(() => import('../pages/organizationadmin/tradein/TradeInsListPage'));
+const TradeInRulesPage = lazy(() => import('../pages/organizationadmin/tradein/TradeInRulesPage'));
+const AccountingLayout = lazy(() => import('../pages/organizationadmin/accounting/AccountingLayout'));
+const AccountingAccountsPage = lazy(() => import('../pages/organizationadmin/accounting/AccountingAccountsPage'));
+const AccountingJournalsPage = lazy(() => import('../pages/organizationadmin/accounting/AccountingJournalsPage'));
+const AccountingReportsPage = lazy(() => import('../pages/organizationadmin/accounting/AccountingReportsPage'));
+const WebsiteCmsLayout = lazy(() => import('../pages/organizationadmin/websitecms/WebsiteCmsLayout'));
+const CmsSettingsPage = lazy(() => import('../pages/organizationadmin/websitecms/CmsSettingsPage'));
+const CmsPagesPage = lazy(() => import('../pages/organizationadmin/websitecms/CmsPagesPage'));
+const CmsBlogPage = lazy(() => import('../pages/organizationadmin/websitecms/CmsBlogPage'));
+const CmsTestimonialsPage = lazy(() => import('../pages/organizationadmin/websitecms/CmsTestimonialsPage'));
+const CmsPaymentsPage = lazy(() => import('../pages/organizationadmin/websitecms/CmsPaymentsPage'));
+const AppointmentsPage = lazy(() => import('../pages/organizationadmin/AppointmentsPage'));
+const TowingPage = lazy(() => import('../pages/organizationadmin/TowingPage'));
+const CrmTasksPage = lazy(() => import('../pages/organizationadmin/CrmTasksPage'));
+const StaffSkillsPage = lazy(() => import('../pages/organizationadmin/StaffSkillsPage'));
+const SystemUsagePage = lazy(() => import('../pages/organizationadmin/SystemUsagePage'));
+const EstimateApprovalPage = lazy(() => import('../pages/home/EstimateApprovalPage'));
+const RentalFleetPage = lazy(() => import('../pages/home/RentalFleetPage'));
+const AppointmentBookingPage = lazy(() => import('../pages/home/AppointmentBookingPage'));
+const PublicWebsitePage = lazy(() => import('../pages/home/PublicWebsitePage'));
+const BranchSelectPage = lazy(() => import('../pages/auth/BranchSelectPage'));
+const UnauthorizedPage = lazy(() => import('../pages/UnauthorizedPage'));
+const BranchDashboardPage = lazy(() => import('../pages/branch/BranchDashboardPage'));
+const POSPage = lazy(() => import('../pages/branch/POSPage'));
+const QuickPOSPage = lazy(() => import('../pages/branch/QuickPOSPage'));
+const ProductsPage = lazy(() => import('../pages/branch/ProductsPage'));
+const BranchAddonRequestsPage = lazy(() => import('../pages/branch/AddonRequestsPage'));
+const BranchCustomersPage = lazy(() => import('../pages/branch/CustomersPage'));
+const BranchSalesPage = lazy(() => import('../pages/branch/BranchSalesPage'));
+const BranchJobSheetsPage = lazy(() => import('../pages/branch/JobSheetsPage'));
+const BranchSaleJobsPage = lazy(() => import('../pages/branch/SaleJobsPage'));
+const BranchReturnsPage = lazy(() => import('../pages/branch/ReturnsPage'));
+const BranchWarrantyPage = lazy(() => import('../pages/branch/BranchWarrantyPage'));
+const ProfilePage = lazy(() => import('../pages/organizationadmin/ProfilePage'));
+const InstallmentsPage = lazy(() => import('../pages/branch/InstallmentsPage'));
+const CreateInstallmentPlanPage = lazy(() => import('../pages/branch/CreateInstallmentPlanPage'));
+const InstallmentDetailPage = lazy(() => import('../pages/branch/InstallmentDetailPage'));
+const EditCustomerFinancialDetailsPage = lazy(() => import('../pages/branch/EditCustomerFinancialDetailsPage'));
+const AddCustomerFinancialDetailsPage = lazy(() => import('../pages/branch/AddCustomerFinancialDetailsPage'));
+const BranchCourierPage = lazy(() => import('../pages/branch/CourierPage'));
+const CourierPerformancePage = lazy(() => import('../pages/branch/CourierPerformancePage'));
+const AdvancePaymentsPage = lazy(() => import('../pages/branch/AdvancePaymentsPage'));
+const OrgAdvancePaymentsPage = lazy(() => import('../pages/organizationadmin/AdvancePaymentsPage'));
+const BranchBarcodeGeneratorPage = lazy(() => import('../pages/branch/BarcodeGeneratorPage'));
+const CashDrawerPage = lazy(() => import('../pages/branch/CashDrawerPage'));
+const AdminLoginPage = lazy(() => import('../pages/auth/AdminLoginPage'));
+const PlatformOverviewPage = lazy(() => import('../pages/platformcontroladmin/PlatformOverviewPage'));
+const SupplierLogin = lazy(() => import('../pages/supplier/SupplierLogin'));
+const SupplierRegister = lazy(() => import('../pages/supplier/SupplierRegister'));
+const SupplierDashboard = lazy(() => import('../pages/supplier/SupplierDashboard'));
+const SupplierPurchaseOrders = lazy(() => import('../pages/supplier/SupplierPurchaseOrders'));
+const SupplierPurchaseOrderDetail = lazy(() => import('../pages/supplier/SupplierPurchaseOrderDetail'));
+const SupplierProfile = lazy(() => import('../pages/supplier/SupplierProfile'));
+const SupplierPayments = lazy(() => import('../pages/supplier/SupplierPayments'));
+const CommunicationSettingsPage = lazy(() => import('../pages/organizationadmin/CommunicationSettingsPage'));
+const SmsAutomationPage = lazy(() => import('../pages/organizationadmin/SmsAutomationPage'));
+const ActivityMonitoringPage = lazy(() => import('../pages/organizationadmin/ActivityMonitoringPage'));
+const ScorecardPage = lazy(() => import('../pages/organizationadmin/ScorecardPage'));
+const MyActivityPage = lazy(() => import('../pages/branch/MyActivityPage'));
+const WhatsAppSettingsPage = lazy(() => import('../pages/Settings/WhatsAppSettings'));
+const WhatsAppAISettingsPage = lazy(() => import('../pages/Settings/WhatsAppAISettings'));
+const WhatsAppInboxPage = lazy(() => import('../pages/WhatsApp/WhatsAppInbox'));
+const WhatsAppOrdersPage = lazy(() => import('../pages/WhatsApp/WhatsAppOrders'));
+const FacebookLeadsPage = lazy(() => import('../pages/FacebookLeads/FacebookLeads'));
+const FacebookLeadsSettingsPage = lazy(() => import('../pages/Settings/FacebookLeadsSettings'));
+const LeadFormsPage = lazy(() => import('../pages/FacebookLeads/LeadFormsPage'));
+const AttendancePage = lazy(() => import('../pages/organizationadmin/AttendancePage'));
+const PayrollPage = lazy(() => import('../pages/organizationadmin/PayrollPage'));
+const StaffAttendancePage = lazy(() => import('../pages/branch/StaffAttendancePage'));
+const WooCommercePage = lazy(() => import('../pages/organizationadmin/WooCommercePage'));
+const WooCommerceOrdersPage = lazy(() => import('../pages/organizationadmin/WooCommerceOrdersPage'));
+const DiscountsPage = lazy(() => import('../pages/organizationadmin/DiscountsPage'));
+const POSSettingsPage = lazy(() => import('../pages/organizationadmin/POSSettingsPage'));
+const AddProductPage = lazy(() => import('../pages/organizationadmin/AddProductPage'));
+const EditProductPage = lazy(() => import('../pages/organizationadmin/EditProductPage'));
+
 import HomePage from '../pages/home/HomePage';
 // import MainLayout from '../layouts/main/MainLayout';
-import ShopPage from '../pages/organizationadmin/ShopPage';
-import StaffPage from '../pages/organizationadmin/StaffPage';
-import StockPage from '../pages/organizationadmin/StockPage';
-import CategoriesPage from '../pages/organizationadmin/CategoriesPage';
-import SalesPage from '../pages/organizationadmin/SalesPage';
-import JobSheetsPage from '../pages/organizationadmin/JobSheetsPage';
-import PartsPage from '../pages/organizationadmin/PartsPage';
-import InventoryPage from '../pages/organizationadmin/InventoryPage';
-import CustomersPage from '../pages/organizationadmin/CustomersPage';
-import WarrantyPage from '../components/superadmin/warranty/WarrantyPage';
-import SuppliersPage from '../pages/organizationadmin/SuppliersPage';
-import GoodsReceiptsPage from '../pages/organizationadmin/GoodsReceiptsPage';
-import StockTransfersPage from '../pages/organizationadmin/StockTransfersPage';
-import ReportsPage from '../pages/organizationadmin/ReportsPage';
-import AIAnalyticsPage from '../pages/organizationadmin/AIAnalyticsPage';
-import AddonRequestsPage from '../pages/admin/AddonRequestsPage';
 // import NotificationsPage from '../pages/superadmin/NotificationsPage';
-import StockDashboardPage from '../pages/organizationadmin/StockDashboardPage';
-import BarcodeGeneratorPage from '../pages/organizationadmin/BarcodeGeneratorPage';
-import PaymentsPage from '../pages/organizationadmin/PaymentsPage';
-import ReturnsPage from '../pages/organizationadmin/ReturnsPage';
-import NotificationSettings from '../components/superadmin/notifications/NotificationSettings';
-import NotificationDashboard from '../components/superadmin/notifications/NotificationDashboard';
-import CourierPage from '../pages/home/CourierServicesPage';
-import CourierServicesPage from '../pages/home/CourierServicesPage';
-import ShipmentTrackingPage from '../pages/organizationadmin/ShipmentTrackingPage';
 // Super Admin Management Pages
-import PermissionsPage from '../pages/organizationadmin/PermissionsPage';
-import RoleManagementPage from '../pages/organizationadmin/RoleManagementPage';
-import OrganizationsPage from '../pages/organizationadmin/OrganizationsPage';
-import SubscriptionsPage from '../pages/organizationadmin/SubscriptionsPage';
-import SubscriptionCheckoutPage from '../pages/organizationadmin/SubscriptionCheckoutPage';
-import PlatformRoleManagementPage from '../pages/platformcontroladmin/PlatformRoleManagementPage';
 // New vertical pages: Vehicle Rental, Car Wash, Garage, Trade-In (split into sub-pages)
-import RentalLayout from '../pages/organizationadmin/rental/RentalLayout';
-import RentalDashboardPage from '../pages/organizationadmin/rental/RentalDashboardPage';
-import RentalFleetSubPage from '../pages/organizationadmin/rental/RentalFleetPage';
-import VehicleFormPage from '../pages/organizationadmin/rental/VehicleFormPage';
-import RentalBookingsPage from '../pages/organizationadmin/rental/RentalBookingsPage';
-import RentalMaintenancePage from '../pages/organizationadmin/rental/RentalMaintenancePage';
-import RentalFuelPage from '../pages/organizationadmin/rental/RentalFuelPage';
-import RentalClaimsPage from '../pages/organizationadmin/rental/RentalClaimsPage';
-import RentalPricingPage from '../pages/organizationadmin/rental/RentalPricingPage';
-import CarWashLayout from '../pages/organizationadmin/carwash/CarWashLayout';
-import CarWashQueuePage from '../pages/organizationadmin/carwash/CarWashQueuePage';
-import CarWashServicesPage from '../pages/organizationadmin/carwash/CarWashServicesPage';
-import CarWashMembershipsPage from '../pages/organizationadmin/carwash/CarWashMembershipsPage';
-import CarWashPerformancePage from '../pages/organizationadmin/carwash/CarWashPerformancePage';
-import GarageLayout from '../pages/organizationadmin/garage/GarageLayout';
-import GarageEstimatesPage from '../pages/organizationadmin/garage/GarageEstimatesPage';
-import GarageVehiclesPage from '../pages/organizationadmin/garage/GarageVehiclesPage';
-import GarageRemindersPage from '../pages/organizationadmin/garage/GarageRemindersPage';
-import TradeInLayout from '../pages/organizationadmin/tradein/TradeInLayout';
-import TradeInsListPage from '../pages/organizationadmin/tradein/TradeInsListPage';
-import TradeInRulesPage from '../pages/organizationadmin/tradein/TradeInRulesPage';
-import AccountingLayout from '../pages/organizationadmin/accounting/AccountingLayout';
-import AccountingAccountsPage from '../pages/organizationadmin/accounting/AccountingAccountsPage';
-import AccountingJournalsPage from '../pages/organizationadmin/accounting/AccountingJournalsPage';
-import AccountingReportsPage from '../pages/organizationadmin/accounting/AccountingReportsPage';
-import WebsiteCmsLayout from '../pages/organizationadmin/websitecms/WebsiteCmsLayout';
-import CmsSettingsPage from '../pages/organizationadmin/websitecms/CmsSettingsPage';
-import CmsPagesPage from '../pages/organizationadmin/websitecms/CmsPagesPage';
-import CmsBlogPage from '../pages/organizationadmin/websitecms/CmsBlogPage';
-import CmsTestimonialsPage from '../pages/organizationadmin/websitecms/CmsTestimonialsPage';
-import AppointmentsPage from '../pages/organizationadmin/AppointmentsPage';
-import TowingPage from '../pages/organizationadmin/TowingPage';
-import CrmTasksPage from '../pages/organizationadmin/CrmTasksPage';
-import StaffSkillsPage from '../pages/organizationadmin/StaffSkillsPage';
-import SystemUsagePage from '../pages/organizationadmin/SystemUsagePage';
-import EstimateApprovalPage from '../pages/home/EstimateApprovalPage';
-import RentalFleetPage from '../pages/home/RentalFleetPage';
-import AppointmentBookingPage from '../pages/home/AppointmentBookingPage';
-import PublicWebsitePage from '../pages/home/PublicWebsitePage';
 import ProtectedRoute from './ProtectedRouteRedux';
 import { PermissionRoute } from './PermissionRoute';
 import IndustryFeatureRoute from './IndustryFeatureRoute';
 import LoginPage from '../pages/auth/LoginPage';
-import BranchSelectPage from '../pages/auth/BranchSelectPage';
-import UnauthorizedPage from '../pages/UnauthorizedPage';
 import { ROLES } from '../constants/roles';
 import { PERMISSIONS } from '../store/types';
 import BranchLayout from '../layouts/branch/BranchLayout';
-import BranchDashboardPage from '../pages/branch/BranchDashboardPage';
-import POSPage from '../pages/branch/POSPage';
-import QuickPOSPage from '../pages/branch/QuickPOSPage';
-import ProductsPage from '../pages/branch/ProductsPage';
-import BranchAddonRequestsPage from '../pages/branch/AddonRequestsPage';
-import BranchCustomersPage from '../pages/branch/CustomersPage';
-import BranchSalesPage from '../pages/branch/BranchSalesPage';
-import BranchJobSheetsPage from '../pages/branch/JobSheetsPage';
-import BranchSaleJobsPage from '../pages/branch/SaleJobsPage';
-import BranchReturnsPage from '../pages/branch/ReturnsPage';
-import BranchWarrantyPage from '../pages/branch/BranchWarrantyPage';
-import ProfilePage from '../pages/organizationadmin/ProfilePage';
-import InstallmentsPage from '../pages/branch/InstallmentsPage';
-import CreateInstallmentPlanPage from '../pages/branch/CreateInstallmentPlanPage';
-import InstallmentDetailPage from '../pages/branch/InstallmentDetailPage';
-import EditCustomerFinancialDetailsPage from '../pages/branch/EditCustomerFinancialDetailsPage';
-import AddCustomerFinancialDetailsPage from '../pages/branch/AddCustomerFinancialDetailsPage';
-import BranchCourierPage from '../pages/branch/CourierPage';
-import CourierPerformancePage from '../pages/branch/CourierPerformancePage';
-import AdvancePaymentsPage from '../pages/branch/AdvancePaymentsPage';
-import OrgAdvancePaymentsPage from '../pages/organizationadmin/AdvancePaymentsPage';
-import BranchBarcodeGeneratorPage from '../pages/branch/BarcodeGeneratorPage';
-import CashDrawerPage from '../pages/branch/CashDrawerPage';
-import AdminLoginPage from '../pages/auth/AdminLoginPage';
 import PlatformLayout from '../layouts/platform/PlatformLayout';
-import PlatformOverviewPage from '../pages/platformcontroladmin/PlatformOverviewPage';
 import AuthRedirect from './AuthRedirect';
 // Supplier Portal Imports
 import SupplierProtectedRoute from './SupplierProtectedRoute';
 import SupplierLayout from '../layouts/supplier/SupplierLayout';
-import SupplierLogin from '../pages/supplier/SupplierLogin';
-import SupplierRegister from '../pages/supplier/SupplierRegister';
-import SupplierDashboard from '../pages/supplier/SupplierDashboard';
-import SupplierPurchaseOrders from '../pages/supplier/SupplierPurchaseOrders';
-import SupplierPurchaseOrderDetail from '../pages/supplier/SupplierPurchaseOrderDetail';
-import SupplierProfile from '../pages/supplier/SupplierProfile';
-import SupplierPayments from '../pages/supplier/SupplierPayments';
-import CommunicationSettingsPage from '../pages/organizationadmin/CommunicationSettingsPage';
-import WhatsAppSettingsPage from '../pages/Settings/WhatsAppSettings';
-import WhatsAppAISettingsPage from '../pages/Settings/WhatsAppAISettings';
-import WhatsAppInboxPage from '../pages/WhatsApp/WhatsAppInbox';
-import WhatsAppOrdersPage from '../pages/WhatsApp/WhatsAppOrders';
-import FacebookLeadsPage from '../pages/FacebookLeads/FacebookLeads';
-import FacebookLeadsSettingsPage from '../pages/Settings/FacebookLeadsSettings';
-import AttendancePage from '../pages/organizationadmin/AttendancePage';
-import PayrollPage from '../pages/organizationadmin/PayrollPage';
-import StaffAttendancePage from '../pages/branch/StaffAttendancePage';
-import WooCommercePage from '../pages/organizationadmin/WooCommercePage';
-import WooCommerceOrdersPage from '../pages/organizationadmin/WooCommerceOrdersPage';
-import DiscountsPage from '../pages/organizationadmin/DiscountsPage';
-import POSSettingsPage from '../pages/organizationadmin/POSSettingsPage';
-import AddProductPage from '../pages/organizationadmin/AddProductPage';
-import EditProductPage from '../pages/organizationadmin/EditProductPage';
 import AllOrdersPage from '@/pages/organizationadmin/AllOrdersPage';
 import BranchAllOrdersPage from '@/pages/branch/BranchAllOrdersPage';
 import ActivityLogsPage from '@/pages/organizationadmin/ActivityLogsPage';
@@ -160,6 +173,13 @@ import ProductUsagePage from '@/pages/organizationadmin/ProductUsagePage';
  */
 
 const AppRouter = () => (
+  <Suspense
+    fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+      </div>
+    }
+  >
   <Routes>
 
       {/* <Route path="/home" element={<MainLayout />}> */}
@@ -349,6 +369,7 @@ const AppRouter = () => (
           <Route path="fuel" element={<RentalFuelPage />} />
           <Route path="claims" element={<RentalClaimsPage />} />
           <Route path="pricing" element={<RentalPricingPage />} />
+          <Route path="licenses" element={<RentalDriverLicensesPage />} />
         </Route>
         <Route path="carwash" element={
           <PermissionRoute module="carwash">
@@ -415,6 +436,7 @@ const AppRouter = () => (
           <Route path="pages" element={<CmsPagesPage />} />
           <Route path="blog" element={<CmsBlogPage />} />
           <Route path="testimonials" element={<CmsTestimonialsPage />} />
+          <Route path="payments" element={<CmsPaymentsPage />} />
         </Route>
         <Route path="crm-tasks" element={
           <PermissionRoute module="crm">
@@ -518,6 +540,21 @@ const AppRouter = () => (
             <CommunicationSettingsPage />
           </PermissionRoute>
         } />
+        <Route path="communication/sms-automation" element={
+          <PermissionRoute permissions={[PERMISSIONS.SMS_AUTOMATION_VIEW, PERMISSIONS.SMS_AUTOMATION_MANAGE]}>
+            <SmsAutomationPage />
+          </PermissionRoute>
+        } />
+        <Route path="activity-monitoring" element={
+          <PermissionRoute permissions={[PERMISSIONS.ACTIVITY_MONITORING_VIEW_TEAM, PERMISSIONS.ACTIVITY_MONITORING_MANAGE]}>
+            <ActivityMonitoringPage />
+          </PermissionRoute>
+        } />
+        <Route path="scorecard" element={
+          <PermissionRoute permissions={[PERMISSIONS.SCORECARD_VIEW_OWN, PERMISSIONS.SCORECARD_VIEW_TEAM, PERMISSIONS.SCORECARD_MANAGE]}>
+            <ScorecardPage />
+          </PermissionRoute>
+        } />
         <Route path="communication/whatsapp" element={
           <PermissionRoute permissions={[PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW]}>
             <WhatsAppSettingsPage />
@@ -546,6 +583,11 @@ const AppRouter = () => (
         <Route path="facebook-leads/settings" element={
           <PermissionRoute permissions={[PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE]}>
             <FacebookLeadsSettingsPage />
+          </PermissionRoute>
+        } />
+        <Route path="facebook-leads/forms" element={
+          <PermissionRoute permissions={[PERMISSIONS.LEAD_FORMS_VIEW, PERMISSIONS.LEAD_FORMS_MANAGE]}>
+            <LeadFormsPage />
           </PermissionRoute>
         } />
         <Route path="woocommerce" element={
@@ -720,6 +762,7 @@ const AppRouter = () => (
           <Route path="fuel" element={<RentalFuelPage />} />
           <Route path="claims" element={<RentalClaimsPage />} />
           <Route path="pricing" element={<RentalPricingPage />} />
+          <Route path="licenses" element={<RentalDriverLicensesPage />} />
         </Route>
         <Route path="carwash" element={
           <PermissionRoute module="carwash">
@@ -786,10 +829,26 @@ const AppRouter = () => (
           <Route path="pages" element={<CmsPagesPage />} />
           <Route path="blog" element={<CmsBlogPage />} />
           <Route path="testimonials" element={<CmsTestimonialsPage />} />
+          <Route path="payments" element={<CmsPaymentsPage />} />
         </Route>
         <Route path="crm-tasks" element={
           <PermissionRoute module="crm">
             <CrmTasksPage />
+          </PermissionRoute>
+        } />
+        <Route path="leads" element={
+          <PermissionRoute permissions={[PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE]}>
+            <FacebookLeadsPage />
+          </PermissionRoute>
+        } />
+        <Route path="my-activity" element={
+          <PermissionRoute permission={PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN}>
+            <MyActivityPage />
+          </PermissionRoute>
+        } />
+        <Route path="my-scorecard" element={
+          <PermissionRoute permissions={[PERMISSIONS.SCORECARD_VIEW_OWN, PERMISSIONS.SCORECARD_VIEW_TEAM]}>
+            <ScorecardPage />
           </PermissionRoute>
         } />
         <Route path="staff-skills" element={
@@ -860,6 +919,7 @@ const AppRouter = () => (
       </Route>
 
     </Routes>
+  </Suspense>
 );
 
 export default AppRouter;

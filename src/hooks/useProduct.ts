@@ -183,6 +183,7 @@ interface CreateProductData {
   parentProductId?: string;
   variantAttributes?: Record<string, any>;
   isService?: boolean;
+  isReload?: boolean;
 }
 
 interface UpdateProductData extends Partial<CreateProductData> {

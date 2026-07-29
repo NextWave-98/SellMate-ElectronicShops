@@ -37,7 +37,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-20 bg-slate-950/30 backdrop-blur-xl backdrop-saturate-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-[100] bg-slate-950/30 backdrop-blur-xl backdrop-saturate-150 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -86,7 +86,7 @@ function DialogContent({
           onInteractOutside?.(event)
         }}
         className={cn(
-          "fixed z-30 top-[50%] left-[50%] glass-modal-panel flex w-full md:min-w-3xl max-w-7xl max-h-[min(90vh,100dvh)] translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden rounded-2xl border border-white/40 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 p-0 shadow-[0_20px_60px_0_rgba(15,23,42,0.2)] ring-1 ring-inset ring-white/50 duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          "fixed z-[110] top-[50%] left-[50%] glass-modal-panel flex w-full md:min-w-3xl max-w-7xl max-h-[min(90vh,100dvh)] translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden rounded-2xl border border-white/40 bg-white/70 backdrop-blur-2xl backdrop-saturate-150 p-0 shadow-[0_20px_60px_0_rgba(15,23,42,0.2)] ring-1 ring-inset ring-white/50 duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           // Legacy dialogs without DialogBody: middle children scroll + get padding
           "[&>:not([data-slot])]:min-h-0 [&>:not([data-slot])]:flex-1 [&>:not([data-slot])]:overflow-y-auto [&>:not([data-slot])]:overscroll-contain [&>:not([data-slot])]:px-6 [&>:not([data-slot])]:py-4",
           className

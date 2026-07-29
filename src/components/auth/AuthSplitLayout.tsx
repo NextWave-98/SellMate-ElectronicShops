@@ -11,9 +11,9 @@ interface AuthSplitLayoutProps {
 }
 
 const HIGHLIGHTS = [
-  'POS, inventory & multi-branch in one place',
-  'Real-time analytics & courier tracking',
-  'Enterprise security with role-based access',
+  'POS, stock & multi-branch electronics retail',
+  'Job sheets, warranty claims & repair tracking',
+  'Courier delivery & real-time sales analytics',
 ];
 
 export function AuthSplitLayout({ children, title, subtitle, badge }: AuthSplitLayoutProps) {
@@ -54,13 +54,13 @@ export function AuthSplitLayout({ children, title, subtitle, badge }: AuthSplitL
             )}
             <img src="/favicon2.png" alt="Sell Mate" className="h-14 w-auto drop-shadow-lg" />
             <h2 className="text-4xl font-extrabold leading-tight text-white xl:text-5xl">
-              Power any business
+              Run your electronics shop
               <span className="block bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
-                with Sell Mate
+                smarter with Sell Mate
               </span>
             </h2>
             <p className="text-base leading-relaxed text-white/85 xl:text-lg">
-              Retail, fashion, food, services & more — POS, inventory, staff, courier delivery, and analytics in one platform.
+              Phones, laptops, accessories & repairs — POS, inventory, job sheets, warranty, and courier delivery in one platform built for electronics retailers.
             </p>
             <ul className="space-y-3">
               {HIGHLIGHTS.map((item) => (

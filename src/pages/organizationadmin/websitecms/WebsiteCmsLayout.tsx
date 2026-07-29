@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Globe, ExternalLink, Settings, Newspaper, FileText, Star } from 'lucide-react';
+import { Globe, ExternalLink, Settings, Newspaper, FileText, Star, CreditCard } from 'lucide-react';
 import { useCms } from '../../../hooks/useCms';
 import { useAuth } from '../../../context/AuthContext';
 import { useBusinessContext } from '../../../context/BusinessContext';
@@ -13,6 +13,7 @@ const navItems = [
   { to: 'pages', end: false, label: 'Pages', icon: FileText },
   { to: 'blog', end: false, label: 'Blog / Promotions', icon: Newspaper },
   { to: 'testimonials', end: false, label: 'Testimonials', icon: Star },
+  { to: 'payments', end: false, label: 'Payments', icon: CreditCard },
 ];
 
 export interface CmsOutletContext {

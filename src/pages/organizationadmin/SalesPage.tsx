@@ -8,7 +8,7 @@ import SalesDashboard from '../../components/superadmin/sales/dashboard/SalesDas
 import { DashboardSkeleton, TableSkeleton, CardSkeleton } from '../../components/common/SkeletonLoader';
 import { EmptySearchState, EmptyTableState } from '../../components/common/EmptyState';
 import { RefreshCw, BarChart3, List, TrendingUp, TrendingDown, Clock, Globe, ChevronLeft, ChevronRight, Package, Eye, CreditCard } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import useFetch from '../../hooks/useFetch';
 import toast from 'react-hot-toast';
@@ -548,7 +548,34 @@ export default function SalesPage() {
     try {
       const response = await getSaleById(sale.id);
       if (response?.success && response?.data) {
-        setSaleDetailsModal({ loading: false, data: response.data as any });
+        const raw = response.data as any;
+        // Backend may nest customer / use items|transactions aliases — normalize for the modal.
+        const customer =
+          raw.customer && typeof raw.customer === 'object' ? raw.customer : null;
+        setSaleDetailsModal({
+          loading: false,
+          data: {
+            ...raw,
+            invoiceNumber: raw.invoiceNumber || raw.saleNumber || sale.id,
+            saleNumber: raw.saleNumber || raw.invoiceNumber || null,
+            customerName:
+              raw.customerName || customer?.name || (sale as any).customerName || null,
+            customerPhone: raw.customerPhone || customer?.phone || null,
+            customerEmail: raw.customerEmail || customer?.email || null,
+            saleItems: Array.isArray(raw.saleItems)
+              ? raw.saleItems
+              : Array.isArray(raw.items)
+                ? raw.items
+                : [],
+            salePayments: Array.isArray(raw.salePayments)
+              ? raw.salePayments
+              : Array.isArray(raw.payments)
+                ? raw.payments
+                : Array.isArray(raw.transactions)
+                  ? raw.transactions
+                  : [],
+          },
+        });
       } else {
         toast.error('Failed to load sale details');
         setSaleDetailsModal(null);
@@ -1857,253 +1884,350 @@ export default function SalesPage() {
 
       {/* Sale Details Modal */}
       <Dialog open={!!saleDetailsModal} onOpenChange={(o) => { if (!o) setSaleDetailsModal(null); }}>
-        <DialogContent className="sm:max-w-7xl max-h-[90vh]  ">
+        <DialogContent className="z-[110] w-[95vw] sm:max-w-5xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Package className="w-4 h-4 text-orange-500" />
               Sale Details
               {saleDetailsModal?.data && (
-                <span className="text-gray-500 font-normal text-sm ml-1">— {saleDetailsModal.data.invoiceNumber || saleDetailsModal.data.saleNumber || saleDetailsModal.data.id}</span>
+                <span className="text-gray-500 font-normal text-sm ml-1">
+                  — {String(saleDetailsModal.data.invoiceNumber || saleDetailsModal.data.saleNumber || saleDetailsModal.data.id || '')}
+                </span>
               )}
             </DialogTitle>
           </DialogHeader>
 
-          {saleDetailsModal?.loading ? (
-            <TableSkeleton rows={5} />
-          ) : saleDetailsModal?.data ? (() => {
-            const d = saleDetailsModal.data;
-            const items: any[] = d.saleItems || d.items || [];
-            const payments: any[] = d.salePayments || d.payments || [];
-            const courier = d.courierShipment || null;
-            const subtotal = Number(d.subtotal || 0);
-            const discount = Number(d.discount || 0);
-            const tax = Number(d.tax || 0);
-            const total = Number(d.totalAmount || 0);
-            const paid = Number(d.paidAmount || 0);
-            const balance = total - paid;
+          <DialogBody>
+            {saleDetailsModal?.loading ? (
+              <TableSkeleton rows={5} />
+            ) : saleDetailsModal?.data ? (() => {
+              try {
+                const d = saleDetailsModal.data;
+                const items: any[] = Array.isArray(d.saleItems)
+                  ? d.saleItems
+                  : Array.isArray(d.items)
+                    ? d.items
+                    : [];
+                const payments: any[] = Array.isArray(d.salePayments)
+                  ? d.salePayments
+                  : Array.isArray(d.payments)
+                    ? d.payments
+                    : Array.isArray(d.transactions)
+                      ? d.transactions
+                      : [];
+                const courier = d.courierShipment || d.shipment || null;
+                const subtotal = Number(d.subtotal || 0);
+                const discount = Number(d.discount || 0);
+                const tax = Number(d.tax || 0);
+                const total = Number(d.totalAmount || 0);
+                const paid = Number(d.paidAmount || 0);
+                const balance = total - paid;
+                const customerName =
+                  d.customerName ||
+                  (typeof d.customer === 'object' ? d.customer?.name : null) ||
+                  null;
+                const customerPhone =
+                  d.customerPhone ||
+                  (typeof d.customer === 'object' ? d.customer?.phone : null) ||
+                  null;
+                const customerEmail =
+                  d.customerEmail ||
+                  (typeof d.customer === 'object' ? d.customer?.email : null) ||
+                  null;
+                const soldByName =
+                  (typeof d.soldBy === 'object' ? d.soldBy?.name : d.soldBy) ||
+                  d.soldByName ||
+                  null;
+                const paymentMethodLabel =
+                  typeof d.paymentMethod === 'string' ? d.paymentMethod : '—';
 
-            const badge = (text: string, color: string) => (
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{text}</span>
-            );
+                const badge = (text: string, color: string) => (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{text}</span>
+                );
 
-            const statusColor = (s: string) => {
-              const v = s?.toUpperCase();
-              if (v === 'COMPLETED') return 'bg-green-100/60 text-green-700 backdrop-blur-sm';
-              if (v === 'PENDING') return 'bg-yellow-100/60 text-yellow-700 backdrop-blur-sm';
-              if (v === 'CANCELLED') return 'bg-red-100/60 text-red-700 backdrop-blur-sm';
-              return 'bg-white/30 backdrop-blur-sm text-gray-600';
-            };
+                const statusColor = (s: string) => {
+                  const v = String(s || '').toUpperCase();
+                  if (v === 'COMPLETED') return 'bg-green-100/60 text-green-700 backdrop-blur-sm';
+                  if (v === 'PENDING' || v === 'PARTIAL') return 'bg-yellow-100/60 text-yellow-700 backdrop-blur-sm';
+                  if (v === 'CANCELLED' || v === 'REFUNDED') return 'bg-red-100/60 text-red-700 backdrop-blur-sm';
+                  return 'bg-white/30 backdrop-blur-sm text-gray-600';
+                };
 
-            return (
-              <div className="space-y-5">
+                const textOrDash = (value: unknown) => {
+                  if (value == null || value === '') return '—';
+                  if (typeof value === 'object') return '—';
+                  return String(value);
+                };
 
-                {/* ── Sale Header ── */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-white/40 backdrop-blur-sm rounded-xl border border-white/20 text-sm">
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Invoice #</p>
-                    <p className="font-semibold">{d.invoiceNumber || d.saleNumber || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Date</p>
-                    <p className="font-medium">{d.createdAt ? new Date(d.createdAt).toLocaleString() : '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Status</p>
-                    {badge(d.status || '—', statusColor(d.status))}
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Payment Method</p>
-                    <p className="font-medium">{d.paymentMethod || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Payment Status</p>
-                    {badge(d.paymentStatus || '—', statusColor(d.paymentStatus))}
-                  </div>
-                  {d.paymentReference && (
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Reference</p>
-                      <p className="font-medium">{d.paymentReference}</p>
+                return (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-white/40 backdrop-blur-sm rounded-xl border border-white/20 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Invoice #</p>
+                        <p className="font-semibold">{textOrDash(d.invoiceNumber || d.saleNumber)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Date</p>
+                        <p className="font-medium">{d.createdAt ? new Date(d.createdAt).toLocaleString() : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Status</p>
+                        {badge(textOrDash(d.status), statusColor(d.status))}
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Payment Method</p>
+                        <p className="font-medium">{paymentMethodLabel}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Payment Status</p>
+                        {badge(textOrDash(d.paymentStatus), statusColor(d.paymentStatus))}
+                      </div>
+                      {d.paymentReference && (
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">Reference</p>
+                          <p className="font-medium">{textOrDash(d.paymentReference)}</p>
+                        </div>
+                      )}
+                      {soldByName && (
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">Sold By</p>
+                          <p className="font-medium">{String(soldByName)}</p>
+                        </div>
+                      )}
+                      {d.location?.name && (
+                        <div>
+                          <p className="text-xs text-gray-400 mb-0.5">Location</p>
+                          <p className="font-medium">{String(d.location.name)}</p>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {(d.soldBy || d.soldByName) && (
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Sold By</p>
-                      <p className="font-medium">{(typeof d.soldBy === 'object' ? d.soldBy?.name : d.soldBy) || d.soldByName}</p>
-                    </div>
-                  )}
-                  {d.location?.name && (
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Location</p>
-                      <p className="font-medium">{d.location.name}</p>
-                    </div>
-                  )}
-                </div>
 
-                {/* ── Customer ── */}
-                {(d.customerName || d.customerPhone || d.customerEmail) && (
-                  <div className="p-4 border border-white/20 bg-white/30 backdrop-blur-sm rounded-lg text-sm">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Customer</p>
-                    <p className="font-semibold">{d.customerName || 'Walk-in'}</p>
-                    {d.customerPhone && <p className="text-gray-600">{d.customerPhone}</p>}
-                    {d.customerEmail && <p className="text-gray-600">{d.customerEmail}</p>}
-                  </div>
-                )}
-
-                {/* ── Items ── */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Items ({items.length})</p>
-                  {items.length === 0 ? (
-                    <p className="text-sm text-gray-400 py-4 text-center">No items found</p>
-                  ) : (
-                    <div className="overflow-x-auto rounded-lg border border-white/20 bg-white/20 backdrop-blur-sm">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-white/20 backdrop-blur-sm">
-                            <TableHead className="text-xs">#</TableHead>
-                            <TableHead className="text-xs">Product</TableHead>
-                            <TableHead className="text-xs text-right">Qty</TableHead>
-                            <TableHead className="text-xs text-right">Unit Price</TableHead>
-                            <TableHead className="text-xs text-right">Discount</TableHead>
-                            <TableHead className="text-xs text-right">Total</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {items.map((item: any, i: number) => (
-                            <TableRow key={i}>
-                              <TableCell className="text-xs text-gray-400">{i + 1}</TableCell>
-                              <TableCell className="text-sm">
-                                <div className="font-medium">{item.product?.name || item.productName || '—'}</div>
-                                {(item.product?.sku || item.sku) && (
-                                  <div className="text-xs text-gray-400">{item.product?.sku || item.sku}</div>
-                                )}
-                                {(item.product?.category?.name || item.category) && (
-                                  <div className="text-xs text-gray-400">{item.product?.category?.name || item.category}</div>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-sm text-right">{item.quantity}</TableCell>
-                              <TableCell className="text-sm text-right">{formatCurrency(Number(item.unitPrice || 0))}</TableCell>
-                              <TableCell className="text-sm text-right">
-                                {Number(item.discount) > 0 ? formatCurrency(Number(item.discount)) : '—'}
-                              </TableCell>
-                              <TableCell className="text-sm text-right font-semibold">
-                                {formatCurrency(Number(item.totalPrice ?? (Number(item.unitPrice) * item.quantity)))}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Totals ── */}
-                <div className="flex justify-end">
-                  <div className="w-64 space-y-1 text-sm">
-                    <div className="flex justify-between text-gray-600">
-                      <span>Subtotal</span><span>{formatCurrency(subtotal)}</span>
-                    </div>
-                    {discount > 0 && (
-                      <div className="flex justify-between text-red-500">
-                        <span>Discount</span><span>- {formatCurrency(discount)}</span>
+                    {(customerName || customerPhone || customerEmail) && (
+                      <div className="p-4 border border-white/20 bg-white/30 backdrop-blur-sm rounded-lg text-sm">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Customer</p>
+                        <p className="font-semibold">{String(customerName || 'Walk-in')}</p>
+                        {customerPhone && <p className="text-gray-600">{String(customerPhone)}</p>}
+                        {customerEmail && <p className="text-gray-600">{String(customerEmail)}</p>}
                       </div>
                     )}
-                    {tax > 0 && (
-                      <div className="flex justify-between text-gray-600">
-                        <span>Tax</span><span>{formatCurrency(tax)}</span>
+
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Items ({items.length})</p>
+                      {items.length === 0 ? (
+                        <p className="text-sm text-gray-400 py-4 text-center">No items found</p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-lg border border-white/20 bg-white/20 backdrop-blur-sm">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-white/20 backdrop-blur-sm">
+                                <TableHead className="text-xs">#</TableHead>
+                                <TableHead className="text-xs">Product</TableHead>
+                                <TableHead className="text-xs text-right">Qty</TableHead>
+                                <TableHead className="text-xs text-right">Unit Price</TableHead>
+                                <TableHead className="text-xs text-right">Discount</TableHead>
+                                <TableHead className="text-xs text-right">Total</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {items.map((item: any, i: number) => {
+                                const productName =
+                                  item.productName ||
+                                  item.product?.name ||
+                                  '—';
+                                const sku =
+                                  typeof item.product?.sku === 'string'
+                                    ? item.product.sku
+                                    : typeof item.sku === 'string'
+                                      ? item.sku
+                                      : null;
+                                const categoryName =
+                                  typeof item.product?.category?.name === 'string'
+                                    ? item.product.category.name
+                                    : typeof item.category === 'string'
+                                      ? item.category
+                                      : null;
+                                const lineTotal = Number(
+                                  item.totalPrice ??
+                                    item.subtotal ??
+                                    Number(item.unitPrice || 0) * Number(item.quantity || 0),
+                                );
+                                return (
+                                  <TableRow key={item.id || i}>
+                                    <TableCell className="text-xs text-gray-400">{i + 1}</TableCell>
+                                    <TableCell className="text-sm">
+                                      <div className="font-medium">{String(productName)}</div>
+                                      {item.reloadPhone && (
+                                        <div className="text-xs text-emerald-700">
+                                          Reload · {String(item.reloadPhone)}
+                                        </div>
+                                      )}
+                                      {sku && <div className="text-xs text-gray-400">{sku}</div>}
+                                      {categoryName && (
+                                        <div className="text-xs text-gray-400">{categoryName}</div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-right">
+                                      {Number(item.quantity || 0)}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-right">
+                                      {formatCurrency(Number(item.unitPrice || 0))}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-right">
+                                      {Number(item.discount || item.discountAmount || 0) > 0
+                                        ? formatCurrency(Number(item.discount || item.discountAmount || 0))
+                                        : '—'}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-right font-semibold">
+                                      {formatCurrency(lineTotal)}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end">
+                      <div className="w-64 space-y-1 text-sm">
+                        <div className="flex justify-between text-gray-600">
+                          <span>Subtotal</span><span>{formatCurrency(subtotal)}</span>
+                        </div>
+                        {discount > 0 && (
+                          <div className="flex justify-between text-red-500">
+                            <span>Discount</span><span>- {formatCurrency(discount)}</span>
+                          </div>
+                        )}
+                        {tax > 0 && (
+                          <div className="flex justify-between text-gray-600">
+                            <span>Tax</span><span>{formatCurrency(tax)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-bold text-base border-t pt-1">
+                          <span>Total</span><span>{formatCurrency(total)}</span>
+                        </div>
+                        <div className="flex justify-between text-green-700">
+                          <span>Paid</span><span>{formatCurrency(paid)}</span>
+                        </div>
+                        {balance > 0.01 && (
+                          <div className="flex justify-between text-red-600 font-semibold">
+                            <span>Balance Due</span><span>{formatCurrency(balance)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {payments.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payment History</p>
+                        <div className="overflow-x-auto rounded-lg border border-white/20 bg-white/20 backdrop-blur-sm">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-white/20 backdrop-blur-sm">
+                                <TableHead className="text-xs">Date</TableHead>
+                                <TableHead className="text-xs">Method</TableHead>
+                                <TableHead className="text-xs">Reference</TableHead>
+                                <TableHead className="text-xs">Status</TableHead>
+                                <TableHead className="text-xs text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {payments.map((p: any, i: number) => (
+                                <TableRow key={p.id || i}>
+                                  <TableCell className="text-xs">
+                                    {(p.createdAt || p.date)
+                                      ? new Date(p.createdAt || p.date).toLocaleString()
+                                      : '—'}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {textOrDash(p.paymentMethod || p.method)}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-gray-500">
+                                    {textOrDash(p.reference || p.referenceNumber || p.transactionId)}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {badge(textOrDash(p.status || 'COMPLETED'), statusColor(p.status || 'COMPLETED'))}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right font-semibold">
+                                    {formatCurrency(Number(p.amount || 0))}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     )}
-                    <div className="flex justify-between font-bold text-base border-t pt-1">
-                      <span>Total</span><span>{formatCurrency(total)}</span>
-                    </div>
-                    <div className="flex justify-between text-green-700">
-                      <span>Paid</span><span>{formatCurrency(paid)}</span>
-                    </div>
-                    {balance > 0.01 && (
-                      <div className="flex justify-between text-red-600 font-semibold">
-                        <span>Balance Due</span><span>{formatCurrency(balance)}</span>
+
+                    {courier && (
+                      <div className="p-4 border border-blue-100 bg-blue-50 rounded-lg text-sm">
+                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Courier / Shipment</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {(courier.shipmentNumber || courier.shipment_number) && (
+                            <div>
+                              <p className="text-xs text-gray-400">Shipment #</p>
+                              <p className="font-medium">{String(courier.shipmentNumber || courier.shipment_number)}</p>
+                            </div>
+                          )}
+                          {courier.courier?.name && (
+                            <div>
+                              <p className="text-xs text-gray-400">Courier</p>
+                              <p className="font-medium">{String(courier.courier.name)}</p>
+                            </div>
+                          )}
+                          {(courier.recipientName || courier.recipient_name) && (
+                            <div>
+                              <p className="text-xs text-gray-400">Recipient</p>
+                              <p className="font-medium">{String(courier.recipientName || courier.recipient_name)}</p>
+                            </div>
+                          )}
+                          {(courier.recipientPhone || courier.recipient_phone) && (
+                            <div>
+                              <p className="text-xs text-gray-400">Phone</p>
+                              <p className="font-medium">{String(courier.recipientPhone || courier.recipient_phone)}</p>
+                            </div>
+                          )}
+                          {(courier.deliveryAddress || courier.recipient_address) && (
+                            <div className="col-span-2">
+                              <p className="text-xs text-gray-400">Address</p>
+                              <p className="font-medium">{String(courier.deliveryAddress || courier.recipient_address)}</p>
+                            </div>
+                          )}
+                          {(courier.trackingNumber || courier.tracking_number) && (
+                            <div>
+                              <p className="text-xs text-gray-400">Tracking #</p>
+                              <p className="font-medium">{String(courier.trackingNumber || courier.tracking_number)}</p>
+                            </div>
+                          )}
+                          {courier.status && (
+                            <div>
+                              <p className="text-xs text-gray-400">Courier Status</p>
+                              {badge(String(courier.status), statusColor(courier.status))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {d.notes && typeof d.notes === 'string' && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-100 rounded-lg text-sm">
+                        <p className="text-xs font-semibold text-yellow-700 mb-1">Notes</p>
+                        <p className="text-gray-700 whitespace-pre-wrap">{d.notes}</p>
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* ── Payment History ── */}
-                {payments.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Payment History</p>
-                    <div className="overflow-x-auto rounded-lg border border-white/20 bg-white/20 backdrop-blur-sm">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-white/20 backdrop-blur-sm">
-                            <TableHead className="text-xs">Date</TableHead>
-                            <TableHead className="text-xs">Method</TableHead>
-                            <TableHead className="text-xs">Reference</TableHead>
-                            <TableHead className="text-xs">Status</TableHead>
-                            <TableHead className="text-xs text-right">Amount</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {payments.map((p: any, i: number) => (
-                            <TableRow key={i}>
-                              <TableCell className="text-xs">{p.createdAt ? new Date(p.createdAt).toLocaleString() : '—'}</TableCell>
-                              <TableCell className="text-xs">{p.paymentMethod || p.method || '—'}</TableCell>
-                              <TableCell className="text-xs text-gray-500">{p.reference || p.transactionId || '—'}</TableCell>
-                              <TableCell className="text-xs">{badge(p.status || '—', statusColor(p.status))}</TableCell>
-                              <TableCell className="text-xs text-right font-semibold">{formatCurrency(Number(p.amount || 0))}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                );
+              } catch (err) {
+                console.error('Sale details render error:', err);
+                return (
+                  <div className="p-6 text-center text-sm text-red-600">
+                    Could not display sale details. Please try again or refresh the page.
                   </div>
-                )}
-
-                {/* ── Courier Info ── */}
-                {courier && (
-                  <div className="p-4 border border-blue-100 bg-blue-50 rounded-lg text-sm">
-                    <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">Courier / Shipment</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {courier.shipmentNumber && (
-                        <div><p className="text-xs text-gray-400">Shipment #</p><p className="font-medium">{courier.shipmentNumber}</p></div>
-                      )}
-                      {courier.courier?.name && (
-                        <div><p className="text-xs text-gray-400">Courier</p><p className="font-medium">{courier.courier.name}</p></div>
-                      )}
-                      {courier.recipientName && (
-                        <div><p className="text-xs text-gray-400">Recipient</p><p className="font-medium">{courier.recipientName}</p></div>
-                      )}
-                      {courier.recipientPhone && (
-                        <div><p className="text-xs text-gray-400">Phone</p><p className="font-medium">{courier.recipientPhone}</p></div>
-                      )}
-                      {courier.deliveryAddress && (
-                        <div className="col-span-2"><p className="text-xs text-gray-400">Address</p><p className="font-medium">{courier.deliveryAddress}</p></div>
-                      )}
-                      {courier.trackingNumber && (
-                        <div><p className="text-xs text-gray-400">Tracking #</p><p className="font-medium">{courier.trackingNumber}</p></div>
-                      )}
-                      {courier.status && (
-                        <div><p className="text-xs text-gray-400">Courier Status</p>{badge(courier.status, statusColor(courier.status))}</div>
-                      )}
-                      {courier.shipping_charge != null && (
-                        <div><p className="text-xs text-gray-400">Shipping Charge</p><p className="font-medium">{formatCurrency(Number(courier.shipping_charge))}</p></div>
-                      )}
-                      {courier.actual_shipping_cost != null && (
-                        <div><p className="text-xs text-gray-400">Actual Shipping Cost</p><p className="font-medium">{formatCurrency(Number(courier.actual_shipping_cost))}</p></div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Notes ── */}
-                {d.notes && (
-                  <div className="p-3 bg-yellow-50 border border-yellow-100 rounded-lg text-sm">
-                    <p className="text-xs font-semibold text-yellow-700 mb-1">Notes</p>
-                    <p className="text-gray-700">{d.notes}</p>
-                  </div>
-                )}
-
-              </div>
-            );
-          })() : null}
+                );
+              }
+            })() : null}
+          </DialogBody>
 
           <DialogFooter>
             <button

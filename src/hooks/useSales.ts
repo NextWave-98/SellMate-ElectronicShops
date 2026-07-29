@@ -422,6 +422,7 @@ const useSales = () => {
         discountType?: "PERCENTAGE" | "FIXED";
         tax?: number;
         warrantyMonths?: number;
+        reloadPhone?: string;
       }>;
       payments?: Array<{
         method:

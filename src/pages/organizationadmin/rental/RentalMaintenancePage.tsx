@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogBody,
 } from '@/components/ui/dialog';
 import LoadingSpinner from '../../../components/common/LoadingSpinner';
 import { useRental } from '../../../hooks/useRental';
@@ -25,6 +25,8 @@ export default function RentalMaintenancePage() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<any>(null);
   const [form, setForm] = useState<any>({
     vehicleId: '', title: '', scheduledDate: '', cost: 0, serviceProvider: '',
   });
@@ -44,28 +46,56 @@ export default function RentalMaintenancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openModal = async () => {
-    setShowModal(true);
+  const loadVehicles = async () => {
     const res = await getVehicles({ limit: 100 });
     setVehicles((res?.data as any)?.vehicles ?? []);
+  };
+
+  const openModal = async () => {
+    setEditingId(null);
+    setForm({ vehicleId: '', title: '', scheduledDate: '', cost: 0, serviceProvider: '' });
+    setShowModal(true);
+    await loadVehicles();
+  };
+
+  const openEdit = async (m: any) => {
+    setEditingId(m.id);
+    setForm({
+      vehicleId: m.vehicleId ?? '', title: m.title ?? '', scheduledDate: m.scheduledDate ?? '',
+      cost: m.cost ?? 0, serviceProvider: m.serviceProvider ?? '',
+    });
+    setShowModal(true);
+    await loadVehicles();
   };
 
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await rental.createMaintenance({
+      const payload = {
         ...form,
         cost: Number(form.cost || 0),
         scheduledDate: form.scheduledDate || null,
-      });
+      };
+      const res = editingId
+        ? await rental.updateMaintenance(editingId, payload)
+        : await rental.createMaintenance(payload);
       if (res?.success || res?.status) {
         setShowModal(false);
+        setEditingId(null);
         load();
         refreshStats();
       }
     } finally {
       setSaving(false);
     }
+  };
+
+  const confirmCancelMaint = async () => {
+    if (!cancelTarget) return;
+    await rental.updateMaintenance(cancelTarget.id, { status: 'CANCELLED' });
+    setCancelTarget(null);
+    load();
+    refreshStats();
   };
 
   if (loading && maintenances.length === 0) return <LoadingSpinner />;
@@ -91,12 +121,18 @@ export default function RentalMaintenancePage() {
                 <td className="p-3">{m.scheduledDate || '—'}</td>
                 <td className="p-3">Rs {Number(m.cost).toLocaleString()}</td>
                 <td className="p-3"><Badge className={statusColor[m.status] || ''}>{m.status}</Badge></td>
-                <td className="p-3 space-x-1">
+                <td className="p-3 space-x-1 whitespace-nowrap">
                   {m.status === 'SCHEDULED' && (
                     <Button size="sm" variant="outline" onClick={async () => { await rental.updateMaintenance(m.id, { status: 'IN_PROGRESS' }); load(); refreshStats(); }}>Start</Button>
                   )}
                   {m.status === 'IN_PROGRESS' && (
                     <Button size="sm" onClick={async () => { await rental.updateMaintenance(m.id, { status: 'COMPLETED', completedDate: new Date().toISOString().slice(0, 10) }); load(); refreshStats(); }}>Complete</Button>
+                  )}
+                  {(m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') && (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(m)}><Pencil className="w-4 h-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => setCancelTarget(m)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </>
                   )}
                 </td>
               </tr>
@@ -109,9 +145,9 @@ export default function RentalMaintenancePage() {
       </CardContent></Card>
 
       {/* Maintenance dialog */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingId(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Schedule Maintenance</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? 'Edit Maintenance' : 'Schedule Maintenance'}</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <div><Label>Vehicle *</Label>
               <select className={selectCls} value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
@@ -125,10 +161,24 @@ export default function RentalMaintenancePage() {
             <div><Label>Service Provider</Label><Input value={form.serviceProvider} onChange={(e) => setForm({ ...form, serviceProvider: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowModal(false); setEditingId(null); }}>Cancel</Button>
             <Button onClick={submit} disabled={saving || !form.vehicleId || !form.title}>
-              {saving ? 'Saving...' : 'Schedule'}
+              {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Schedule'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel maintenance confirmation */}
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Cancel this maintenance?</DialogTitle></DialogHeader>
+          <DialogBody>
+            <p className="text-sm text-muted-foreground">{cancelTarget?.title} on {cancelTarget?.vehicle?.registrationNo || 'this vehicle'} will be marked cancelled.</p>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)}>Keep</Button>
+            <Button variant="destructive" onClick={confirmCancelMaint}>Cancel maintenance</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

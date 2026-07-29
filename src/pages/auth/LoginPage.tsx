@@ -123,7 +123,7 @@ const LoginPage = () => {
 
   return (
     <AuthSplitLayout
-      badge="All-in-One Business Platform"
+      badge="Electronics Retail Platform"
       title="Welcome back"
       subtitle="Sign in to manage your business with Sell Mate"
     >

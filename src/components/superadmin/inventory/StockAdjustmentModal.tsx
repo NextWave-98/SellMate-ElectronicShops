@@ -37,10 +37,12 @@ export default function StockAdjustmentModal({
 
   if (!isOpen || !item) return null;
 
+  const isReload = item.product?.isReload === true;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (quantity <= 0) {
-      alert('Please enter a valid quantity');
+      alert(isReload ? 'Please enter a valid amount' : 'Please enter a valid quantity');
       return;
     }
 
@@ -110,12 +112,18 @@ export default function StockAdjustmentModal({
                     <p className="font-medium text-gray-900">{item.location?.name || item.branch?.name || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Current Stock</p>
-                    <p className="font-medium text-gray-900">{currentStock} units</p>
+                    <p className="text-gray-500">{isReload ? 'Current Balance' : 'Current Stock'}</p>
+                    <p className="font-medium text-gray-900">
+                      {isReload ? `Rs. ${currentStock.toLocaleString()}` : `${currentStock} units`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-500">Available</p>
-                    <p className="font-medium text-gray-900">{item.availableQuantity} units</p>
+                    <p className="font-medium text-gray-900">
+                      {isReload
+                        ? `Rs. ${Number(item.availableQuantity).toLocaleString()}`
+                        : `${item.availableQuantity} units`}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -153,7 +161,7 @@ export default function StockAdjustmentModal({
               {/* Quantity Input */}
               <div>
                 <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
-                  Quantity <span className="text-red-500">*</span>
+                  {isReload ? 'Amount (LKR)' : 'Quantity'} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -162,7 +170,7 @@ export default function StockAdjustmentModal({
                   value={quantity || ''}
                   onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                  placeholder="Enter quantity"
+                  placeholder={isReload ? 'Enter amount in LKR' : 'Enter quantity'}
                   required
                 />
               </div>
@@ -172,12 +180,12 @@ export default function StockAdjustmentModal({
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Current Stock</p>
+                      <p className="text-sm text-gray-600">{isReload ? 'Current Balance' : 'Current Stock'}</p>
                       <p className="text-2xl font-bold text-gray-900">{currentStock}</p>
                     </div>
                     <div className="text-3xl text-gray-400">→</div>
                     <div>
-                      <p className="text-sm text-gray-600">New Stock</p>
+                      <p className="text-sm text-gray-600">{isReload ? 'New Balance' : 'New Stock'}</p>
                       <p className={`text-2xl font-bold ${newStock >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {newStock}
                       </p>
@@ -185,7 +193,7 @@ export default function StockAdjustmentModal({
                   </div>
                   {newStock < 0 && (
                     <p className="mt-2 text-sm text-red-600">
-                      ⚠️ Warning: This adjustment will result in negative stock!
+                      ⚠️ Warning: This adjustment will result in negative {isReload ? 'balance' : 'stock'}!
                     </p>
                   )}
                 </div>

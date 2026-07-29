@@ -4,10 +4,15 @@ import BranchSidebar from './BranchSidebar';
 import { useEffect, useRef, useState } from 'react';
 import { ShieldX, Loader2 } from 'lucide-react';
 import useBranchScope from '../../hooks/useBranchScope';
+import { useActivityHeartbeat } from '../../hooks/useActivityHeartbeat';
+import { usePermissions } from '../../hooks/usePermissions';
+import { PERMISSIONS } from '../../store/types';
 
 const BranchLayout = () => {
   const location = useLocation();
   const { ready, syncing, error: scopeError } = useBranchScope();
+  const { hasPermission } = usePermissions();
+  useActivityHeartbeat(hasPermission(PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [accessDenied, setAccessDenied] = useState<{ show: boolean; message: string }>({

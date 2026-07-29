@@ -63,6 +63,12 @@ export interface CreateFormPayload {
 export interface FacebookLeadStats {
   total: number;
   converted: number;
+  /** Leads that reached an order (a courier shipment was created). */
+  ordersCreated: number;
+  /** Rejected + lost leads. */
+  rejected: number;
+  /** ordersCreated / total, as a percentage (one decimal place). */
+  successRate: number;
   byStatus: Record<FacebookLeadStatus, number>;
   byForm: Array<{ formId: string | null; formName: string | null; count: number }>;
 }
@@ -90,7 +96,56 @@ export interface FacebookLeadSettings {
   lastSyncAt: string | null;
 }
 
-export type FacebookLeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST';
+export type FacebookLeadStatus =
+  | 'NEW'
+  | 'CONTACTED'
+  | 'QUALIFIED'
+  | 'WON'
+  | 'LOST'
+  | 'ORDER_CONFIRMED'
+  | 'ON_HOLD'
+  | 'CALL_ATTEMPT_1'
+  | 'CALL_ATTEMPT_2'
+  | 'CALL_ATTEMPT_3'
+  | 'NO_RESPONSE'
+  | 'REJECTED'
+  | 'ORDER_CREATED';
+
+/** Full status list in pipeline order (kept in sync with the backend enum). */
+export const LEAD_STATUSES: FacebookLeadStatus[] = [
+  'NEW',
+  'CONTACTED',
+  'QUALIFIED',
+  'WON',
+  'LOST',
+  'ORDER_CONFIRMED',
+  'ON_HOLD',
+  'CALL_ATTEMPT_1',
+  'CALL_ATTEMPT_2',
+  'CALL_ATTEMPT_3',
+  'NO_RESPONSE',
+  'REJECTED',
+  'ORDER_CREATED',
+];
+
+export interface CreateOrderPayload {
+  recipientAddress: string;
+  recipientCity: string;
+  recipientDistrict?: string;
+  recipientPostalCode?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  recipientPhone2?: string;
+  courierServiceId?: string;
+  weight?: number;
+  numberOfPieces?: number;
+  description?: string;
+  orderAmount?: number;
+  shippingCharge?: number;
+  paymentMethod?: 'cod' | 'bank' | 'cash' | 'online';
+  codAmount?: number;
+  notes?: string;
+}
 
 export interface FacebookLead {
   id: string;
@@ -108,6 +163,12 @@ export interface FacebookLead {
   assignedStaffId: string | null;
   customerId: string | null;
   notes: string | null;
+  source?: 'FACEBOOK' | 'WEB_FORM' | 'MANUAL' | 'WALK_IN' | 'OTHER' | null;
+  leadFormId?: string | null;
+  courierShipmentId?: string | null;
+  trackingNumber?: string | null;
+  orderAmount?: number | null;
+  orderCreatedAt?: string | null;
   createdAt: string;
   Branch?: { id: string; name: string };
   Staff?: { id: string; staffId: string; user?: { id: string; name: string } };
@@ -197,6 +258,14 @@ export const facebookLeadsService = {
 
   convertLead: (orgId: string, leadId: string) =>
     apiRequest(orgId, `/leads/${leadId}/convert`, { method: 'POST' }),
+
+  /** Create an order from a lead — the backend auto-creates the courier shipment. */
+  createOrder: (orgId: string, leadId: string, payload: CreateOrderPayload) =>
+    apiRequest<{ data: { lead: FacebookLead; shipment: Record<string, unknown> } }>(
+      orgId,
+      `/leads/${leadId}/create-order`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    ),
 
   updateNotes: (orgId: string, leadId: string, notes: string | null) =>
     apiRequest<{ data: FacebookLead }>(orgId, `/leads/${leadId}/notes`, {

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Pencil, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import LoadingSpinner from '../../../components/common/LoadingSpinner';
 import { useRental } from '../../../hooks/useRental';
-import { statusColor } from './shared';
+import { selectCls, statusColor } from './shared';
+
+const VEHICLE_STATUSES = ['AVAILABLE', 'RESERVED', 'RENTED', 'MAINTENANCE', 'CLEANING', 'ACCIDENT', 'RETIRED', 'SOLD'];
 
 /** Service-due helper: due now, or within 500 km. */
 const serviceState = (v: any): 'due' | 'soon' | null => {
@@ -26,6 +28,7 @@ export default function RentalFleetPage() {
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,17 +45,26 @@ export default function RentalFleetPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const filteredVehicles = useMemo(
+    () => (statusFilter ? vehicles.filter((v) => v.status === statusFilter) : vehicles),
+    [vehicles, statusFilter]
+  );
+
   if (loading && vehicles.length === 0) return <LoadingSpinner />;
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
           <Input className="pl-8" placeholder="Search reg no / make / model" value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && load()} />
         </div>
+        <select className={`${selectCls} max-w-44`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">All statuses</option>
+          {VEHICLE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
         <Link to="new"><Button><Plus className="w-4 h-4 mr-1" /> Add Vehicle</Button></Link>
       </div>
       <Card><CardContent className="p-0 overflow-x-auto">
@@ -65,7 +77,7 @@ export default function RentalFleetPage() {
             </tr>
           </thead>
           <tbody>
-            {vehicles.map((v) => (
+            {filteredVehicles.map((v) => (
               <tr key={v.id} className="border-t">
                 <td className="p-3">
                   <div className="flex items-center gap-2.5">
@@ -97,9 +109,11 @@ export default function RentalFleetPage() {
                 </td>
               </tr>
             ))}
-            {vehicles.length === 0 && (
+            {filteredVehicles.length === 0 && (
               <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">
-                No vehicles in the fleet yet — <Link to="new" className="underline">add the first one</Link>
+                {vehicles.length === 0
+                  ? <>No vehicles in the fleet yet — <Link to="new" className="underline">add the first one</Link></>
+                  : 'No vehicles match this status'}
               </td></tr>
             )}
           </tbody>

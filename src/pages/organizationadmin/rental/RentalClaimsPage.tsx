@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ export default function RentalClaimsPage() {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<any>({ vehicleId: '', claimNo: '', insurer: '', incidentDate: '', description: '', claimedAmount: '' });
 
   // Approve dialog (replaces window.prompt)
@@ -46,22 +47,42 @@ export default function RentalClaimsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openModal = async () => {
-    setShowModal(true);
+  const loadVehicles = async () => {
     const res = await getVehicles({ limit: 100 });
     setVehicles((res?.data as any)?.vehicles ?? []);
+  };
+
+  const openModal = async () => {
+    setEditingId(null);
+    setForm({ vehicleId: '', claimNo: '', insurer: '', incidentDate: '', description: '', claimedAmount: '' });
+    setShowModal(true);
+    await loadVehicles();
+  };
+
+  const openEdit = async (c: any) => {
+    setEditingId(c.id);
+    setForm({
+      vehicleId: c.vehicleId ?? '', claimNo: c.claimNo ?? '', insurer: c.insurer ?? '',
+      incidentDate: c.incidentDate ?? '', description: c.description ?? '',
+      claimedAmount: c.claimedAmount != null ? String(c.claimedAmount) : '',
+    });
+    setShowModal(true);
+    await loadVehicles();
   };
 
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await rental.createClaim({
+      const payload = {
         ...form,
         claimedAmount: Number(form.claimedAmount || 0),
         incidentDate: form.incidentDate || null,
         description: form.description || null,
-      });
-      if (res?.success || res?.status) { setShowModal(false); load(); }
+      };
+      const res = editingId
+        ? await rental.updateClaim(editingId, payload)
+        : await rental.createClaim(payload);
+      if (res?.success || res?.status) { setShowModal(false); setEditingId(null); load(); }
     } finally { setSaving(false); }
   };
 
@@ -115,9 +136,12 @@ export default function RentalClaimsPage() {
                 <td className="p-3">{c.approvedAmount != null ? `Rs ${Number(c.approvedAmount).toLocaleString()}` : '—'}</td>
                 <td className="p-3"><Badge className={statusColor[c.status] || 'bg-gray-100 text-gray-700'}>{c.status}</Badge></td>
                 <td className="p-3">
-                  <select className={selectCls} value={c.status} onChange={(e) => changeStatus(c, e.target.value)}>
-                    {CLAIM_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <div className="flex items-center gap-1.5">
+                    <select className={selectCls} value={c.status} onChange={(e) => changeStatus(c, e.target.value)}>
+                      {CLAIM_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button onClick={() => openEdit(c)} title="Edit"><Pencil className="w-4 h-4 text-muted-foreground hover:text-foreground" /></button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -129,9 +153,9 @@ export default function RentalClaimsPage() {
       </CardContent></Card>
 
       {/* New claim dialog */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
+      <Dialog open={showModal} onOpenChange={(open) => { setShowModal(open); if (!open) setEditingId(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New Insurance Claim</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? 'Edit Insurance Claim' : 'New Insurance Claim'}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Vehicle *</Label>
               <select className={selectCls} value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
@@ -146,9 +170,9 @@ export default function RentalClaimsPage() {
             <div className="col-span-2"><Label>Description</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowModal(false); setEditingId(null); }}>Cancel</Button>
             <Button onClick={submit} disabled={saving || !form.vehicleId || !form.claimNo || !form.insurer}>
-              {saving ? 'Saving...' : 'Create Claim'}
+              {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Create Claim'}
             </Button>
           </DialogFooter>
         </DialogContent>

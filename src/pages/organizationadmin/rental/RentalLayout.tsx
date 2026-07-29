@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  Car, CalendarDays, Wrench, RefreshCw, AlertTriangle, Fuel, ShieldAlert, Tags, LayoutDashboard,
+  Car, CalendarDays, Wrench, RefreshCw, AlertTriangle, Fuel, ShieldAlert, Tags, LayoutDashboard, IdCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,7 @@ const navItems = [
   { to: 'fuel', end: false, label: 'Fuel Logs', icon: Fuel },
   { to: 'claims', end: false, label: 'Claims', icon: ShieldAlert },
   { to: 'pricing', end: false, label: 'Pricing', icon: Tags },
+  { to: 'licenses', end: false, label: 'Licenses', icon: IdCard },
 ];
 
 /** Shared shell for all Vehicle Rental sub-pages: header + stats strip + sub-nav. */

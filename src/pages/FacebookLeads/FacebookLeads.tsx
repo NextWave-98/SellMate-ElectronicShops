@@ -11,6 +11,9 @@ import {
   Download,
   Trash2,
   Save,
+  Package,
+  Truck,
+  X,
 } from 'lucide-react';
 import { useAuthRedux } from '../../hooks/useAuthRedux';
 import { useShopAPI } from '../../hooks/useShopAPI';
@@ -19,7 +22,10 @@ import facebookLeadsService, {
   FacebookLeadStatus,
   FacebookLeadStats,
   StaffOption,
+  CreateOrderPayload,
+  LEAD_STATUSES,
 } from '../../services/facebookLeadsService';
+import LeadInteractionPanel from '../../components/FacebookLeads/LeadInteractionPanel';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -31,15 +37,26 @@ const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
   (import.meta.env.VITE_BASE_URL || 'http://localhost:3000/api').replace(/\/api\/?$/, '');
 
-const STATUSES: FacebookLeadStatus[] = ['NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST'];
-
-const statusColor: Record<FacebookLeadStatus, string> = {
-  NEW: 'bg-blue-600',
-  CONTACTED: 'bg-amber-600',
-  QUALIFIED: 'bg-purple-600',
-  WON: 'bg-green-600',
-  LOST: 'bg-gray-500',
+const STATUS_META: Record<FacebookLeadStatus, { label: string; color: string }> = {
+  NEW: { label: 'New', color: 'bg-blue-600' },
+  CONTACTED: { label: 'Contacted', color: 'bg-amber-600' },
+  QUALIFIED: { label: 'Qualified', color: 'bg-purple-600' },
+  WON: { label: 'Won', color: 'bg-green-600' },
+  LOST: { label: 'Lost', color: 'bg-gray-500' },
+  ORDER_CONFIRMED: { label: 'Order Confirmed', color: 'bg-emerald-600' },
+  ON_HOLD: { label: 'On Hold', color: 'bg-yellow-500' },
+  CALL_ATTEMPT_1: { label: 'Call Attempt 1', color: 'bg-sky-500' },
+  CALL_ATTEMPT_2: { label: 'Call Attempt 2', color: 'bg-sky-600' },
+  CALL_ATTEMPT_3: { label: 'Call Attempt 3', color: 'bg-sky-700' },
+  NO_RESPONSE: { label: 'No Response', color: 'bg-orange-500' },
+  REJECTED: { label: 'Rejected', color: 'bg-red-600' },
+  ORDER_CREATED: { label: 'Order Created', color: 'bg-green-700' },
 };
+
+const statusLabel = (s: FacebookLeadStatus) => STATUS_META[s]?.label ?? s;
+const statusColor: Record<FacebookLeadStatus, string> = Object.fromEntries(
+  (Object.keys(STATUS_META) as FacebookLeadStatus[]).map((s) => [s, STATUS_META[s].color]),
+) as Record<FacebookLeadStatus, string>;
 
 const FacebookLeadsPage: React.FC = () => {
   const { user } = useAuthRedux();
@@ -61,6 +78,14 @@ const FacebookLeadsPage: React.FC = () => {
   const [staff, setStaff] = useState<StaffOption[]>([]);
   const [stats, setStats] = useState<FacebookLeadStats | null>(null);
   const [syncing, setSyncing] = useState(false);
+
+  // Create-order modal state
+  const [orderLead, setOrderLead] = useState<FacebookLead | null>(null);
+  const [orderForm, setOrderForm] = useState<CreateOrderPayload>({
+    recipientAddress: '',
+    recipientCity: '',
+  });
+  const [orderSubmitting, setOrderSubmitting] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -240,13 +265,57 @@ const FacebookLeadsPage: React.FC = () => {
     setNoteDraft(lead.notes || '');
   };
 
+  const openOrder = (lead: FacebookLead) => {
+    setOrderLead(lead);
+    setOrderForm({
+      recipientAddress: '',
+      recipientCity: '',
+      recipientName: lead.fullName || '',
+      recipientPhone: lead.phone || '',
+      paymentMethod: 'cod',
+      numberOfPieces: 1,
+    });
+  };
+
+  const setOrderField = <K extends keyof CreateOrderPayload>(
+    key: K,
+    value: CreateOrderPayload[K],
+  ) => setOrderForm((f) => ({ ...f, [key]: value }));
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessId || !orderLead) return;
+    if (!orderForm.recipientAddress.trim() || !orderForm.recipientCity.trim()) {
+      alert.error('Delivery address and city are required.');
+      return;
+    }
+    setOrderSubmitting(true);
+    try {
+      const res = await facebookLeadsService.createOrder(businessId, orderLead.id, orderForm);
+      const updated = res.data.lead;
+      alert.success(
+        updated.trackingNumber
+          ? `Order created — tracking ${updated.trackingNumber}`
+          : 'Order created and courier shipment generated.',
+      );
+      setLeads((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)));
+      if (selected?.id === updated.id) setSelected((s) => (s ? { ...s, ...updated } : s));
+      setOrderLead(null);
+      fetchStats();
+    } catch (err) {
+      alert.error(err instanceof Error ? err.message : 'Failed to create order');
+    } finally {
+      setOrderSubmitting(false);
+    }
+  };
+
   const staffName = (id: string | null) => staff.find((s) => s.id === id)?.name || '';
 
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Facebook className="text-[#1877F2]" /> Facebook Leads
+          <Facebook className="text-[#1877F2]" /> Leads
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
@@ -269,12 +338,16 @@ const FacebookLeadsPage: React.FC = () => {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-          <StatCard label="Total" value={stats.total} />
-          <StatCard label="Converted" value={stats.converted} accent="text-green-600" />
-          {STATUSES.map((s) => (
-            <StatCard key={s} label={s} value={stats.byStatus[s] ?? 0} />
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+          <StatCard label="Total Leads" value={stats.total} />
+          <StatCard label="Orders Created" value={stats.ordersCreated ?? 0} accent="text-green-700" />
+          <StatCard
+            label="Success Rate"
+            value={`${stats.successRate ?? 0}%`}
+            accent="text-emerald-600"
+          />
+          <StatCard label="Converted" value={stats.converted} accent="text-blue-600" />
+          <StatCard label="Rejected / Lost" value={stats.rejected ?? 0} accent="text-red-600" />
         </div>
       )}
 
@@ -318,9 +391,9 @@ const FacebookLeadsPage: React.FC = () => {
           }}
         >
           <NativeSelectOption value="">All statuses</NativeSelectOption>
-          {STATUSES.map((s) => (
+          {LEAD_STATUSES.map((s) => (
             <NativeSelectOption key={s} value={s}>
-              {s}
+              {statusLabel(s)}
             </NativeSelectOption>
           ))}
         </NativeSelect>
@@ -386,6 +459,11 @@ const FacebookLeadsPage: React.FC = () => {
                           Customer
                         </Badge>
                       )}
+                      {lead.source && lead.source !== 'FACEBOOK' && (
+                        <Badge variant="outline" className="ml-2 text-[10px]">
+                          {lead.source.replace(/_/g, ' ')}
+                        </Badge>
+                      )}
                     </td>
                     <td className="p-3">
                       <div>{lead.phone || '—'}</div>
@@ -415,16 +493,32 @@ const FacebookLeadsPage: React.FC = () => {
                         value={lead.status}
                         onChange={(e) => handleStatus(lead, e.target.value as FacebookLeadStatus)}
                       >
-                        {STATUSES.map((s) => (
+                        {LEAD_STATUSES.map((s) => (
                           <NativeSelectOption key={s} value={s}>
-                            {s}
+                            {statusLabel(s)}
                           </NativeSelectOption>
                         ))}
                       </NativeSelect>
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-1">
-                        {!lead.customerId && (
+                        {lead.courierShipmentId ? (
+                          <Badge className="bg-green-700 gap-1">
+                            <Truck className="size-3" />
+                            {lead.trackingNumber || 'Ordered'}
+                          </Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openOrder(lead)}
+                            disabled={!lead.phone}
+                            title={lead.phone ? 'Create order + shipment' : 'Lead has no phone'}
+                          >
+                            <Package className="size-4 mr-1" /> Order
+                          </Button>
+                        )}
+                        {!lead.customerId && !lead.courierShipmentId && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -492,7 +586,18 @@ const FacebookLeadsPage: React.FC = () => {
                 Close
               </Button>
             </div>
-            <Badge className={statusColor[selected.status]}>{selected.status}</Badge>
+            <Badge className={statusColor[selected.status]}>{statusLabel(selected.status)}</Badge>
+            {selected.source && (
+              <Badge variant="outline" className="ml-2">
+                {selected.source.replace(/_/g, ' ')}
+              </Badge>
+            )}
+            {selected.courierShipmentId && (
+              <Badge className="ml-2 bg-green-700 gap-1">
+                <Truck className="size-3" />
+                {selected.trackingNumber || 'Ordered'}
+              </Badge>
+            )}
             <div className="text-sm space-y-1">
               <div>
                 <strong>Phone:</strong> {selected.phone || '—'}
@@ -536,9 +641,37 @@ const FacebookLeadsPage: React.FC = () => {
               </Button>
             </div>
 
-            <div className="flex items-center gap-2 pt-2 border-t">
-              {!selected.customerId && (
-                <Button onClick={() => handleConvert(selected)} disabled={!selected.phone}>
+            <LeadInteractionPanel leadId={selected.id} phone={selected.phone} />
+
+            {selected.courierShipmentId && (
+              <div className="text-sm rounded-md border bg-muted/30 p-2 space-y-1">
+                <div className="font-medium flex items-center gap-1">
+                  <Truck className="size-4" /> Order / Shipment
+                </div>
+                <div>
+                  <strong>Tracking:</strong> {selected.trackingNumber || '—'}
+                </div>
+                {selected.orderAmount != null && (
+                  <div>
+                    <strong>Amount:</strong> {selected.orderAmount}
+                  </div>
+                )}
+                {selected.orderCreatedAt && (
+                  <div>
+                    <strong>Created:</strong> {new Date(selected.orderCreatedAt).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
+              {!selected.courierShipmentId && (
+                <Button onClick={() => openOrder(selected)} disabled={!selected.phone}>
+                  <Package className="size-4 mr-1" /> Create order
+                </Button>
+              )}
+              {!selected.customerId && !selected.courierShipmentId && (
+                <Button variant="outline" onClick={() => handleConvert(selected)} disabled={!selected.phone}>
                   <UserPlus className="size-4 mr-1" /> Convert to customer
                 </Button>
               )}
@@ -549,11 +682,199 @@ const FacebookLeadsPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Create Order modal */}
+      {orderLead && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => !orderSubmitting && setOrderLead(null)}
+        >
+          <form
+            className="bg-background w-full max-w-lg rounded-lg shadow-lg max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleCreateOrder}
+          >
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Package className="size-5" /> Create Order
+              </h2>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setOrderLead(null)}>
+                <X className="size-4" />
+              </Button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="text-sm text-muted-foreground">
+                For <strong>{orderLead.fullName || orderLead.phone}</strong>. A courier shipment is
+                created automatically and the lead is marked <em>Order Created</em>.
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Recipient name">
+                  <Input
+                    value={orderForm.recipientName || ''}
+                    onChange={(e) => setOrderField('recipientName', e.target.value)}
+                  />
+                </Field>
+                <Field label="Phone">
+                  <Input
+                    value={orderForm.recipientPhone || ''}
+                    onChange={(e) => setOrderField('recipientPhone', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Delivery address *">
+                <Input
+                  value={orderForm.recipientAddress}
+                  onChange={(e) => setOrderField('recipientAddress', e.target.value)}
+                  placeholder="No, street, area"
+                />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="City *">
+                  <Input
+                    value={orderForm.recipientCity}
+                    onChange={(e) => setOrderField('recipientCity', e.target.value)}
+                  />
+                </Field>
+                <Field label="District">
+                  <Input
+                    value={orderForm.recipientDistrict || ''}
+                    onChange={(e) => setOrderField('recipientDistrict', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Order amount">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={orderForm.orderAmount ?? ''}
+                    onChange={(e) =>
+                      setOrderField(
+                        'orderAmount',
+                        e.target.value === '' ? undefined : Number(e.target.value),
+                      )
+                    }
+                  />
+                </Field>
+                <Field label="Shipping">
+                  <Input
+                    type="number"
+                    min="0"
+                    value={orderForm.shippingCharge ?? ''}
+                    onChange={(e) =>
+                      setOrderField(
+                        'shippingCharge',
+                        e.target.value === '' ? undefined : Number(e.target.value),
+                      )
+                    }
+                  />
+                </Field>
+                <Field label="Weight (kg)">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={orderForm.weight ?? ''}
+                    onChange={(e) =>
+                      setOrderField(
+                        'weight',
+                        e.target.value === '' ? undefined : Number(e.target.value),
+                      )
+                    }
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Payment method">
+                  <NativeSelect
+                    value={orderForm.paymentMethod || 'cod'}
+                    onChange={(e) =>
+                      setOrderField(
+                        'paymentMethod',
+                        e.target.value as CreateOrderPayload['paymentMethod'],
+                      )
+                    }
+                  >
+                    <NativeSelectOption value="cod">Cash on Delivery</NativeSelectOption>
+                    <NativeSelectOption value="bank">Bank Transfer</NativeSelectOption>
+                    <NativeSelectOption value="cash">Cash</NativeSelectOption>
+                    <NativeSelectOption value="online">Online</NativeSelectOption>
+                  </NativeSelect>
+                </Field>
+                <Field label="COD amount">
+                  <Input
+                    type="number"
+                    min="0"
+                    disabled={orderForm.paymentMethod !== 'cod'}
+                    value={orderForm.codAmount ?? ''}
+                    onChange={(e) =>
+                      setOrderField(
+                        'codAmount',
+                        e.target.value === '' ? undefined : Number(e.target.value),
+                      )
+                    }
+                    placeholder={orderForm.paymentMethod === 'cod' ? 'defaults to order amount' : '—'}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Pieces">
+                <Input
+                  type="number"
+                  min="1"
+                  value={orderForm.numberOfPieces ?? 1}
+                  onChange={(e) =>
+                    setOrderField(
+                      'numberOfPieces',
+                      e.target.value === '' ? undefined : Number(e.target.value),
+                    )
+                  }
+                />
+              </Field>
+
+              <Field label="Notes">
+                <textarea
+                  className="w-full min-h-16 rounded-md border bg-background p-2 text-sm"
+                  value={orderForm.notes || ''}
+                  onChange={(e) => setOrderField('notes', e.target.value)}
+                />
+              </Field>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 p-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOrderLead(null)}
+                disabled={orderSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={orderSubmitting}>
+                <Truck className="size-4 mr-1" />
+                {orderSubmitting ? 'Creating…' : 'Create order + shipment'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
 
-const StatCard: React.FC<{ label: string; value: number; accent?: string }> = ({
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <label className="block space-y-1">
+    <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    {children}
+  </label>
+);
+
+const StatCard: React.FC<{ label: string; value: number | string; accent?: string }> = ({
   label,
   value,
   accent,

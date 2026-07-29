@@ -258,6 +258,12 @@ export const useRental = () => {
     [fetchData]
   );
 
+  const deleteCharge = useCallback(
+    async (bookingId: string, chargeId: string) =>
+      fetchData({ endpoint: `/rental/bookings/${bookingId}/charges/${chargeId}`, method: 'DELETE', successMessage: 'Charge removed' }),
+    [fetchData]
+  );
+
   // Pricing engine
   const getPricingRules = useCallback(
     async () => fetchData({ endpoint: '/rental/pricing-rules', method: 'GET', silent: true }),
@@ -370,7 +376,7 @@ export const useRental = () => {
       getBlockedDays, createBlockedDay, deleteBlockedDay,
       getDriverLicenses, createDriverLicense, updateDriverLicense, deleteDriverLicense,
       getRatePlans, createRatePlan, updateRatePlan,
-      getBookings, getBookingById, createBooking, updateBooking, bookingAction, addCharge, generateAgreement,
+      getBookings, getBookingById, createBooking, updateBooking, bookingAction, addCharge, deleteCharge, generateAgreement,
       getMaintenances, createMaintenance, updateMaintenance,
       getFuelLogs, createFuelLog, deleteFuelLog,
       getClaims, createClaim, updateClaim,
@@ -386,7 +392,7 @@ export const useRental = () => {
       getBlockedDays, createBlockedDay, deleteBlockedDay,
       getDriverLicenses, createDriverLicense, updateDriverLicense, deleteDriverLicense,
       getRatePlans, createRatePlan, updateRatePlan,
-      getBookings, getBookingById, createBooking, updateBooking, bookingAction, addCharge, generateAgreement,
+      getBookings, getBookingById, createBooking, updateBooking, bookingAction, addCharge, deleteCharge, generateAgreement,
       getMaintenances, createMaintenance, updateMaintenance,
       getFuelLogs, createFuelLog, deleteFuelLog,
       getClaims, createClaim, updateClaim,

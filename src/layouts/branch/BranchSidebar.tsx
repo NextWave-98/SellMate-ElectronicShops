@@ -101,6 +101,9 @@ const BranchSidebar = ({
     { id: 'accounting', name: 'Accounting', path: `/${branchCode}/accounting`, icon: BookOpen },
     { id: 'website', name: 'Website / CMS', path: `/${branchCode}/website`, icon: Globe },
     { id: 'crm-tasks', name: 'CRM Tasks', path: `/${branchCode}/crm-tasks`, icon: ListChecks },
+    { id: 'leads', name: 'Leads', path: `/${branchCode}/leads`, icon: Users },
+    { id: 'my-activity', name: 'My Activity', path: `/${branchCode}/my-activity`, icon: Activity },
+    { id: 'my-scorecard', name: 'My Scorecard', path: `/${branchCode}/my-scorecard`, icon: TrendingUp },
     { id: 'system-usage', name: 'System Usage', path: `/${branchCode}/system-usage`, icon: CircleHelp },
   ];
 

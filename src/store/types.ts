@@ -333,6 +333,28 @@ export const PERMISSIONS = {
   FACEBOOK_LEADS_VIEW: 'facebook-leads.view',
   FACEBOOK_LEADS_MANAGE: 'facebook-leads.manage',
 
+  // Lead forms & interactions (Phase 2)
+  LEAD_FORMS_VIEW: 'lead-forms.view',
+  LEAD_FORMS_MANAGE: 'lead-forms.manage',
+  LEAD_INTERACTIONS_VIEW: 'lead-interactions.view',
+  LEAD_INTERACTIONS_MANAGE: 'lead-interactions.manage',
+
+  // SMS automation (Phase 2)
+  SMS_AUTOMATION_VIEW: 'sms-automation.view',
+  SMS_AUTOMATION_MANAGE: 'sms-automation.manage',
+  SMS_AUTOMATION_QUICK_SEND: 'sms-automation.quick-send',
+
+  // Activity monitoring (Phase 2)
+  ACTIVITY_MONITORING_VIEW_OWN: 'activity-monitoring.view-own',
+  ACTIVITY_MONITORING_VIEW_TEAM: 'activity-monitoring.view-team',
+  ACTIVITY_MONITORING_MANAGE: 'activity-monitoring.manage',
+
+  // Performance scorecard (Phase 2)
+  SCORECARD_VIEW_OWN: 'scorecard.view-own',
+  SCORECARD_VIEW_TEAM: 'scorecard.view-team',
+  SCORECARD_MANAGE: 'scorecard.manage',
+  SCORECARD_FINALIZE: 'scorecard.finalize',
+
   // AI Analytics
   AIANALYTICS_VIEW: 'aianalytics.view',
   AIANALYTICS_MANAGE: 'aianalytics.manage',

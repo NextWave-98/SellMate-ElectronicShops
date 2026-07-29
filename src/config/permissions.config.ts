@@ -134,6 +134,23 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredPermission: PERMISSIONS.ACTIVITYLOGS_READ,
   },
   {
+    id: 'activity-monitoring',
+    requiredPermissions: [
+      PERMISSIONS.ACTIVITY_MONITORING_VIEW_TEAM,
+      PERMISSIONS.ACTIVITY_MONITORING_MANAGE,
+    ],
+    requireAnyPermission: true,
+  },
+  {
+    id: 'scorecard',
+    requiredPermissions: [
+      PERMISSIONS.SCORECARD_VIEW_OWN,
+      PERMISSIONS.SCORECARD_VIEW_TEAM,
+      PERMISSIONS.SCORECARD_MANAGE,
+    ],
+    requireAnyPermission: true,
+  },
+  {
     id: 'notifications',
     requiredModule: 'notifications',
   },
@@ -141,9 +158,30 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     id: 'communication',
     children: [
       { id: 'communication-settings', requiredModule: 'communication' },
+      {
+        id: 'sms-automation',
+        requiredPermissions: [PERMISSIONS.SMS_AUTOMATION_VIEW, PERMISSIONS.SMS_AUTOMATION_MANAGE],
+        requireAnyPermission: true,
+      },
       { id: 'whatsapp-settings', requiredModule: 'whatsapp' },
       { id: 'whatsapp-ai', requiredModule: 'whatsapp' },
       { id: 'whatsapp-inbox', requiredModule: 'whatsapp' },
+      { id: 'whatsapp-orders', requiredModule: 'whatsapp' },
+      {
+        id: 'facebook-leads',
+        requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'facebook-leads-settings',
+        requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'lead-forms',
+        requiredPermissions: [PERMISSIONS.LEAD_FORMS_VIEW, PERMISSIONS.LEAD_FORMS_MANAGE],
+        requireAnyPermission: true,
+      },
       { id: 'notification-settings', requiredPermission: PERMISSIONS.NOTIFICATIONS_MANAGE },
     ],
   },
@@ -258,6 +296,20 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     // Accessible to all authenticated branch staff
   },
   {
+    id: 'leads',
+    requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+    requireAnyPermission: true,
+  },
+  {
+    id: 'my-activity',
+    requiredPermission: PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN,
+  },
+  {
+    id: 'my-scorecard',
+    requiredPermissions: [PERMISSIONS.SCORECARD_VIEW_OWN, PERMISSIONS.SCORECARD_VIEW_TEAM],
+    requireAnyPermission: true,
+  },
+  {
     id: 'suppliers',
     requiredPermissions: [
       PERMISSIONS.SUPPLIERS_READ,
@@ -313,9 +365,31 @@ export const SUPERADMIN_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   { path: '/superadmin/courier/management', requiredModule: 'courier' },
   { path: '/superadmin/reports', requiredPermissions: [PERMISSIONS.REPORTS_VIEW], requireAnyPermission: true },
   { path: '/superadmin/ai-analytics', requiredModule: 'aianalytics' },
+  {
+    path: '/superadmin/activity-monitoring',
+    requiredPermissions: [
+      PERMISSIONS.ACTIVITY_MONITORING_VIEW_TEAM,
+      PERMISSIONS.ACTIVITY_MONITORING_MANAGE,
+    ],
+    requireAnyPermission: true,
+  },
+  {
+    path: '/superadmin/scorecard',
+    requiredPermissions: [
+      PERMISSIONS.SCORECARD_VIEW_OWN,
+      PERMISSIONS.SCORECARD_VIEW_TEAM,
+      PERMISSIONS.SCORECARD_MANAGE,
+    ],
+    requireAnyPermission: true,
+  },
   { path: '/superadmin/notifications/dashboard', requiredModule: 'notifications' },
   { path: '/superadmin/notifications/settings', requiredPermission: PERMISSIONS.NOTIFICATIONS_MANAGE },
   { path: '/superadmin/communication/settings', requiredModule: 'communication' },
+  {
+    path: '/superadmin/communication/sms-automation',
+    requiredPermissions: [PERMISSIONS.SMS_AUTOMATION_VIEW, PERMISSIONS.SMS_AUTOMATION_MANAGE],
+    requireAnyPermission: true,
+  },
   {
     path: '/superadmin/communication/whatsapp',
     requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
@@ -339,6 +413,11 @@ export const SUPERADMIN_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   {
     path: '/superadmin/facebook-leads/settings',
     requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+    requireAnyPermission: true,
+  },
+  {
+    path: '/superadmin/facebook-leads/forms',
+    requiredPermissions: [PERMISSIONS.LEAD_FORMS_VIEW, PERMISSIONS.LEAD_FORMS_MANAGE],
     requireAnyPermission: true,
   },
   { path: '/superadmin/installments', requiredModule: 'installments' },
@@ -369,6 +448,20 @@ export const BRANCH_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   { path: '/:branchCode/installments', requiredPermission: PERMISSIONS.INSTALLMENTS_READ },
   { path: '/:branchCode/installments/create', requiredPermission: PERMISSIONS.INSTALLMENTS_CREATE },
   { path: '/:branchCode/installments/:id', requiredPermission: PERMISSIONS.INSTALLMENTS_READ },
+  {
+    path: '/:branchCode/leads',
+    requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+    requireAnyPermission: true,
+  },
+  {
+    path: '/:branchCode/my-activity',
+    requiredPermission: PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN,
+  },
+  {
+    path: '/:branchCode/my-scorecard',
+    requiredPermissions: [PERMISSIONS.SCORECARD_VIEW_OWN, PERMISSIONS.SCORECARD_VIEW_TEAM],
+    requireAnyPermission: true,
+  },
   {
     path: '/:branchCode/suppliers/management',
     requiredPermissions: [

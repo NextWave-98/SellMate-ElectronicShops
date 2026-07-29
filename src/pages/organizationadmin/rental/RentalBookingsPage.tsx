@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Plus, List, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Plus, List, CalendarDays, ChevronLeft, ChevronRight, Search, Eye, Pencil, Trash2, AlertTriangle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +21,18 @@ import { useCustomer } from '../../../hooks';
 import DriverLicensePicker from './DriverLicensePicker';
 import { selectCls, statusColor, type RentalOutletContext } from './shared';
 
-/** Bookings: list, quote-driven creation, check-out / check-in condition reports, agreements. */
+const BOOKING_STATUSES = ['PENDING', 'CONFIRMED', 'CHECKED_OUT', 'RETURNED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
+const CHARGE_TYPES = ['DAMAGE', 'CLEANING', 'FINE', 'EXCESS_KM', 'FUEL_DIFFERENCE', 'LATE_RETURN', 'EXTRA', 'OTHER'];
+const textareaCls = 'w-full min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm';
+
+const emptyBookingForm = {
+  vehicleId: '', customerId: '', ratePlanId: '', startAt: '', endAt: '',
+  baseAmount: 0, depositAmount: 0, withDriver: false, isLoanVehicle: false, notes: '',
+  renterNic: '', renterLicenseNo: '', driverLicenseId: '', identityPhotos: [] as string[],
+  extraFeeIds: [] as string[], couponCode: '',
+};
+
+/** Bookings: list, quote-driven creation, edit, detail, check-out / check-in, charges, agreements. */
 export default function RentalBookingsPage() {
   const { refreshStats } = useOutletContext<RentalOutletContext>();
   const rental = useRental();
@@ -36,13 +49,13 @@ export default function RentalBookingsPage() {
   const [ratePlans, setRatePlans] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // List filters
+  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
+
   const [showBookingModal, setShowBookingModal] = useState(false);
-  const [bookingForm, setBookingForm] = useState<any>({
-    vehicleId: '', customerId: '', ratePlanId: '', startAt: '', endAt: '',
-    baseAmount: 0, depositAmount: 0, withDriver: false, isLoanVehicle: false, notes: '',
-    renterNic: '', renterLicenseNo: '', driverLicenseId: '', identityPhotos: [] as string[],
-    extraFeeIds: [] as string[], couponCode: '',
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [bookingForm, setBookingForm] = useState<any>({ ...emptyBookingForm });
   const [quote, setQuote] = useState<any>(null);
   const [quoting, setQuoting] = useState(false);
 
@@ -55,6 +68,15 @@ export default function RentalBookingsPage() {
   // Agreement dialog
   const [agreementText, setAgreementText] = useState<string | null>(null);
   const [agreementBookingId, setAgreementBookingId] = useState<string | null>(null);
+
+  // Booking detail dialog
+  const [detail, setDetail] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [chargeForm, setChargeForm] = useState<any>({ chargeType: 'DAMAGE', description: '', amount: '' });
+  const [chargeSaving, setChargeSaving] = useState(false);
+
+  // Cancel confirmation
+  const [cancelTarget, setCancelTarget] = useState<any>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,9 +93,7 @@ export default function RentalBookingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openBookingModal = async () => {
-    setQuote(null);
-    setShowBookingModal(true);
+  const loadLookups = async () => {
     const [vehiclesRes, customersRes, feesRes, plansRes] = await Promise.all([
       getVehicles({ limit: 100 }),
       getCustomers({ limit: 200 } as any),
@@ -86,6 +106,49 @@ export default function RentalBookingsPage() {
     setExtraFees((feesRes?.data as any) ?? []);
     setRatePlans(((plansRes?.data as any) ?? []).filter((p: any) => p.isActive));
   };
+
+  const openBookingModal = async () => {
+    setEditingId(null);
+    setBookingForm({ ...emptyBookingForm });
+    setQuote(null);
+    setShowBookingModal(true);
+    await loadLookups();
+  };
+
+  const openEditModal = async (b: any) => {
+    setEditingId(b.id);
+    setQuote(null);
+    setBookingForm({
+      vehicleId: b.vehicleId ?? '', customerId: b.customerId ?? '', ratePlanId: b.ratePlanId ?? '',
+      startAt: b.startAt ? new Date(b.startAt).toISOString().slice(0, 16) : '',
+      endAt: b.endAt ? new Date(b.endAt).toISOString().slice(0, 16) : '',
+      baseAmount: b.baseAmount ?? 0, depositAmount: b.depositAmount ?? 0,
+      withDriver: Boolean(b.withDriver), isLoanVehicle: Boolean(b.isLoanVehicle), notes: b.notes ?? '',
+      renterNic: b.renterNic ?? '', renterLicenseNo: b.renterLicenseNo ?? '', driverLicenseId: b.driverLicenseId ?? '',
+      identityPhotos: b.identityPhotos ?? [], extraFeeIds: [], couponCode: '',
+    });
+    setShowBookingModal(true);
+    await loadLookups();
+  };
+
+  /** Bookings that overlap [start,end] on the same vehicle (active statuses only). */
+  const conflictFor = useCallback((vehicleId: string, startAt: string, endAt: string): any[] => {
+    if (!vehicleId || !startAt || !endAt) return [];
+    const s = new Date(startAt).getTime();
+    const e = new Date(endAt).getTime();
+    if (!(s < e)) return [];
+    return bookings.filter((b) =>
+      b.id !== editingId &&
+      b.vehicleId === vehicleId &&
+      !['CANCELLED', 'NO_SHOW', 'COMPLETED', 'RETURNED'].includes(b.status) &&
+      new Date(b.startAt).getTime() < e && new Date(b.endAt).getTime() > s
+    );
+  }, [bookings, editingId]);
+
+  const bookingConflicts = useMemo(
+    () => conflictFor(bookingForm.vehicleId, bookingForm.startAt, bookingForm.endAt),
+    [conflictFor, bookingForm.vehicleId, bookingForm.startAt, bookingForm.endAt]
+  );
 
   const fetchQuote = async (form: any) => {
     if (!form.vehicleId || !form.startAt || !form.endAt) { setQuote(null); return; }
@@ -106,8 +169,7 @@ export default function RentalBookingsPage() {
   const submitBooking = async () => {
     setSaving(true);
     try {
-      const useQuote = Boolean(quote);
-      const res = await rental.createBooking({
+      const payload = {
         ...bookingForm,
         ratePlanId: bookingForm.ratePlanId || null,
         renterNic: bookingForm.renterNic || null,
@@ -120,10 +182,13 @@ export default function RentalBookingsPage() {
         endAt: new Date(bookingForm.endAt).toISOString(),
         extraFeeIds: bookingForm.extraFeeIds ?? [],
         couponCode: bookingForm.couponCode || null,
-        useQuote,
-      });
+      };
+      const res = editingId
+        ? await rental.updateBooking(editingId, payload)
+        : await rental.createBooking({ ...payload, useQuote: Boolean(quote) });
       if (res?.success || res?.status) {
         setShowBookingModal(false);
+        setEditingId(null);
         setQuote(null);
         load();
         refreshStats();
@@ -135,6 +200,14 @@ export default function RentalBookingsPage() {
 
   const doBookingAction = async (id: string, action: any) => {
     await rental.bookingAction(id, action, {});
+    load();
+    refreshStats();
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    await rental.bookingAction(cancelTarget.id, 'cancel', {});
+    setCancelTarget(null);
     load();
     refreshStats();
   };
@@ -168,6 +241,50 @@ export default function RentalBookingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ---- Booking detail ----
+  const openDetail = async (id: string) => {
+    setDetailLoading(true);
+    setDetail({ id });
+    try {
+      const res = await rental.getBookingById(id);
+      setDetail((res?.data as any) ?? null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const reloadDetail = async () => {
+    if (!detail?.id) return;
+    const res = await rental.getBookingById(detail.id);
+    setDetail((res?.data as any) ?? null);
+    load();
+    refreshStats();
+  };
+
+  const submitCharge = async () => {
+    if (!detail?.id || !chargeForm.description || chargeForm.amount === '') return;
+    setChargeSaving(true);
+    try {
+      const res = await rental.addCharge(detail.id, {
+        chargeType: chargeForm.chargeType,
+        description: chargeForm.description,
+        amount: Number(chargeForm.amount || 0),
+      });
+      if (res?.success || res?.status) {
+        setChargeForm({ chargeType: 'DAMAGE', description: '', amount: '' });
+        await reloadDetail();
+      }
+    } finally {
+      setChargeSaving(false);
+    }
+  };
+
+  const removeCharge = async (chargeId: string) => {
+    if (!detail?.id) return;
+    await rental.deleteCharge(detail.id, chargeId);
+    await reloadDetail();
   };
 
   const viewAgreement = async (id: string) => {
@@ -205,6 +322,21 @@ export default function RentalBookingsPage() {
     w.print();
   };
 
+  // Filtered list
+  const filteredBookings = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return bookings.filter((b) => {
+      if (statusFilter && b.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        String(b.bookingNumber || '').toLowerCase().includes(q) ||
+        String(b.vehicle?.registrationNo || '').toLowerCase().includes(q) ||
+        String(b.customer?.name || '').toLowerCase().includes(q) ||
+        String(b.customer?.phone || '').toLowerCase().includes(q)
+      );
+    });
+  }, [bookings, statusFilter, search]);
+
   // Availability calendar: bookings overlapping each day of the shown month
   const calendarDays = useMemo(() => {
     const year = calMonth.getFullYear();
@@ -231,6 +363,8 @@ export default function RentalBookingsPage() {
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
   };
 
+  const money = (n: any) => `Rs ${Number(n || 0).toLocaleString()}`;
+
   if (loading && bookings.length === 0) return <LoadingSpinner />;
 
   return (
@@ -252,6 +386,22 @@ export default function RentalBookingsPage() {
         <Button onClick={openBookingModal}><Plus className="w-4 h-4 mr-1" /> New Booking</Button>
       </div>
 
+      {/* Filters (list view) */}
+      {view === 'list' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
+            <Input className="pl-8" placeholder="Search booking # / vehicle / customer / phone"
+              value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <select className={`${selectCls} max-w-44`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            {BOOKING_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+          </select>
+          <span className="text-xs text-muted-foreground">{filteredBookings.length} of {bookings.length}</span>
+        </div>
+      )}
+
       {/* Availability calendar */}
       {view === 'calendar' && (
         <Card><CardContent className="p-4">
@@ -272,8 +422,9 @@ export default function RentalBookingsPage() {
                     <div className="space-y-0.5 mt-0.5">
                       {day.items.slice(0, 3).map((b: any) => (
                         <div key={b.id}
+                          onClick={() => openDetail(b.id)}
                           title={`${b.bookingNumber} — ${b.customer?.name || ''} (${b.status})`}
-                          className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate ${statusColor[b.status] || 'bg-gray-100 text-gray-700'}`}>
+                          className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate cursor-pointer ${statusColor[b.status] || 'bg-gray-100 text-gray-700'}`}>
                           {b.vehicle?.registrationNo || b.bookingNumber}
                         </div>
                       ))}
@@ -302,29 +453,40 @@ export default function RentalBookingsPage() {
           <thead className="bg-muted/50 text-left">
             <tr>
               <th className="p-3">Booking #</th><th className="p-3">Vehicle</th><th className="p-3">Customer</th>
-              <th className="p-3">Period</th><th className="p-3">Total</th><th className="p-3">Status</th><th className="p-3">Actions</th>
+              <th className="p-3">Period</th><th className="p-3">Total</th><th className="p-3">Balance</th><th className="p-3">Status</th><th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {bookings.map((b) => (
+            {filteredBookings.map((b) => {
+              const balance = Number(b.totalAmount || 0) - Number(b.paidAmount || 0);
+              return (
               <tr key={b.id} className="border-t">
                 <td className="p-3 font-medium">
-                  {b.bookingNumber}
+                  <button className="hover:underline text-primary" onClick={() => openDetail(b.id)}>{b.bookingNumber}</button>
                   {b.isLoanVehicle && <Badge variant="outline" className="ml-1.5 text-[10px]">LOAN</Badge>}
                 </td>
                 <td className="p-3">{b.vehicle ? `${b.vehicle.registrationNo}` : '—'}</td>
                 <td className="p-3">{b.customer?.name || '—'}</td>
                 <td className="p-3">{new Date(b.startAt).toLocaleDateString()} → {new Date(b.endAt).toLocaleDateString()}</td>
-                <td className="p-3">Rs {Number(b.totalAmount).toLocaleString()}</td>
+                <td className="p-3">{money(b.totalAmount)}</td>
+                <td className="p-3">
+                  {balance > 0
+                    ? <span className="text-red-600 font-medium">{money(balance)}</span>
+                    : <span className="text-green-600">Paid</span>}
+                </td>
                 <td className="p-3"><Badge className={statusColor[b.status] || ''}>{b.status}</Badge></td>
-                <td className="p-3 space-x-1">
+                <td className="p-3 space-x-1 whitespace-nowrap">
+                  <Button size="sm" variant="ghost" title="Details" onClick={() => openDetail(b.id)}><Eye className="w-4 h-4" /></Button>
                   {b.status === 'PENDING' && (
-                    <Button size="sm" variant="outline" onClick={() => doBookingAction(b.id, 'confirm')}>Confirm</Button>
+                    <>
+                      <Button size="sm" variant="ghost" title="Edit" onClick={() => openEditModal(b)}><Pencil className="w-4 h-4" /></Button>
+                      <Button size="sm" variant="outline" onClick={() => doBookingAction(b.id, 'confirm')}>Confirm</Button>
+                    </>
                   )}
                   {(b.status === 'PENDING' || b.status === 'CONFIRMED') && (
                     <>
                       <Button size="sm" onClick={() => openConditionDialog(b, 'checkout')}>Check-Out</Button>
-                      <Button size="sm" variant="destructive" onClick={() => doBookingAction(b.id, 'cancel')}>Cancel</Button>
+                      <Button size="sm" variant="destructive" onClick={() => setCancelTarget(b)}>Cancel</Button>
                     </>
                   )}
                   {b.status === 'CHECKED_OUT' && (
@@ -336,19 +498,22 @@ export default function RentalBookingsPage() {
                   <Button size="sm" variant="ghost" onClick={() => viewAgreement(b.id)}>Agreement</Button>
                 </td>
               </tr>
-            ))}
-            {bookings.length === 0 && (
-              <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No bookings yet</td></tr>
+              );
+            })}
+            {filteredBookings.length === 0 && (
+              <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">
+                {bookings.length === 0 ? 'No bookings yet' : 'No bookings match your filters'}
+              </td></tr>
             )}
           </tbody>
         </table>
       </CardContent></Card>
       )}
 
-      {/* New Booking dialog */}
-      <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
+      {/* New / Edit Booking dialog */}
+      <Dialog open={showBookingModal} onOpenChange={(open) => { setShowBookingModal(open); if (!open) setEditingId(null); }}>
         <DialogContent className="max-w-2xl sm:max-w-2xl">
-          <DialogHeader><DialogTitle>New Rental Booking</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? 'Edit Booking' : 'New Rental Booking'}</DialogTitle></DialogHeader>
           <DialogBody>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div><Label>Vehicle *</Label>
@@ -380,6 +545,22 @@ export default function RentalBookingsPage() {
             )}
             <div><Label>Start *</Label><Input type="datetime-local" value={bookingForm.startAt} onChange={(e) => setBookingForm({ ...bookingForm, startAt: e.target.value })} /></div>
             <div><Label>End *</Label><Input type="datetime-local" value={bookingForm.endAt} onChange={(e) => setBookingForm({ ...bookingForm, endAt: e.target.value })} /></div>
+
+            {/* Availability conflict warning */}
+            {bookingConflicts.length > 0 && (
+              <div className="col-span-2 flex items-start gap-2 rounded-md border border-red-300 bg-red-50 p-2.5 text-sm text-red-800">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold">This vehicle is already booked for that period:</p>
+                  <ul className="text-xs mt-0.5">
+                    {bookingConflicts.map((c) => (
+                      <li key={c.id}>{c.bookingNumber} · {new Date(c.startAt).toLocaleString()} → {new Date(c.endAt).toLocaleString()} ({c.status})</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             <div><Label>Base Amount (Rs)</Label><Input type="number" value={bookingForm.baseAmount} onChange={(e) => setBookingForm({ ...bookingForm, baseAmount: e.target.value })} /></div>
             <div><Label>Deposit (Rs)</Label><Input type="number" value={bookingForm.depositAmount} onChange={(e) => setBookingForm({ ...bookingForm, depositAmount: e.target.value })} /></div>
             <div className="col-span-2 flex items-center gap-5">
@@ -401,7 +582,6 @@ export default function RentalBookingsPage() {
                   setBookingForm((prev: any) => ({
                     ...prev,
                     driverLicenseId,
-                    // Keep the flat agreement fields in sync with the license on file
                     renterLicenseNo: license?.licenseNo ?? prev.renterLicenseNo,
                     renterNic: license?.nicNo ?? prev.renterNic,
                   }))
@@ -418,10 +598,12 @@ export default function RentalBookingsPage() {
                 onChange={(identityPhotos) => setBookingForm({ ...bookingForm, identityPhotos })}
               />
             </div>
-            <div className="col-span-2"><Label>Notes</Label><Input value={bookingForm.notes} onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Notes</Label>
+              <textarea className={textareaCls} value={bookingForm.notes} onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })} />
+            </div>
 
-            {/* Pricing engine: extras + coupon + live quote */}
-            {extraFees.filter((f: any) => f.isActive).length > 0 && (
+            {/* Pricing engine: extras + coupon + live quote (create only) */}
+            {!editingId && extraFees.filter((f: any) => f.isActive).length > 0 && (
               <div className="col-span-2">
                 <Label>Extras</Label>
                 <div className="grid grid-cols-2 gap-1 mt-1 border rounded-md p-2">
@@ -443,16 +625,18 @@ export default function RentalBookingsPage() {
                 </div>
               </div>
             )}
-            <div className="col-span-2 flex gap-2 items-end">
-              <div className="flex-1">
-                <Label>Coupon Code</Label>
-                <Input value={bookingForm.couponCode} onChange={(e) => setBookingForm({ ...bookingForm, couponCode: e.target.value.toUpperCase() })} />
+            {!editingId && (
+              <div className="col-span-2 flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label>Coupon Code</Label>
+                  <Input value={bookingForm.couponCode} onChange={(e) => setBookingForm({ ...bookingForm, couponCode: e.target.value.toUpperCase() })} />
+                </div>
+                <Button type="button" variant="outline" disabled={quoting} onClick={() => fetchQuote(bookingForm)}>
+                  {quoting ? 'Calculating…' : 'Get Quote'}
+                </Button>
               </div>
-              <Button type="button" variant="outline" disabled={quoting} onClick={() => fetchQuote(bookingForm)}>
-                {quoting ? 'Calculating…' : 'Get Quote'}
-              </Button>
-            </div>
-            {quote && (
+            )}
+            {!editingId && quote && (
               <div className="col-span-2 bg-blue-50 rounded-md p-3 text-sm">
                 <p>
                   Base ({quote.days} day{quote.days > 1 ? 's' : ''} × Rs {Number(quote.dayRate).toLocaleString()}): <b>Rs {Number(quote.baseAmount).toLocaleString()}</b>
@@ -469,9 +653,9 @@ export default function RentalBookingsPage() {
           </div>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBookingModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowBookingModal(false); setEditingId(null); }}>Cancel</Button>
             <Button onClick={submitBooking} disabled={saving || !bookingForm.vehicleId || !bookingForm.customerId || !bookingForm.startAt || !bookingForm.endAt}>
-              {saving ? 'Saving...' : quote ? `Book — Rs ${Number(quote.totalAmount).toLocaleString()}` : 'Create Booking'}
+              {saving ? 'Saving...' : editingId ? 'Save Changes' : quote ? `Book — Rs ${Number(quote.totalAmount).toLocaleString()}` : 'Create Booking'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -487,6 +671,11 @@ export default function RentalBookingsPage() {
           </DialogHeader>
           <DialogBody>
           <div className="grid gap-4">
+            {conditionTarget?.action === 'checkin' && conditionTarget?.booking?.ratePlan && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-800">
+                Auto-charges may apply from rate plan <b>{conditionTarget.booking.ratePlan.name}</b> if the vehicle is returned over the km allowance, with less fuel, or late. Review them in the booking details after check-in.
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5"><Label>Odometer (km)</Label><Input type="number" value={conditionForm.odometer} onChange={(e) => setConditionForm({ ...conditionForm, odometer: e.target.value })} /></div>
               <div className="space-y-1.5"><Label>Fuel Level</Label>
@@ -496,7 +685,9 @@ export default function RentalBookingsPage() {
                 </select>
               </div>
             </div>
-            <div className="space-y-1.5"><Label>Notes / Damage remarks</Label><Input value={conditionForm.notes} onChange={(e) => setConditionForm({ ...conditionForm, notes: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Notes / Damage remarks</Label>
+              <textarea className={textareaCls} value={conditionForm.notes} onChange={(e) => setConditionForm({ ...conditionForm, notes: e.target.value })} />
+            </div>
             <div className="space-y-1.5"><Label>Payment collected now (Rs)</Label><Input type="number" value={conditionForm.paidAmount} onChange={(e) => setConditionForm({ ...conditionForm, paidAmount: e.target.value })} /></div>
             <PhotoUploadInput
               label="Condition Photos (before/after evidence)"
@@ -519,6 +710,165 @@ export default function RentalBookingsPage() {
             <Button onClick={submitCondition} disabled={saving}>
               {saving ? 'Saving...' : conditionTarget?.action === 'checkout' ? 'Confirm Check-Out' : 'Confirm Check-In'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Booking detail dialog */}
+      <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="max-w-3xl sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Booking {detail?.bookingNumber || ''}
+              {detail?.status && <Badge className={statusColor[detail.status] || ''}>{detail.status}</Badge>}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            {detailLoading || !detail?.bookingNumber ? (
+              <div className="py-10"><LoadingSpinner /></div>
+            ) : (
+              <div className="space-y-4 text-sm">
+                {/* Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-md border p-3 space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Vehicle & Customer</p>
+                    <p><b>{detail.vehicle?.registrationNo}</b> — {detail.vehicle?.make} {detail.vehicle?.model}</p>
+                    <p>{detail.customer?.name} {detail.customer?.phone ? `· ${detail.customer.phone}` : ''}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(detail.startAt).toLocaleString()} → {new Date(detail.endAt).toLocaleString()}
+                    </p>
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {detail.withDriver && <Badge variant="outline" className="text-[10px]">With driver</Badge>}
+                      {detail.isLoanVehicle && <Badge variant="outline" className="text-[10px]">Loan vehicle</Badge>}
+                      {detail.ratePlan && <Badge variant="outline" className="text-[10px]">{detail.ratePlan.name}</Badge>}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 space-y-0.5">
+                    <p className="text-xs font-semibold text-muted-foreground">Money</p>
+                    <div className="flex justify-between"><span>Base</span><span>{money(detail.baseAmount)}</span></div>
+                    <div className="flex justify-between"><span>Extras</span><span>{money(detail.extrasAmount)}</span></div>
+                    <div className="flex justify-between"><span>Charges</span><span>{money(detail.chargesAmount)}</span></div>
+                    {Number(detail.discountAmount) > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>−{money(detail.discountAmount)}</span></div>}
+                    <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total</span><span>{money(detail.totalAmount)}</span></div>
+                    <div className="flex justify-between"><span>Paid</span><span>{money(detail.paidAmount)}</span></div>
+                    <div className="flex justify-between"><span>Balance</span>
+                      <span className={Number(detail.totalAmount) - Number(detail.paidAmount) > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
+                        {money(Number(detail.totalAmount) - Number(detail.paidAmount))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground"><span>Deposit</span>
+                      <span>{money(detail.depositAmount)} {detail.depositReleased ? '· released' : '· held'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Identity */}
+                {(detail.renterNic || detail.renterLicenseNo || (detail.identityPhotos?.length ?? 0) > 0) && (
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Renter Identity</p>
+                    <p className="text-xs">NIC: {detail.renterNic || '—'} · License: {detail.renterLicenseNo || '—'}</p>
+                    {(detail.identityPhotos?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {detail.identityPhotos.map((p: string, i: number) => (
+                          <a key={i} href={p} target="_blank" rel="noreferrer"><img src={p} alt="" className="w-20 h-14 object-cover rounded border" /></a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Condition reports */}
+                {(detail.conditionReports?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground">Condition Reports</p>
+                    {detail.conditionReports.map((r: any) => (
+                      <div key={r.id} className="rounded-md border p-3">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className="text-[10px]">{r.reportType}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {r.odometer != null ? `${Number(r.odometer).toLocaleString()} km` : ''} {r.fuelLevel ? `· ${r.fuelLevel}` : ''}
+                          </span>
+                        </div>
+                        {r.notes && <p className="text-xs mt-1">{r.notes}</p>}
+                        {(r.damageMarkers?.length ?? 0) > 0 && <p className="text-[11px] text-amber-700 mt-1">{r.damageMarkers.length} damage marker(s)</p>}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {(r.photos ?? []).map((p: string, i: number) => (
+                            <a key={i} href={p} target="_blank" rel="noreferrer"><img src={p} alt="" className="w-20 h-14 object-cover rounded border" /></a>
+                          ))}
+                          {r.customerSignature && <img src={r.customerSignature} alt="signature" className="h-14 rounded border bg-white" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Charges */}
+                <div className="rounded-md border p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Charges</p>
+                  {(detail.charges?.length ?? 0) > 0 ? (
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {detail.charges.map((c: any) => (
+                          <tr key={c.id} className="border-t first:border-t-0">
+                            <td className="py-1.5"><Badge variant="outline" className="text-[10px]">{c.chargeType}</Badge></td>
+                            <td className="py-1.5">{c.description}</td>
+                            <td className="py-1.5 text-right font-medium">{money(c.amount)}</td>
+                            <td className="py-1.5 text-right w-8">
+                              {detail.status !== 'COMPLETED' && detail.status !== 'CANCELLED' && (
+                                <button onClick={() => removeCharge(c.id)} title="Remove"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : <p className="text-xs text-muted-foreground">No charges added.</p>}
+
+                  {/* Add charge */}
+                  {detail.status !== 'COMPLETED' && detail.status !== 'CANCELLED' && (
+                    <div className="flex flex-wrap items-end gap-2 mt-3 border-t pt-3">
+                      <div>
+                        <Label className="text-xs">Type</Label>
+                        <select className={`${selectCls} h-8 w-36`} value={chargeForm.chargeType} onChange={(e) => setChargeForm({ ...chargeForm, chargeType: e.target.value })}>
+                          {CHARGE_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 min-w-40">
+                        <Label className="text-xs">Description</Label>
+                        <Input className="h-8" value={chargeForm.description} onChange={(e) => setChargeForm({ ...chargeForm, description: e.target.value })} placeholder="e.g. Scratch on rear bumper" />
+                      </div>
+                      <div className="w-28">
+                        <Label className="text-xs">Amount (Rs)</Label>
+                        <Input className="h-8" type="number" value={chargeForm.amount} onChange={(e) => setChargeForm({ ...chargeForm, amount: e.target.value })} />
+                      </div>
+                      <Button size="sm" onClick={submitCharge} disabled={chargeSaving || !chargeForm.description || chargeForm.amount === ''}>
+                        <Plus className="w-3 h-3 mr-1" /> {chargeSaving ? 'Adding…' : 'Add'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            {detail?.bookingNumber && (
+              <Button variant="outline" onClick={() => viewAgreement(detail.id)}>Agreement</Button>
+            )}
+            <Button variant="outline" onClick={() => setDetail(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel confirmation */}
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Cancel booking {cancelTarget?.bookingNumber}?</DialogTitle></DialogHeader>
+          <DialogBody>
+            <p className="text-sm text-muted-foreground">This releases the reserved vehicle. This cannot be undone.</p>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)}>Keep booking</Button>
+            <Button variant="destructive" onClick={confirmCancel}>Cancel booking</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

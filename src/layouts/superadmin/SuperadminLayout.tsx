@@ -3,12 +3,15 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopNavbar from './TopNavbar';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useActivityHeartbeat } from '@/hooks/useActivityHeartbeat';
+import { PERMISSIONS } from '@/store/types';
 
 export default function SuperadminLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const location = useLocation();
-  const { isOrganizationAdmin, isSuperAdmin } = usePermissions();
+  const { isOrganizationAdmin, isSuperAdmin, hasPermission } = usePermissions();
+  useActivityHeartbeat(hasPermission(PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN));
 
   useEffect(() => {
     if (isOrganizationAdmin && !isSuperAdmin) {

@@ -81,6 +81,7 @@ interface Product {
   warrantyMonths?: number;
   productCode?: string;
   isService?: boolean;
+  isReload?: boolean;
 }
 
 interface CartItem {
@@ -95,6 +96,8 @@ interface CartItem {
   image?: string;
   warrantyMonths?: number;
   isService?: boolean;
+  isReload?: boolean;
+  reloadPhone?: string;
 }
 
 interface InventoryItem {
@@ -112,6 +115,7 @@ interface InventoryItem {
     warrantyMonths?: number;
     productCode?: string;
     isService?: boolean;
+    isReload?: boolean;
     discountInfo?: {
       discountName: string;
       discountType: "PERCENTAGE" | "FIXED";
@@ -271,12 +275,15 @@ const QuickPOSPage: React.FC = () => {
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedItemType, setSelectedItemType] = useState<
-    "all" | "products" | "services"
+    "all" | "products" | "services" | "reload"
   >("all");
   const [productPage, setProductPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalProducts, setTotalProducts] = useState(0);
   const [jumpPageInput, setJumpPageInput] = useState("1");
+  const [reloadProviderId, setReloadProviderId] = useState<string | null>(null);
+  const [reloadPhone, setReloadPhone] = useState("");
+  const [reloadAmount, setReloadAmount] = useState("");
 
   // ── Location selector (org admin only)
   const [locations, setLocations] = useState<LocationDetails[]>([]);
@@ -529,6 +536,7 @@ const QuickPOSPage: React.FC = () => {
       warrantyMonths: i.product?.warrantyMonths || 0,
       productCode: i.product?.productCode,
       isService: i.product?.isService ?? false,
+      isReload: i.product?.isReload ?? false,
     };
   }, []);
 
@@ -543,7 +551,7 @@ const QuickPOSPage: React.FC = () => {
         sortOrder: "asc",
         includeDiscount: true,
         availableOnly: true,
-        includeServices: selectedItemType !== "products",
+        includeServices: selectedItemType !== "products" && selectedItemType !== "reload",
         page: productPage,
         limit: pageSize,
       };
@@ -606,8 +614,9 @@ const QuickPOSPage: React.FC = () => {
   // ─── Derived values ─────────────────────────────────────────────────────────
 
   const typeFilteredProducts = products.filter((p) => {
-    if (selectedItemType === "products") return !p.isService;
+    if (selectedItemType === "products") return !p.isService && !p.isReload;
     if (selectedItemType === "services") return !!p.isService;
+    if (selectedItemType === "reload") return !!p.isReload;
     return true;
   });
   const categories = [
@@ -830,6 +839,11 @@ const QuickPOSPage: React.FC = () => {
   // ─── Cart actions ───────────────────────────────────────────────────────────
 
   const addToCart = (product: Product) => {
+    if (product.isReload) {
+      setSelectedItemType("reload");
+      setReloadProviderId(product.id);
+      return;
+    }
     if (!product.isService && product.stock <= 0) {
       toast.error(`${product.name} is out of stock`);
       return;
@@ -860,9 +874,83 @@ const QuickPOSPage: React.FC = () => {
           image: product.image,
           warrantyMonths: product.warrantyMonths || 0,
           isService: product.isService ?? false,
+          isReload: false,
         },
       ];
     });
+  };
+
+  const addReloadToCart = () => {
+    const product = products.find((p) => p.id === reloadProviderId);
+    if (!product || !product.isReload) {
+      toast.error("Select a reload provider");
+      return;
+    }
+    const phone = reloadPhone.trim();
+    if (!phone) {
+      toast.error("Phone number is required");
+      return;
+    }
+    const amount = Math.floor(Number(reloadAmount));
+    if (!Number.isFinite(amount) || amount < 1) {
+      toast.error("Enter a valid reload amount (whole LKR)");
+      return;
+    }
+    const cartId = `${product.id}:${phone}`;
+    const otherAmt = cart
+      .filter(
+        (i) =>
+          i.isReload &&
+          i.productId === product.productId &&
+          i.id !== cartId,
+      )
+      .reduce((sum, i) => sum + i.quantity, 0);
+    if (otherAmt + amount > product.stock) {
+      toast.error(
+        `Insufficient balance for ${product.name}. Available: Rs.${Math.max(0, product.stock - otherAmt).toLocaleString()}`,
+      );
+      return;
+    }
+    const unitPrice =
+      Number(product.price) > 0 ? Number(product.price) : 1;
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === cartId);
+      if (existing) {
+        return prev.map((i) =>
+          i.id === cartId
+            ? {
+                ...i,
+                quantity: amount,
+                stock: product.stock,
+                price: unitPrice,
+              }
+            : i,
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: cartId,
+          productId: product.productId,
+          name: product.name,
+          price: unitPrice,
+          costPrice: product.costPrice || 0,
+          quantity: amount,
+          stock: product.stock,
+          category: product.category,
+          image: product.image,
+          warrantyMonths: 0,
+          isService: false,
+          isReload: true,
+          reloadPhone: phone,
+        },
+      ];
+    });
+    toast.success(
+      `${product.name} · ${phone} · Rs.${amount.toLocaleString()} added`,
+      { duration: 1500 },
+    );
+    setReloadAmount("");
   };
 
   const updateQty = (id: string, qty: number) => {
@@ -870,8 +958,30 @@ const QuickPOSPage: React.FC = () => {
       setCart((prev) => prev.filter((i) => i.id !== id));
       return;
     }
-    const product = products.find((p) => p.id === id);
     const cartItem = cart.find((i) => i.id === id);
+    if (cartItem?.isReload) {
+      const product = products.find((p) => p.productId === cartItem.productId && p.isReload);
+      const balance = product?.stock ?? cartItem.stock;
+      const otherAmt = cart
+        .filter(
+          (i) =>
+            i.isReload &&
+            i.productId === cartItem.productId &&
+            i.id !== id,
+        )
+        .reduce((sum, i) => sum + i.quantity, 0);
+      if (otherAmt + qty > balance) {
+        toast.error(
+          `Insufficient balance. Available: Rs.${Math.max(0, balance - otherAmt).toLocaleString()}`,
+        );
+        return;
+      }
+      setCart((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, quantity: qty } : i)),
+      );
+      return;
+    }
+    const product = products.find((p) => p.id === id);
     if (product && !cartItem?.isService && qty > product.stock) {
       toast.error(`Only ${product.stock} units available`);
       return;
@@ -1259,6 +1369,9 @@ const QuickPOSPage: React.FC = () => {
         discountType: "FIXED" as const,
         tax: 0,
         warrantyMonths: item.warrantyMonths || 0,
+        ...(item.isReload && item.reloadPhone
+          ? { reloadPhone: item.reloadPhone }
+          : {}),
       }));
 
       const shipmentSaleItems = saleItems.map((item) => ({
@@ -1274,7 +1387,11 @@ const QuickPOSPage: React.FC = () => {
         const isCodShipment = shipmentPm === "cod";
         const paymentFlags = getShipmentPaymentFlags(shipmentPm, total);
         const itemDescription = cart
-          .map((item) => `${item.name} x${item.quantity}`)
+          .map((item) =>
+            item.isReload
+              ? `${item.name} · ${item.reloadPhone} · Rs.${item.quantity}`
+              : `${item.name} x${item.quantity}`,
+          )
           .join(", ");
         const shipmentResponse = await createCourierShipment({
           courierServiceId: selectedCourierId,
@@ -1689,11 +1806,14 @@ const QuickPOSPage: React.FC = () => {
               { id: "all", label: "All" },
               { id: "products", label: "Products" },
               { id: "services", label: "Services" },
+              { id: "reload", label: "Reload" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() =>
-                  setSelectedItemType(tab.id as "all" | "products" | "services")
+                  setSelectedItemType(
+                    tab.id as "all" | "products" | "services" | "reload",
+                  )
                 }
                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                   selectedItemType === tab.id
@@ -1724,9 +1844,100 @@ const QuickPOSPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Product grid */}
+        {/* Product grid / Reload form */}
         <div className="flex-1 overflow-y-auto p-3">
-          {loadingProducts ? (
+          {selectedItemType === "reload" ? (
+            <div className="space-y-4">
+              {loadingProducts ? (
+                <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                  <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                  <p className="text-sm">Loading reload providers…</p>
+                </div>
+              ) : typeFilteredProducts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                  <Smartphone className="w-10 h-10 mb-2" />
+                  <p className="text-sm">No reload providers found</p>
+                  <p className="text-xs mt-1 text-center px-4">
+                    Create a Reload product (Dialog, Hutch, …) and add credit amount in Stock.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {typeFilteredProducts.map((product) => {
+                      const selected = reloadProviderId === product.id;
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => setReloadProviderId(product.id)}
+                          className={`relative flex flex-col bg-white border rounded-xl p-3 text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
+                            selected
+                              ? "border-emerald-600 bg-emerald-50/40"
+                              : "border-gray-200"
+                          }`}
+                        >
+                          <div className="w-full h-16 rounded-lg mb-2 bg-emerald-50 flex items-center justify-center">
+                            <Smartphone className="w-7 h-7 text-emerald-600" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-800 line-clamp-2">
+                            {product.name}
+                          </p>
+                          <p className="mt-2 text-[11px] font-medium text-emerald-700">
+                            Balance: Rs.{product.stock.toLocaleString()}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {reloadProviderId && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
+                      <p className="text-sm font-semibold text-gray-800">
+                        Reload details —{" "}
+                        {products.find((p) => p.id === reloadProviderId)?.name}
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Phone number
+                          </label>
+                          <input
+                            type="tel"
+                            value={reloadPhone}
+                            onChange={(e) => setReloadPhone(e.target.value)}
+                            placeholder="07XXXXXXXX"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Amount (LKR)
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={reloadAmount}
+                            onChange={(e) => setReloadAmount(e.target.value)}
+                            placeholder="100"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addReloadToCart}
+                        className="w-full py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
+                      >
+                        Add Reload to Cart
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : loadingProducts ? (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <Loader2 className="w-8 h-8 animate-spin mb-2" />
               <p className="text-sm">Loading products…</p>
@@ -1739,19 +1950,23 @@ const QuickPOSPage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
               {displayedProducts.map((product) => {
-                const inCart = cart.find((i) => i.id === product.id);
+                const inCart = cart.find((i) =>
+                  product.isReload
+                    ? i.productId === product.productId && i.isReload
+                    : i.id === product.id,
+                );
                 return (
                   <button
                     key={product.id}
                     onClick={() => addToCart(product)}
-                    disabled={!product.isService && product.stock <= 0}
+                    disabled={!product.isService && !product.isReload && product.stock <= 0}
                     className={`relative flex flex-col bg-white border rounded-xl p-3 text-left transition-all hover:shadow-md hover:border-[#1e3a8a]/40 focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${
-                      !product.isService && product.stock <= 0
+                      !product.isService && !product.isReload && product.stock <= 0
                         ? "opacity-50 cursor-not-allowed"
                         : "cursor-pointer"
                     } ${inCart ? "border-[#1e3a8a] bg-blue-50/30" : "border-gray-200"}`}
                   >
-                    {inCart && (
+                    {inCart && !product.isReload && (
                       <span className="absolute top-2 right-2 bg-[#1e3a8a] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                         {inCart.quantity}
                       </span>
@@ -1771,7 +1986,11 @@ const QuickPOSPage: React.FC = () => {
                       />
                     ) : (
                       <div className="w-full h-28 rounded-lg mb-2 bg-gray-100 flex items-center justify-center">
-                        <Package className="w-8 h-8 text-gray-300" />
+                        {product.isReload ? (
+                          <Smartphone className="w-8 h-8 text-emerald-400" />
+                        ) : (
+                          <Package className="w-8 h-8 text-gray-300" />
+                        )}
                       </div>
                     )}
                     <p className="text-xs font-semibold text-gray-800 line-clamp-2 leading-tight">
@@ -1784,25 +2003,43 @@ const QuickPOSPage: React.FC = () => {
                     )}
                     <div className="mt-auto pt-2 flex items-center justify-between">
                       <div>
-                        <span
-                          className={`text-xs font-bold ${product.discountInfo ? "text-red-600" : "text-[#1e3a8a]"}`}
-                        >
-                          {formatCurrency(product.price)}
-                        </span>
-                        {product.originalPrice !== undefined && (
-                          <span className="block text-[10px] text-gray-400 line-through">
-                            {formatCurrency(product.originalPrice)}
+                        {product.isReload ? (
+                          <span className="text-xs font-bold text-emerald-700">
+                            Reload
                           </span>
+                        ) : (
+                          <>
+                            <span
+                              className={`text-xs font-bold ${product.discountInfo ? "text-red-600" : "text-[#1e3a8a]"}`}
+                            >
+                              {formatCurrency(product.price)}
+                            </span>
+                            {product.originalPrice !== undefined && (
+                              <span className="block text-[10px] text-gray-400 line-through">
+                                {formatCurrency(product.originalPrice)}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                       <span
-                        className={`text-[10px] font-medium ${product.isService ? "text-indigo-600" : product.stock <= 5 ? "text-orange-500" : "text-green-600"}`}
+                        className={`text-[10px] font-medium ${
+                          product.isService
+                            ? "text-indigo-600"
+                            : product.isReload
+                              ? "text-emerald-600"
+                              : product.stock <= 5
+                                ? "text-orange-500"
+                                : "text-green-600"
+                        }`}
                       >
                         {product.isService
                           ? "Service"
-                          : product.stock <= 0
-                            ? "Out"
-                            : `${product.stock} left`}
+                          : product.isReload
+                            ? `Rs.${product.stock.toLocaleString()}`
+                            : product.stock <= 0
+                              ? "Out"
+                              : `${product.stock} left`}
                       </span>
                     </div>
                   </button>
@@ -1926,9 +2163,18 @@ const QuickPOSPage: React.FC = () => {
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-gray-800 truncate">
-                          {item.name}
+                          {item.isReload
+                            ? `${item.name} · ${item.reloadPhone}`
+                            : item.name}
                         </p>
-                        {!item.isService ? (
+                        {item.isReload ? (
+                          <p className="text-xs text-emerald-700 font-medium mt-0.5">
+                            Reload Rs.{item.quantity.toLocaleString()}
+                            {item.price !== 1
+                              ? ` · ${formatCurrency(item.price * item.quantity)}`
+                              : ""}
+                          </p>
+                        ) : !item.isService ? (
                           <p className="text-xs text-[#1e3a8a] font-medium mt-0.5">
                             {formatCurrency(item.price)}
                           </p>
@@ -1955,29 +2201,43 @@ const QuickPOSPage: React.FC = () => {
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => updateQty(item.id, item.quantity - 1)}
-                          className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
-                        >
-                          <Minus className="w-3 h-3 text-gray-600" />
-                        </button>
-                        <span className="w-6 text-center text-sm font-bold text-gray-800">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQty(item.id, item.quantity + 1)}
-                          className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
-                        >
-                          <Plus className="w-3 h-3 text-gray-600" />
-                        </button>
-                        <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="ml-1 text-red-300 hover:text-red-500"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      {item.isReload ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-gray-800">
+                            {formatCurrency(item.price * item.quantity)}
+                          </span>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="ml-1 text-red-300 hover:text-red-500"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => updateQty(item.id, item.quantity - 1)}
+                            className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                          >
+                            <Minus className="w-3 h-3 text-gray-600" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-bold text-gray-800">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQty(item.id, item.quantity + 1)}
+                            className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                          >
+                            <Plus className="w-3 h-3 text-gray-600" />
+                          </button>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="ml-1 text-red-300 hover:text-red-500"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

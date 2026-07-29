@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, CalendarOff, Layers } from 'lucide-react';
+import { Plus, Trash2, CalendarOff, Layers, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,6 +33,11 @@ export default function RentalPricingPage() {
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  // Editing ids (null = creating)
+  const [editPlanId, setEditPlanId] = useState<string | null>(null);
+  const [editRuleId, setEditRuleId] = useState<string | null>(null);
+  const [editFeeId, setEditFeeId] = useState<string | null>(null);
+  const [editCouponId, setEditCouponId] = useState<string | null>(null);
   const [ruleForm, setRuleForm] = useState<any>({ name: '', ruleType: 'WEEKEND', vehicleClass: '', multiplier: '', flatAddition: '', startDate: '', endDate: '' });
   const [feeForm, setFeeForm] = useState<any>({ name: '', amount: '', perDay: false });
   const [couponForm, setCouponForm] = useState<any>({ code: '', discountType: 'PERCENT', value: '', validFrom: '', validTo: '', maxUses: '' });
@@ -99,6 +104,65 @@ export default function RentalPricingPage() {
     return null;
   })();
 
+  // ---- Open dialogs (new vs edit) ----
+  const openNewPlan = () => {
+    setEditPlanId(null);
+    setPlanForm({ name: '', vehicleClass: '', rateType: 'DAILY', baseRate: '', withDriverRate: '', includedKm: '', excessKmRate: '', depositAmount: '', lateFeePerHour: '', fuelStepCharge: '', durationTiers: [] });
+    setShowPlanModal(true);
+  };
+  const openEditPlan = (p: any) => {
+    setEditPlanId(p.id);
+    setPlanForm({
+      name: p.name ?? '', vehicleClass: p.vehicleClass ?? '', rateType: p.rateType ?? 'DAILY',
+      baseRate: p.baseRate != null ? String(p.baseRate) : '', withDriverRate: p.withDriverRate != null ? String(p.withDriverRate) : '',
+      includedKm: p.includedKm != null ? String(p.includedKm) : '', excessKmRate: p.excessKmRate != null ? String(p.excessKmRate) : '',
+      depositAmount: p.depositAmount != null ? String(p.depositAmount) : '', lateFeePerHour: p.lateFeePerHour != null ? String(p.lateFeePerHour) : '',
+      fuelStepCharge: p.fuelStepCharge != null ? String(p.fuelStepCharge) : '',
+      durationTiers: (p.durationTiers ?? []).map((t: any) => ({
+        minDays: String(t.minDays), maxDays: t.maxDays == null ? '' : String(t.maxDays),
+        rate: String(t.rate), withDriverRate: t.withDriverRate != null ? String(t.withDriverRate) : '',
+      })),
+    });
+    setShowPlanModal(true);
+  };
+  const openNewRule = () => {
+    setEditRuleId(null);
+    setRuleForm({ name: '', ruleType: 'WEEKEND', vehicleClass: '', multiplier: '', flatAddition: '', startDate: '', endDate: '' });
+    setShowRuleModal(true);
+  };
+  const openEditRule = (r: any) => {
+    setEditRuleId(r.id);
+    setRuleForm({
+      name: r.name ?? '', ruleType: r.ruleType ?? 'WEEKEND', vehicleClass: r.vehicleClass ?? '',
+      multiplier: r.multiplier != null ? String(r.multiplier) : '', flatAddition: r.flatAddition != null ? String(r.flatAddition) : '',
+      startDate: r.startDate ?? '', endDate: r.endDate ?? '',
+    });
+    setShowRuleModal(true);
+  };
+  const openNewFee = () => {
+    setEditFeeId(null);
+    setFeeForm({ name: '', amount: '', perDay: false });
+    setShowFeeModal(true);
+  };
+  const openEditFee = (f: any) => {
+    setEditFeeId(f.id);
+    setFeeForm({ name: f.name ?? '', amount: f.amount != null ? String(f.amount) : '', perDay: Boolean(f.perDay) });
+    setShowFeeModal(true);
+  };
+  const openNewCoupon = () => {
+    setEditCouponId(null);
+    setCouponForm({ code: '', discountType: 'PERCENT', value: '', validFrom: '', validTo: '', maxUses: '' });
+    setShowCouponModal(true);
+  };
+  const openEditCoupon = (c: any) => {
+    setEditCouponId(c.id);
+    setCouponForm({
+      code: c.code ?? '', discountType: c.discountType ?? 'PERCENT', value: c.value != null ? String(c.value) : '',
+      validFrom: c.validFrom ?? '', validTo: c.validTo ?? '', maxUses: c.maxUses != null ? String(c.maxUses) : '',
+    });
+    setShowCouponModal(true);
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -123,7 +187,7 @@ export default function RentalPricingPage() {
   const submitRule = async () => {
     setSaving(true);
     try {
-      const res = await rental.createPricingRule({
+      const payload = {
         name: ruleForm.name,
         ruleType: ruleForm.ruleType,
         vehicleClass: ruleForm.vehicleClass || null,
@@ -131,38 +195,47 @@ export default function RentalPricingPage() {
         flatAddition: ruleForm.flatAddition ? Number(ruleForm.flatAddition) : null,
         startDate: ruleForm.startDate || null,
         endDate: ruleForm.endDate || null,
-      });
-      if (res?.success || res?.status) { setShowRuleModal(false); load(); }
+      };
+      const res = editRuleId
+        ? await rental.updatePricingRule(editRuleId, payload)
+        : await rental.createPricingRule(payload);
+      if (res?.success || res?.status) { setShowRuleModal(false); setEditRuleId(null); load(); }
     } finally { setSaving(false); }
   };
 
   const submitFee = async () => {
     setSaving(true);
     try {
-      const res = await rental.createExtraFee({ name: feeForm.name, amount: Number(feeForm.amount || 0), perDay: feeForm.perDay });
-      if (res?.success || res?.status) { setShowFeeModal(false); load(); }
+      const payload = { name: feeForm.name, amount: Number(feeForm.amount || 0), perDay: feeForm.perDay };
+      const res = editFeeId
+        ? await rental.updateExtraFee(editFeeId, payload)
+        : await rental.createExtraFee(payload);
+      if (res?.success || res?.status) { setShowFeeModal(false); setEditFeeId(null); load(); }
     } finally { setSaving(false); }
   };
 
   const submitCoupon = async () => {
     setSaving(true);
     try {
-      const res = await rental.createCoupon({
+      const payload = {
         code: couponForm.code,
         discountType: couponForm.discountType,
         value: Number(couponForm.value || 0),
         validFrom: couponForm.validFrom || null,
         validTo: couponForm.validTo || null,
         maxUses: couponForm.maxUses ? Number(couponForm.maxUses) : null,
-      });
-      if (res?.success || res?.status) { setShowCouponModal(false); load(); }
+      };
+      const res = editCouponId
+        ? await rental.updateCoupon(editCouponId, payload)
+        : await rental.createCoupon(payload);
+      if (res?.success || res?.status) { setShowCouponModal(false); setEditCouponId(null); load(); }
     } finally { setSaving(false); }
   };
 
   const submitPlan = async () => {
     setSaving(true);
     try {
-      const res = await rental.createRatePlan({
+      const payload = {
         name: planForm.name,
         vehicleClass: planForm.vehicleClass || null,
         rateType: planForm.rateType,
@@ -181,8 +254,11 @@ export default function RentalPricingPage() {
               withDriverRate: t.withDriverRate ? Number(t.withDriverRate) : null,
             }))
           : null,
-      });
-      if (res?.success || res?.status) { setShowPlanModal(false); load(); }
+      };
+      const res = editPlanId
+        ? await rental.updateRatePlan(editPlanId, payload)
+        : await rental.createRatePlan(payload);
+      if (res?.success || res?.status) { setShowPlanModal(false); setEditPlanId(null); load(); }
     } finally { setSaving(false); }
   };
 
@@ -194,11 +270,11 @@ export default function RentalPricingPage() {
       <Card><CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <p className="font-semibold text-sm">Rate Plans (base pricing per class / vehicle)</p>
-          <Button size="sm" onClick={() => setShowPlanModal(true)}><Plus className="w-3 h-3 mr-1" /> Rate Plan</Button>
+          <Button size="sm" onClick={openNewPlan}><Plus className="w-3 h-3 mr-1" /> Rate Plan</Button>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left">
-            <tr><th className="p-2">Name</th><th className="p-2">Class</th><th className="p-2">Type</th><th className="p-2">Base Rate</th><th className="p-2">With Driver</th><th className="p-2">Included Km</th><th className="p-2">Deposit</th><th className="p-2">Active</th></tr>
+            <tr><th className="p-2">Name</th><th className="p-2">Class</th><th className="p-2">Type</th><th className="p-2">Base Rate</th><th className="p-2">With Driver</th><th className="p-2">Included Km</th><th className="p-2">Deposit</th><th className="p-2">Active</th><th className="p-2"></th></tr>
           </thead>
           <tbody>
             {ratePlans.map((p) => (
@@ -220,9 +296,12 @@ export default function RentalPricingPage() {
                 <td className="p-2">
                   <input type="checkbox" checked={p.isActive} onChange={async () => { await rental.updateRatePlan(p.id, { isActive: !p.isActive }); load(); }} />
                 </td>
+                <td className="p-2 text-right">
+                  <button onClick={() => openEditPlan(p)} title="Edit"><Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" /></button>
+                </td>
               </tr>
             ))}
-            {ratePlans.length === 0 && <tr><td colSpan={8} className="p-4 text-center text-muted-foreground">No rate plans yet</td></tr>}
+            {ratePlans.length === 0 && <tr><td colSpan={9} className="p-4 text-center text-muted-foreground">No rate plans yet</td></tr>}
           </tbody>
         </table>
       </CardContent></Card>
@@ -231,11 +310,11 @@ export default function RentalPricingPage() {
       <Card><CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <p className="font-semibold text-sm">Price Rules (weekend / holiday / seasonal)</p>
-          <Button size="sm" onClick={() => setShowRuleModal(true)}><Plus className="w-3 h-3 mr-1" /> Rule</Button>
+          <Button size="sm" onClick={openNewRule}><Plus className="w-3 h-3 mr-1" /> Rule</Button>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left">
-            <tr><th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2">Class</th><th className="p-2">Adjustment</th><th className="p-2">Period</th><th className="p-2">Active</th></tr>
+            <tr><th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2">Class</th><th className="p-2">Adjustment</th><th className="p-2">Period</th><th className="p-2">Active</th><th className="p-2"></th></tr>
           </thead>
           <tbody>
             {pricingRules.map((r) => (
@@ -248,9 +327,12 @@ export default function RentalPricingPage() {
                 <td className="p-2">
                   <input type="checkbox" checked={r.isActive} onChange={async () => { await rental.updatePricingRule(r.id, { isActive: !r.isActive }); load(); }} />
                 </td>
+                <td className="p-2 text-right">
+                  <button onClick={() => openEditRule(r)} title="Edit"><Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" /></button>
+                </td>
               </tr>
             ))}
-            {pricingRules.length === 0 && <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No price rules</td></tr>}
+            {pricingRules.length === 0 && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No price rules</td></tr>}
           </tbody>
         </table>
       </CardContent></Card>
@@ -259,29 +341,32 @@ export default function RentalPricingPage() {
       <Card><CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <p className="font-semibold text-sm">Extra Fees (airport pickup, delivery, baby seat...)</p>
-          <Button size="sm" onClick={() => setShowFeeModal(true)}><Plus className="w-3 h-3 mr-1" /> Fee</Button>
+          <Button size="sm" onClick={openNewFee}><Plus className="w-3 h-3 mr-1" /> Fee</Button>
         </div>
         <div className="flex flex-wrap gap-2">
           {extraFees.map((f) => (
-            <Badge key={f.id} variant="outline" className={`text-xs py-1.5 px-3 cursor-pointer ${f.isActive ? '' : 'opacity-50 line-through'}`}
-              onClick={async () => { await rental.updateExtraFee(f.id, { isActive: !f.isActive }); load(); }}>
-              {f.name}: Rs {Number(f.amount).toLocaleString()}{f.perDay ? '/day' : ''}
-            </Badge>
+            <span key={f.id} className={`inline-flex items-center gap-1.5 rounded-full border text-xs py-1.5 px-3 ${f.isActive ? '' : 'opacity-50'}`}>
+              <button className={f.isActive ? '' : 'line-through'} title="Enable / disable"
+                onClick={async () => { await rental.updateExtraFee(f.id, { isActive: !f.isActive }); load(); }}>
+                {f.name}: Rs {Number(f.amount).toLocaleString()}{f.perDay ? '/day' : ''}
+              </button>
+              <button onClick={() => openEditFee(f)} title="Edit"><Pencil className="w-3 h-3 text-muted-foreground hover:text-foreground" /></button>
+            </span>
           ))}
           {extraFees.length === 0 && <p className="text-sm text-muted-foreground">No extra fees configured</p>}
         </div>
-        {extraFees.length > 0 && <p className="text-[11px] text-muted-foreground mt-2">Tip: click a fee to enable / disable it.</p>}
+        {extraFees.length > 0 && <p className="text-[11px] text-muted-foreground mt-2">Tip: click a fee name to enable / disable it, or the pencil to edit.</p>}
       </CardContent></Card>
 
       {/* Coupons */}
       <Card><CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <p className="font-semibold text-sm">Coupons</p>
-          <Button size="sm" onClick={() => setShowCouponModal(true)}><Plus className="w-3 h-3 mr-1" /> Coupon</Button>
+          <Button size="sm" onClick={openNewCoupon}><Plus className="w-3 h-3 mr-1" /> Coupon</Button>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left">
-            <tr><th className="p-2">Code</th><th className="p-2">Discount</th><th className="p-2">Valid</th><th className="p-2">Used</th><th className="p-2">Active</th></tr>
+            <tr><th className="p-2">Code</th><th className="p-2">Discount</th><th className="p-2">Valid</th><th className="p-2">Used</th><th className="p-2">Active</th><th className="p-2"></th></tr>
           </thead>
           <tbody>
             {coupons.map((c) => (
@@ -293,9 +378,12 @@ export default function RentalPricingPage() {
                 <td className="p-2">
                   <input type="checkbox" checked={c.isActive} onChange={async () => { await rental.updateCoupon(c.id, { isActive: !c.isActive }); load(); }} />
                 </td>
+                <td className="p-2 text-right">
+                  <button onClick={() => openEditCoupon(c)} title="Edit"><Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" /></button>
+                </td>
               </tr>
             ))}
-            {coupons.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No coupons</td></tr>}
+            {coupons.length === 0 && <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No coupons</td></tr>}
           </tbody>
         </table>
       </CardContent></Card>
@@ -330,9 +418,9 @@ export default function RentalPricingPage() {
       </CardContent></Card>
 
       {/* Rate plan dialog */}
-      <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
+      <Dialog open={showPlanModal} onOpenChange={(open) => { setShowPlanModal(open); if (!open) setEditPlanId(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New Rate Plan</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editPlanId ? 'Edit Rate Plan' : 'New Rate Plan'}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Name *</Label><Input placeholder="e.g. Sedan Daily Standard" value={planForm.name} onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })} /></div>
             <div><Label>Vehicle Class</Label>
@@ -392,18 +480,18 @@ export default function RentalPricingPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPlanModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowPlanModal(false); setEditPlanId(null); }}>Cancel</Button>
             <Button onClick={submitPlan} disabled={saving || !planForm.name || planForm.baseRate === '' || Boolean(tierError)}>
-              {saving ? 'Saving...' : 'Create Plan'}
+              {saving ? 'Saving...' : editPlanId ? 'Save Changes' : 'Create Plan'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Pricing rule dialog */}
-      <Dialog open={showRuleModal} onOpenChange={setShowRuleModal}>
+      <Dialog open={showRuleModal} onOpenChange={(open) => { setShowRuleModal(open); if (!open) setEditRuleId(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New Price Rule</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editRuleId ? 'Edit Price Rule' : 'New Price Rule'}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Name *</Label><Input placeholder="e.g. Weekend surcharge / December season" value={ruleForm.name} onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })} /></div>
             <div><Label>Type</Label>
@@ -429,18 +517,18 @@ export default function RentalPricingPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRuleModal(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowRuleModal(false); setEditRuleId(null); }}>Cancel</Button>
             <Button onClick={submitRule} disabled={saving || !ruleForm.name || (!ruleForm.multiplier && !ruleForm.flatAddition)}>
-              {saving ? 'Saving...' : 'Create Rule'}
+              {saving ? 'Saving...' : editRuleId ? 'Save Changes' : 'Create Rule'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Fee dialog */}
-      <Dialog open={showFeeModal} onOpenChange={setShowFeeModal}>
+      <Dialog open={showFeeModal} onOpenChange={(open) => { setShowFeeModal(open); if (!open) setEditFeeId(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New Extra Fee</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editFeeId ? 'Edit Extra Fee' : 'New Extra Fee'}</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <div><Label>Name *</Label><Input placeholder="e.g. Airport Pickup / Baby Seat" value={feeForm.name} onChange={(e) => setFeeForm({ ...feeForm, name: e.target.value })} /></div>
             <div><Label>Amount (Rs) *</Label><Input type="number" value={feeForm.amount} onChange={(e) => setFeeForm({ ...feeForm, amount: e.target.value })} /></div>
@@ -450,16 +538,16 @@ export default function RentalPricingPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowFeeModal(false)}>Cancel</Button>
-            <Button onClick={submitFee} disabled={saving || !feeForm.name || !feeForm.amount}>{saving ? 'Saving...' : 'Create Fee'}</Button>
+            <Button variant="outline" onClick={() => { setShowFeeModal(false); setEditFeeId(null); }}>Cancel</Button>
+            <Button onClick={submitFee} disabled={saving || !feeForm.name || !feeForm.amount}>{saving ? 'Saving...' : editFeeId ? 'Save Changes' : 'Create Fee'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Coupon dialog */}
-      <Dialog open={showCouponModal} onOpenChange={setShowCouponModal}>
+      <Dialog open={showCouponModal} onOpenChange={(open) => { setShowCouponModal(open); if (!open) setEditCouponId(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>New Coupon</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editCouponId ? 'Edit Coupon' : 'New Coupon'}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Code *</Label><Input placeholder="NEWYEAR25" value={couponForm.code} onChange={(e) => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} /></div>
             <div><Label>Type</Label>
@@ -474,8 +562,8 @@ export default function RentalPricingPage() {
             <div><Label>Valid To</Label><Input type="date" value={couponForm.validTo} onChange={(e) => setCouponForm({ ...couponForm, validTo: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCouponModal(false)}>Cancel</Button>
-            <Button onClick={submitCoupon} disabled={saving || !couponForm.code || !couponForm.value}>{saving ? 'Saving...' : 'Create Coupon'}</Button>
+            <Button variant="outline" onClick={() => { setShowCouponModal(false); setEditCouponId(null); }}>Cancel</Button>
+            <Button onClick={submitCoupon} disabled={saving || !couponForm.code || !couponForm.value}>{saving ? 'Saving...' : editCouponId ? 'Save Changes' : 'Create Coupon'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

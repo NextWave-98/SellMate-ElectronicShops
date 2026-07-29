@@ -22,6 +22,7 @@ import {
   Wrench,
   ScanLine,
   Loader2,
+  Smartphone,
 } from 'lucide-react';
 import { useProduct } from '../../hooks/useProduct';
 import useBarcode from '../../hooks/useBarcode';
@@ -202,6 +203,7 @@ export default function AddProductPage() {
 
   // ── Product type ──────────────────────────────────────────────────────────────
   const [isService, setIsService] = useState(false);
+  const [isReload, setIsReload] = useState(false);
 
   // ── Variants ─────────────────────────────────────────────────────────────────
   const [hasVariants, setHasVariants] = useState(false);
@@ -580,9 +582,10 @@ export default function AddProductPage() {
         ...(tags.length > 0 && { tags }),
         ...(imageUrls.length > 0 && { images: imageUrls }),
         ...(primaryUrl && { primaryImage: primaryUrl }),
-        hasVariants: hasVariants && variantRows.length > 0,
+        hasVariants: hasVariants && variantRows.length > 0 && !isReload,
         isActive: true,
         isService,
+        isReload,
         ...(hasVariants && selectedTypeIds.length > 0 && {
           customAttributes: { variantTypeIds: selectedTypeIds },
         }),
@@ -812,12 +815,15 @@ export default function AddProductPage() {
               </Field>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Product Type</label>
-                <div className="flex items-center gap-3 p-3 rounded-xl border border-white/40 bg-white/30 backdrop-blur-sm">
+                <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl border border-white/40 bg-white/30 backdrop-blur-sm">
                   <button
                     type="button"
-                    onClick={() => setIsService(false)}
+                    onClick={() => {
+                      setIsService(false);
+                      setIsReload(false);
+                    }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                      !isService
+                      !isService && !isReload
                         ? 'bg-orange-500 text-white border-orange-500'
                         : 'bg-white/30 backdrop-blur-sm text-gray-600 border-white/40 hover:border-orange-300'
                     }`}
@@ -827,7 +833,11 @@ export default function AddProductPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsService(true)}
+                    onClick={() => {
+                      setIsService(true);
+                      setIsReload(false);
+                      setHasVariants(false);
+                    }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                       isService
                         ? 'bg-indigo-600 text-white border-indigo-600'
@@ -837,9 +847,31 @@ export default function AddProductPage() {
                     <Wrench className="w-4 h-4" />
                     Service
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsService(false);
+                      setIsReload(true);
+                      setHasVariants(false);
+                      if (!unitPrice) setUnitPrice('1');
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      isReload
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white/30 backdrop-blur-sm text-gray-600 border-white/40 hover:border-emerald-300'
+                    }`}
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    Reload
+                  </button>
                   {isService && (
                     <span className="text-xs text-indigo-600 font-medium">
                       No inventory tracking — always available in POS
+                    </span>
+                  )}
+                  {isReload && (
+                    <span className="text-xs text-emerald-700 font-medium">
+                      Credit balance pool — inventory amount is LKR balance
                     </span>
                   )}
                 </div>
@@ -875,7 +907,7 @@ export default function AddProductPage() {
           {/* ── Pricing & Identifiers ── */}
           <Section id="pricing" collapsed={collapsed.pricing} onToggle={() => toggle('pricing')}>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label="Unit Price (Selling)" required error={errors.unitPrice}>
+              <Field label={isReload ? 'Price per LKR (usually 1)' : 'Unit Price (Selling)'} required error={errors.unitPrice}>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
                   <input
@@ -1109,6 +1141,40 @@ export default function AddProductPage() {
                   <p className="text-xs text-indigo-600 mt-0.5">Service products are always considered available and do not consume physical stock.</p>
                 </div>
               </div>
+            ) : isReload ? (
+              <div className="mt-4 space-y-4">
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                  <Smartphone className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">Reload Product — Credit Balance Pool</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">
+                      Inventory stores whole-LKR credit (e.g. Dialog Rs.50,000). POS reload sales deduct the sold amount from this balance.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Field label="Min Balance (LKR)">
+                    <input
+                      type="number"
+                      min="0"
+                      value={minStockLevel}
+                      onChange={e => setMinStockLevel(e.target.value)}
+                      placeholder="0"
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Reorder Level (LKR)">
+                    <input
+                      type="number"
+                      min="0"
+                      value={reorderLevel}
+                      onChange={e => setReorderLevel(e.target.value)}
+                      placeholder="0"
+                      className={inputCls}
+                    />
+                  </Field>
+                </div>
+              </div>
             ) : (
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
               <Field label="Min Stock Level">
@@ -1157,10 +1223,16 @@ export default function AddProductPage() {
             {/* ── Initial Stock (simple, non-variant products) ── */}
             {!isService && !hasVariants && (
               <div className="mt-5 rounded-xl border border-orange-200 bg-orange-50/50 p-4">
-                <p className="text-sm font-semibold text-gray-800">Initial Stock (Optional)</p>
-                <p className="mt-0.5 text-xs text-gray-500">Add opening stock for this product and choose where to store it.</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {isReload ? 'Initial Credit Amount (Optional)' : 'Initial Stock (Optional)'}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {isReload
+                    ? 'Add opening reload credit (LKR) and choose which location holds the balance.'
+                    : 'Add opening stock for this product and choose where to store it.'}
+                </p>
                 <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Field label="Quantity">
+                  <Field label={isReload ? 'Credit Amount (LKR)' : 'Quantity'}>
                     <input
                       type="number"
                       min="0"
@@ -1189,12 +1261,15 @@ export default function AddProductPage() {
                     </select>
                   </Field>
                 </div>
-                <p className="mt-1.5 text-[11px] text-gray-500">Defaults to your warehouse. Leave quantity 0 to skip.</p>
+                <p className="mt-1.5 text-[11px] text-gray-500">
+                  {isReload ? 'Defaults to your warehouse. Leave amount 0 to skip.' : 'Defaults to your warehouse. Leave quantity 0 to skip.'}
+                </p>
               </div>
             )}
           </Section>
 
           {/* ── Variants ── */}
+          {!isReload && (
           <Section id="variants" collapsed={collapsed.variants} onToggle={() => toggle('variants')}>
             <div className="mt-4 space-y-5">
               {/* Toggle */}
@@ -1489,6 +1564,7 @@ export default function AddProductPage() {
               )}
             </div>
           </Section>
+          )}
         </div>
 
         {/* ── Right: summary card ── */}

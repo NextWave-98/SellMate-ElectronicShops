@@ -25,6 +25,8 @@ export interface InventoryItem {
     primaryImage?: string;
     warrantyMonths: number;
     isActive: boolean;
+    isService?: boolean;
+    isReload?: boolean;
     discountInfo?: {
       discountId: string;
       discountName: string;
