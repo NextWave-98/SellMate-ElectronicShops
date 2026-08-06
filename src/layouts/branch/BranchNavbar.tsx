@@ -20,17 +20,25 @@ import {
 
 interface BranchNavbarProps {
   onMobileMenuClick?: () => void;
+  isPosRoute?: boolean;
+  isPosFullscreen?: boolean;
+  onTogglePosFullscreen?: () => void;
 }
 import { CourierShipmentModal } from '@/components/courier/modals';
 
-const BranchNavbar = ({ onMobileMenuClick }: BranchNavbarProps) => {
+const BranchNavbar = ({
+  onMobileMenuClick,
+  isPosRoute = false,
+  isPosFullscreen = false,
+  onTogglePosFullscreen,
+}: BranchNavbarProps) => {
   const { user, logout } = useAuth();
   const { branchCode } = useParams();
   const { businessData, loadBusinessProfile } = useBusinessProfile();
   const { courierServices, fetchCourierServices, createCourierShipment } = useCourier();
 
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showCourierModal, setShowCourierModal] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -58,6 +66,12 @@ const BranchNavbar = ({ onMobileMenuClick }: BranchNavbarProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const syncBrowserFullscreen = () => setIsBrowserFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', syncBrowserFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncBrowserFullscreen);
+  }, []);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -67,15 +81,34 @@ const BranchNavbar = ({ onMobileMenuClick }: BranchNavbarProps) => {
     }
   };
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
+  const toggleFullscreen = async () => {
+    if (isPosRoute && onTogglePosFullscreen) {
+      const entering = !isPosFullscreen;
+      onTogglePosFullscreen();
+      try {
+        if (entering && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else if (!entering && document.fullscreenElement) {
+          await document.exitFullscreen();
+        }
+      } catch {
+        // Browser may block fullscreen without a user gesture or policy; chrome hide still works.
+      }
+      return;
+    }
+
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen API errors
     }
   };
+
+  const isFullscreenActive = isPosRoute ? isPosFullscreen : isBrowserFullscreen;
 
   const formatDate = (date: Date) =>
     date.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
@@ -92,13 +125,15 @@ const BranchNavbar = ({ onMobileMenuClick }: BranchNavbarProps) => {
 
         {/* ── Left: menu + brand + branch pill + clock ── */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-          <button
-            onClick={onMobileMenuClick}
-            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white/60 transition-colors flex-shrink-0"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          {!isPosFullscreen && (
+            <button
+              onClick={onMobileMenuClick}
+              className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white/60 transition-colors flex-shrink-0"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
 
           {/* Org name */}
           {businessData?.name && (
@@ -150,10 +185,18 @@ const BranchNavbar = ({ onMobileMenuClick }: BranchNavbarProps) => {
           {/* Fullscreen */}
           <button
             onClick={toggleFullscreen}
-            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            className="hidden sm:flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-white/60 rounded-lg transition-colors"
+            title={
+              isPosRoute
+                ? isFullscreenActive
+                  ? 'Exit POS fullscreen'
+                  : 'Enter POS fullscreen'
+                : isFullscreenActive
+                  ? 'Exit Fullscreen'
+                  : 'Enter Fullscreen'
+            }
+            className="flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-white/60 rounded-lg transition-colors"
           >
-            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            {isFullscreenActive ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
 
           {/* Profile */}

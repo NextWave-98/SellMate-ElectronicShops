@@ -46,6 +46,7 @@ import { useBusinessContext } from '../../context/BusinessContext';
 import { industryAllowsFeature } from '../../utils/industryFeatures';
 import { formatCurrency } from '../../utils/currency';
 import { buildPeriodFilters } from '../../utils/dashboardPeriod';
+import { usePermissions } from '../../hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -88,6 +89,8 @@ export default function DashboardPage() {
   const { checkSMSBalance } = useSMS();
   const { getOrgDashboardActivity } = useActivityLog();
   const { industryType } = useBusinessContext();
+  const { hasCourierAccess } = usePermissions();
+  const canViewCourier = hasCourierAccess();
   const showJobSheets = industryAllowsFeature(industryType, 'jobsheets');
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -499,6 +502,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Courier (collapsed — secondary for electronics shops) ── */}
+      {canViewCourier && (<>
       <Card className="rounded-2xl">
         <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
@@ -751,6 +755,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+      </>)}
       </>)}
 
       {/* ── Job Sheets (Electronics & General only) ── */}

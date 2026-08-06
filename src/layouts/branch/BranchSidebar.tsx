@@ -63,7 +63,7 @@ const BranchSidebar = ({
   onMobileClose,
 }: BranchSidebarProps) => {
   const { branchCode } = useParams();
-  const { hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, hasAnyRole } = usePermissions();
+  const { hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, hasCourierAccess, isSuperAdmin, hasAnyRole } = usePermissions();
   const { supplierOrdersEnabled } = useOrgFeatures();
   const { industryType } = useBusinessContext();
 
@@ -143,10 +143,17 @@ const BranchSidebar = ({
         'sale-jobs', 'installments', 'woocommerce-orders', 'suppliers',
       ];
       if (branchRetailOnlyIds.includes(item.id) && !industryAllowsFeature(industryType, 'retail')) return false;
+      // Courier + WooCommerce are tied: no courier access → hide both
+      if (
+        (item.id === 'courier' || item.id === 'woocommerce-orders') &&
+        !hasCourierAccess()
+      ) {
+        return false;
+      }
       const permConfig = BRANCH_SIDEBAR_PERMISSIONS.find(p => p.id === item.id);
       return checkPermissionConfig(permConfig);
     });
-  }, [allMenuItems, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, hasAnyRole, industryType, supplierOrdersEnabled]);
+  }, [allMenuItems, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, hasCourierAccess, isSuperAdmin, hasAnyRole, industryType, supplierOrdersEnabled]);
 
   const showExpanded = isMobileOpen || !isCollapsed;
 

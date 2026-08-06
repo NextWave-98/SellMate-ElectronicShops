@@ -103,14 +103,27 @@ export const usePermissions = () => {
 
   /**
    * Check if user can access a specific module
+   * Treats known aliases as equivalent (e.g. courier <-> couriers)
    */
   const canAccessModule = useCallback(
     (module: string): boolean => {
       if (isSuperAdmin) return true;
-      return permissionNames.some((perm) => perm.startsWith(`${module}.`));
+      const aliases: Record<string, string[]> = {
+        courier: ['courier', 'couriers'],
+        couriers: ['couriers', 'courier'],
+      };
+      const modules = aliases[module] ?? [module];
+      return modules.some((mod) =>
+        permissionNames.some((perm) => perm.startsWith(`${mod}.`)),
+      );
     },
     [permissionNames, isSuperAdmin]
   );
+
+  /** Courier sidebar + WooCommerce + dashboard courier widgets share this gate */
+  const hasCourierAccess = useCallback((): boolean => {
+    return isSuperAdmin || canAccessModule('couriers');
+  }, [isSuperAdmin, canAccessModule]);
 
   /**
    * Check if user can perform an action on a module
@@ -183,6 +196,7 @@ export const usePermissions = () => {
       hasRole,
       hasAnyRole,
       canAccessModule,
+      hasCourierAccess,
       canPerformAction,
       canAccessLocation,
       getAvailablePermissions,
@@ -215,6 +229,7 @@ export const usePermissions = () => {
       hasRole,
       hasAnyRole,
       canAccessModule,
+      hasCourierAccess,
       canPerformAction,
       canAccessLocation,
       getAvailablePermissions,

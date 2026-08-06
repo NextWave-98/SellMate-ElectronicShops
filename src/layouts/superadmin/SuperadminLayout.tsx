@@ -6,12 +6,19 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useActivityHeartbeat } from '@/hooks/useActivityHeartbeat';
 import { PERMISSIONS } from '@/store/types';
 
+const isPosPath = (pathname: string) =>
+  pathname.endsWith('/pos') || pathname.endsWith('/quick-pos');
+
 export default function SuperadminLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isPosFullscreen, setIsPosFullscreen] = useState(false);
   const location = useLocation();
   const { isOrganizationAdmin, isSuperAdmin, hasPermission } = usePermissions();
   useActivityHeartbeat(hasPermission(PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN));
+
+  const isPosRoute = isPosPath(location.pathname);
+  const hideChrome = isPosRoute && isPosFullscreen;
 
   useEffect(() => {
     if (isOrganizationAdmin && !isSuperAdmin) {
@@ -25,6 +32,14 @@ export default function SuperadminLayout() {
       }
     };
   }, [isOrganizationAdmin, isSuperAdmin]);
+
+  useEffect(() => {
+    setIsPosFullscreen(isPosRoute);
+  }, [isPosRoute]);
+
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   // Get page title based on route
   const getPageTitle = () => {
@@ -54,6 +69,8 @@ export default function SuperadminLayout() {
       return 'Notifications';
     } else if (path.startsWith('/superadmin/settings')) {
       return 'Settings';
+    } else if (path.endsWith('/quick-pos')) {
+      return 'Quick POS';
     }
 
     return 'Super Admin Panel';
@@ -61,39 +78,47 @@ export default function SuperadminLayout() {
 
   return (
     <div className="theme-organization flex h-screen bg-gradient-to-br from-slate-100 via-orange-50/40 to-indigo-100">
-      {/* Sidebar */}
-      <Sidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={setIsSidebarCollapsed}
-        isMobileOpen={isMobileSidebarOpen}
-        onMobileClose={() => setIsMobileSidebarOpen(false)}
-      />
+      {!hideChrome && (
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={setIsSidebarCollapsed}
+          isMobileOpen={isMobileSidebarOpen}
+          onMobileClose={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
 
-      {/* Main Content */}
       <div
         className={`transition-all duration-300 flex flex-col flex-1 w-full min-w-0 ${
-          isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+          hideChrome ? 'ml-0' : isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
         }`}
       >
-        {/* Top Navbar */}
         <TopNavbar
           title={getPageTitle()}
           isSidebarCollapsed={isSidebarCollapsed}
           onMobileMenuClick={() =>
             setIsMobileSidebarOpen(!isMobileSidebarOpen)
           }
+          isPosRoute={isPosRoute}
+          isPosFullscreen={hideChrome}
+          onTogglePosFullscreen={
+            isPosRoute ? () => setIsPosFullscreen(prev => !prev) : undefined
+          }
         />
 
-        {/* Page Content */}
-        <main className="pt-16 sm:pt-20 px-2 sm:px-4 pb-6 sm:pb-8 min-h-screen w-full min-w-0 overflow-x-hidden bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100">
+        <main
+          className={`w-full min-w-0 overflow-x-hidden bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100 ${
+            hideChrome
+              ? 'pt-14 px-2 pb-2 min-h-0 flex-1 overflow-y-auto'
+              : 'pt-16 sm:pt-20 px-2 sm:px-4 pb-6 sm:pb-8 min-h-screen'
+          }`}
+        >
           <div className="w-full max-w-full">
             <Outlet />
           </div>
         </main>
       </div>
 
-      {/* Mobile Overlay */}
-      {isMobileSidebarOpen && (
+      {!hideChrome && isMobileSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsMobileSidebarOpen(false)}

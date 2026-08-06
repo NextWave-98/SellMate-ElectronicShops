@@ -30,6 +30,7 @@ import { Card } from '@/components/ui/card';
 import { useReports } from '../../hooks/useReports';
 import { ReportPeriod } from '../../types/reports.types';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface DashboardStats {
   sales: { total: number; change: string };
@@ -54,6 +55,8 @@ const BranchDashboardPage = () => {
   const { branchCode } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { hasCourierAccess } = usePermissions();
+  const canViewCourier = hasCourierAccess();
 
   // Hooks
   const { getDashboardStats, getLowStockItems } = useInventory();
@@ -414,7 +417,7 @@ const BranchDashboardPage = () => {
       </div>
 
        {/* Courier summary (collapsed by default — electronics shop focus) */}
-      {courierStats && (
+      {canViewCourier && courierStats && (
         <Card className="p-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
@@ -433,7 +436,7 @@ const BranchDashboardPage = () => {
         </Card>
       )}
 
-      {courierStats && showCourierDetails && (
+      {canViewCourier && courierStats && showCourierDetails && (
         <Card className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
             <div className="flex items-center gap-3">

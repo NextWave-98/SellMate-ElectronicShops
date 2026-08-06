@@ -244,7 +244,7 @@ interface SidebarProps {
 }
 
 const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile | null): MenuItem[] => {
-  const { hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, hasAnyRole } = usePermissions();
+  const { hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, hasCourierAccess, isSuperAdmin, hasAnyRole } = usePermissions();
   const { industryType } = useBusinessContext();
 
   return useMemo(() => {
@@ -287,6 +287,14 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
         ];
         if (retailOnlyIds.includes(item.id) && !industryAllowsFeature(industryType, 'retail')) return null;
 
+        // Courier + WooCommerce are tied: no courier access → hide both
+        if (
+          (item.id === 'courier' || item.id === 'woocommerce' || item.id === 'woocommerce-orders') &&
+          !hasCourierAccess()
+        ) {
+          return null;
+        }
+
         const permConfig = parentChildConfigs
           ? parentChildConfigs.find(p => p.id === item.id)
           : SUPERADMIN_SIDEBAR_PERMISSIONS.find(p => p.id === item.id);
@@ -297,6 +305,8 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
 
           if (childConfigs !== undefined) {
             if (!filteredChildren.length) return null;
+            // Parent module must also pass (e.g. couriers for WooCommerce group)
+            if (!check(permConfig)) return null;
             return { ...item, children: filteredChildren };
           }
 
@@ -310,7 +320,7 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
       }).filter((item): item is MenuItem => item !== null);
 
     return filter(items);
-  }, [items, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, hasAnyRole, industryType, orgFeatures]);
+  }, [items, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, hasCourierAccess, isSuperAdmin, hasAnyRole, industryType, orgFeatures]);
 };
 
 export default function Sidebar({

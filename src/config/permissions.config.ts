@@ -228,11 +228,12 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     ],
   },
   {
+    // Hidden when courier access is missing (same gate as Courier sidebar)
     id: 'woocommerce',
-    requiredModule: 'products',
+    requiredModule: 'couriers',
     children: [
-      { id: 'woocommerce-settings', requiredModule: 'products' },
-      { id: 'woocommerce-orders', requiredModule: 'products' },
+      { id: 'woocommerce-settings', requiredModule: 'couriers' },
+      { id: 'woocommerce-orders', requiredModule: 'couriers' },
     ],
   },
   {
@@ -423,8 +424,9 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredModule: 'couriers',
   },
   {
+    // Hidden when courier access is missing (same gate as Courier sidebar)
     id: 'woocommerce-orders',
-    requiredModule: 'products',
+    requiredModule: 'couriers',
   },
   {
     id: 'attendance',

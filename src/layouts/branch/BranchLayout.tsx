@@ -8,6 +8,9 @@ import { useActivityHeartbeat } from '../../hooks/useActivityHeartbeat';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
 
+const isPosPath = (pathname: string) =>
+  pathname.endsWith('/pos') || pathname.endsWith('/quick-pos');
+
 const BranchLayout = () => {
   const location = useLocation();
   const { ready, syncing, error: scopeError } = useBranchScope();
@@ -15,10 +18,14 @@ const BranchLayout = () => {
   useActivityHeartbeat(hasPermission(PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN));
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isPosFullscreen, setIsPosFullscreen] = useState(false);
   const [accessDenied, setAccessDenied] = useState<{ show: boolean; message: string }>({
     show: false,
     message: '',
   });
+
+  const isPosRoute = isPosPath(location.pathname);
+  const hideChrome = isPosRoute && isPosFullscreen;
 
   const deniedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -46,6 +53,10 @@ const BranchLayout = () => {
   }, [location.pathname]);
 
   useEffect(() => {
+    setIsPosFullscreen(isPosRoute);
+  }, [isPosRoute]);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = 'branch';
     return () => {
       delete document.documentElement.dataset.theme;
@@ -54,21 +65,34 @@ const BranchLayout = () => {
 
   return (
     <div className="theme-branch flex h-screen overflow-hidden bg-gradient-to-br from-slate-100 via-blue-50 to-indigo-100">
-      <BranchSidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={setIsSidebarCollapsed}
-        isMobileOpen={isMobileSidebarOpen}
-        onMobileClose={() => setIsMobileSidebarOpen(false)}
-      />
+      {!hideChrome && (
+        <BranchSidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={setIsSidebarCollapsed}
+          isMobileOpen={isMobileSidebarOpen}
+          onMobileClose={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
 
       <div
         className={`transition-all duration-300 flex flex-col flex-1 w-full min-w-0 ${
-          isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'
+          hideChrome ? 'ml-0' : isSidebarCollapsed ? 'lg:ml-[60px]' : 'lg:ml-64'
         }`}
       >
-        <BranchNavbar onMobileMenuClick={() => setIsMobileSidebarOpen(prev => !prev)} />
+        <BranchNavbar
+          onMobileMenuClick={() => setIsMobileSidebarOpen(prev => !prev)}
+          isPosRoute={isPosRoute}
+          isPosFullscreen={hideChrome}
+          onTogglePosFullscreen={
+            isPosRoute ? () => setIsPosFullscreen(prev => !prev) : undefined
+          }
+        />
 
-        <main className="relative z-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 min-w-0">
+        <main
+          className={`relative z-0 flex-1 overflow-y-auto overflow-x-hidden min-w-0 ${
+            hideChrome ? 'p-2 sm:p-3' : 'p-3 sm:p-4 md:p-6'
+          }`}
+        >
           <div className="w-full max-w-full min-w-0">
             {syncing || !ready ? (
               <div className="flex items-center justify-center min-h-[40vh]">
@@ -127,7 +151,7 @@ const BranchLayout = () => {
         )}
       </div>
 
-      {isMobileSidebarOpen && (
+      {!hideChrome && isMobileSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsMobileSidebarOpen(false)}

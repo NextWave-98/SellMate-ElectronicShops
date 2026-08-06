@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Search, User, ChevronDown, Menu, X, LogOut, Settings, ShoppingCart, Truck } from 'lucide-react';
+import { Bell, Search, User, ChevronDown, Menu, X, LogOut, Settings, ShoppingCart, Truck, Maximize, Minimize } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import useNotification, { type Notification as NotificationItem } from '../../hooks/useNotification';
 import useCourier from '../../hooks/useCourier';
@@ -14,21 +14,32 @@ interface TopNavbarProps {
   title: string;
   isSidebarCollapsed?: boolean;
   onMobileMenuClick?: () => void;
+  isPosRoute?: boolean;
+  isPosFullscreen?: boolean;
+  onTogglePosFullscreen?: () => void;
 }
 
-export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileMenuClick }: TopNavbarProps) {
+export default function TopNavbar({
+  title,
+  isSidebarCollapsed = false,
+  onMobileMenuClick,
+  isPosRoute = false,
+  isPosFullscreen = false,
+  onTogglePosFullscreen,
+}: TopNavbarProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCourierModal, setShowCourierModal] = useState(false);
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const { getMyNotifications } = useNotification();
   const { courierServices, fetchCourierServices, createCourierShipment } = useCourier();
-  const { hasPermission, canAccessModule, isSuperAdmin } = usePermissions();
+  const { hasPermission, hasCourierAccess, isSuperAdmin } = usePermissions();
   const canQuickPos = isSuperAdmin || hasPermission(PERMISSIONS.SALES_CREATE);
-  const canQuickCourier = isSuperAdmin || canAccessModule('couriers');
+  const canQuickCourier = hasCourierAccess();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
@@ -50,6 +61,40 @@ export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileM
     loadNotifications();
   }, [isNotificationOpen]);
 
+  useEffect(() => {
+    const syncBrowserFullscreen = () => setIsBrowserFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', syncBrowserFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncBrowserFullscreen);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    if (isPosRoute && onTogglePosFullscreen) {
+      const entering = !isPosFullscreen;
+      onTogglePosFullscreen();
+      try {
+        if (entering && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else if (!entering && document.fullscreenElement) {
+          await document.exitFullscreen();
+        }
+      } catch {
+        // Chrome hide still works if browser fullscreen is blocked.
+      }
+      return;
+    }
+
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen API errors
+    }
+  };
+
+  const isFullscreenActive = isPosRoute ? isPosFullscreen : isBrowserFullscreen;
   const unreadCount = notifications.length;
   const userInitial = user?.name?.charAt(0).toUpperCase() ?? 'A';
 
@@ -81,7 +126,7 @@ export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileM
       className={`fixed top-0 right-0 left-0  transition-all duration-300
         bg-white/70 backdrop-blur-2xl backdrop-saturate-150
         border-b border-white/40 ${isProfileOpen ? 'z-100' : 'z-10'} ${
-        isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+        isPosFullscreen ? 'lg:ml-0' : isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       }`}
       style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}
     >
@@ -89,12 +134,14 @@ export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileM
 
         {/* ── Left: hamburger + title ── */}
         <div className="flex items-center gap-3 min-w-0">
-          <button
-            onClick={onMobileMenuClick}
-            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white/60 transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          {!isPosFullscreen && (
+            <button
+              onClick={onMobileMenuClick}
+              className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white/60 transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
 
           <div className="min-w-0 flex-1">
             <h1 className="text-sm sm:text-base font-bold text-gray-900 truncate">{title}</h1>
@@ -108,7 +155,7 @@ export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileM
         <div className="flex items-center gap-1.5">
 
           {/* Quick POS */}
-          {canQuickPos && (
+          {canQuickPos && !isPosRoute && (
             <button
               onClick={() => navigate('/superadmin/quick-pos')}
               className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1e3a8a]/90 hover:bg-[#162d6e] text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(30,58,138,0.25)]"
@@ -118,6 +165,22 @@ export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileM
               <span className="hidden lg:inline">Quick POS</span>
             </button>
           )}
+
+          <button
+            onClick={toggleFullscreen}
+            title={
+              isPosRoute
+                ? isFullscreenActive
+                  ? 'Exit POS fullscreen'
+                  : 'Enter POS fullscreen'
+                : isFullscreenActive
+                  ? 'Exit Fullscreen'
+                  : 'Enter Fullscreen'
+            }
+            className="flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-white/60 rounded-lg transition-colors"
+          >
+            {isFullscreenActive ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </button>
 
           {/* Quick Courier */}
           {canQuickCourier && (
