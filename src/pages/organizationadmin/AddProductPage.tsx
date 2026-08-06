@@ -30,6 +30,7 @@ import BarcodeScannerModal from '../../components/common/BarcodeScannerModal';
 import AsyncSearchSelect from '../../components/common/AsyncSearchSelect';
 import { useProductCategory } from '../../hooks/useProductCategory';
 import { toCategoryOptions } from '../../utils/productListFilters';
+import { formatCurrency } from '../../utils/currency';
 import { useProductVariantType } from '../../hooks/useProductVariantType';
 import { useLocation } from '../../hooks/useLocation';
 import type { ProductVariantType } from '../../hooks/useProductVariantType';
@@ -245,8 +246,10 @@ export default function AddProductPage() {
   const selectedTypes = variantTypes.filter(vt => selectedTypeIds.includes(vt.id));
 
   const searchCategories = useCallback(async (search: string) => {
+    const q = search.trim();
+    if (!q) return [];
     const response = await categoryHook.getAllCategories({
-      search: search || undefined,
+      search: q,
       limit: 20,
       isActive: true,
       sortBy: 'name',
@@ -792,6 +795,9 @@ export default function AddProductPage() {
                   getOptionLabel={(c) => c.name}
                   getOptionKey={(c) => c.id}
                   placeholder="Type to search category..."
+                  minChars={1}
+                  minCharsMessage="Type a category name to search"
+                  emptyMessage="No categories found"
                   inputClassName={errors.categoryId ? 'border-red-400' : ''}
                 />
               </Field>
@@ -1599,13 +1605,13 @@ export default function AddProductPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Unit Price</span>
                 <span className="font-medium text-gray-800">
-                  {unitPrice ? `$${Number(unitPrice).toFixed(2)}` : '—'}
+                  {unitPrice ? formatCurrency(Number(unitPrice)) : '—'}
                 </span>
               </div>
               {costPrice && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Cost Price</span>
-                  <span className="font-medium text-gray-800">${Number(costPrice).toFixed(2)}</span>
+                  <span className="font-medium text-gray-800">{formatCurrency(Number(costPrice))}</span>
                 </div>
               )}
               {categoryId && (

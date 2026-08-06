@@ -476,6 +476,30 @@ const CourierSettingsModal = ({
                   />
                 </div>
               </div>
+
+              <div className="mt-4 rounded-lg border border-orange-300 bg-white p-3 space-y-2">
+                <h4 className="text-xs font-semibold text-orange-900">Royal Express Webhook Setup</h4>
+                <p className="text-xs text-orange-800">
+                  In the Royal Express merchant portal go to <strong>Webhook Settings → Add Webhook</strong> and use:
+                </p>
+                <code className="block text-[11px] bg-orange-50 border border-orange-200 rounded px-2 py-1.5 break-all text-gray-800">
+                  {`${(import.meta.env.VITE_BASE_URL || 'https://api.sellmate.lk/api').replace(/\/$/, '')}/courier/webhooks/curfox`}
+                </code>
+                <ul className="text-xs text-orange-800 list-disc pl-4 space-y-1">
+                  <li>Request Type: <strong>POST</strong>, Active: on, Max Retries: 3</li>
+                  <li>Event Type: order / shipment status update</li>
+                  <li>
+                    Field Mappings → destination keys:{' '}
+                    <code className="bg-orange-50 px-1 rounded">waybill_number</code>,{' '}
+                    <code className="bg-orange-50 px-1 rounded">status</code>, optional{' '}
+                    <code className="bg-orange-50 px-1 rounded">updated_at</code>
+                  </li>
+                  <li>
+                    Optional header: <code className="bg-orange-50 px-1 rounded">X-Webhook-Secret</code> matching backend{' '}
+                    <code className="bg-orange-50 px-1 rounded">CURFOX_WEBHOOK_SECRET</code>
+                  </li>
+                </ul>
+              </div>
             </div>
           )}
 

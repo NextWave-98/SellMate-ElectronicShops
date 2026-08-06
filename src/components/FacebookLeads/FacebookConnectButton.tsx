@@ -23,7 +23,7 @@ const META_APP_ID = import.meta.env.VITE_META_APP_ID as string | undefined;
 // incrementally) without a code change — must match what the Meta app has enabled.
 const FB_LEADS_SCOPE =
   (import.meta.env.VITE_FB_LEADS_SCOPE as string | undefined) ||
-  'pages_show_list,pages_read_engagement,pages_manage_metadata,leads_retrieval,business_management';
+  'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_ads,leads_retrieval,business_management';
 
 interface FacebookConnectButtonProps {
   organizationId: string;
@@ -145,6 +145,9 @@ const FacebookConnectButton: React.FC<FacebookConnectButtonProps> = ({
       {
         scope: FB_LEADS_SCOPE,
         return_scopes: true,
+        // Force Meta to re-prompt for any previously declined / missing scopes
+        // (e.g. pages_manage_ads). Without this, reconnect keeps the old grants.
+        auth_type: 'rerequest',
       },
     );
   };

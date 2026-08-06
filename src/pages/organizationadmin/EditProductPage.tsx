@@ -27,6 +27,9 @@ import { useProductCategory } from '../../hooks/useProductCategory';
 import { useProductVariantType } from '../../hooks/useProductVariantType';
 import { useLocation } from '../../hooks/useLocation';
 import type { ProductVariantType } from '../../hooks/useProductVariantType';
+import AsyncSearchSelect from '../../components/common/AsyncSearchSelect';
+import { toCategoryOptions } from '../../utils/productListFilters';
+import { formatCurrency } from '../../utils/currency';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,7 +153,7 @@ export default function EditProductPage() {
   const locationHook = useLocation();
 
   // ── Reference data ──────────────────────────────────────────────────────────
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [variantTypes, setVariantTypes] = useState<ProductVariantType[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
 
@@ -213,15 +216,11 @@ export default function EditProductPage() {
     if (!productId) return;
     const load = async () => {
       setPageLoading(true);
-      const [catRes, vtRes, locRes, productRes] = await Promise.all([
-        categoryHook.getAllCategories({ isActive: true }),
+      const [vtRes, locRes, productRes] = await Promise.all([
         variantTypeHook.getAllVariantTypes({ isActive: true }),
         locationHook.getAllLocations(),
         productHook.getProductById(productId),
       ]);
-      if (catRes?.data) {
-        setCategories(Array.isArray(catRes.data) ? (catRes.data as Category[]) : []);
-      }
       if (vtRes?.data) {
         setVariantTypes(Array.isArray(vtRes.data) ? (vtRes.data as ProductVariantType[]) : []);
       }
@@ -246,6 +245,13 @@ export default function EditProductPage() {
         setName(p.name ?? '');
         setDescription(p.description ?? '');
         setCategoryId(p.categoryId ?? '');
+        if (p.category?.id) {
+          setSelectedCategory({ id: p.category.id, name: p.category.name ?? '' });
+        } else if (p.categoryId && p.categoryName) {
+          setSelectedCategory({ id: p.categoryId, name: p.categoryName });
+        } else {
+          setSelectedCategory(null);
+        }
         setBrand(p.brand ?? '');
         setModel(p.model ?? '');
         setTags(Array.isArray(p.tags) ? p.tags : []);
@@ -321,6 +327,19 @@ export default function EditProductPage() {
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const selectedTypes = variantTypes.filter(vt => selectedTypeIds.includes(vt.id));
+
+  const searchCategories = useCallback(async (search: string) => {
+    const q = search.trim();
+    if (!q) return [];
+    const response = await categoryHook.getAllCategories({
+      search: q,
+      limit: 20,
+      isActive: true,
+      sortBy: 'name',
+      sortOrder: 'asc',
+    });
+    return toCategoryOptions(response?.data);
+  }, [categoryHook]);
 
   // ─── Section helpers ─────────────────────────────────────────────────────────
   const toggle = (id: SectionId) =>
@@ -807,16 +826,20 @@ export default function EditProductPage() {
                 </Field>
               </div>
               <Field label="Category">
-                <select
-                  value={categoryId}
-                  onChange={e => setCategoryId(e.target.value)}
-                  className={inputCls}
-                >
-                  <option value="">Select category</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <AsyncSearchSelect<Category>
+                  value={selectedCategory}
+                  onSelect={(cat) => {
+                    setSelectedCategory(cat);
+                    setCategoryId(cat?.id ?? '');
+                  }}
+                  fetcher={searchCategories}
+                  getOptionLabel={(c) => c.name}
+                  getOptionKey={(c) => c.id}
+                  placeholder="Type to search category..."
+                  minChars={1}
+                  minCharsMessage="Type a category name to search"
+                  emptyMessage="No categories found"
+                />
               </Field>
               <Field label="Brand">
                 <input
@@ -1606,20 +1629,20 @@ export default function EditProductPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Unit Price</span>
                 <span className="font-medium text-gray-800">
-                  {unitPrice ? `$${Number(unitPrice).toFixed(2)}` : '—'}
+                  {unitPrice ? formatCurrency(Number(unitPrice)) : '—'}
                 </span>
               </div>
               {costPrice && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Cost Price</span>
-                  <span className="font-medium text-gray-800">${Number(costPrice).toFixed(2)}</span>
+                  <span className="font-medium text-gray-800">{formatCurrency(Number(costPrice))}</span>
                 </div>
               )}
               {categoryId && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Category</span>
                   <span className="font-medium text-gray-800 text-right max-w-35 truncate">
-                    {categories.find(c => c.id === categoryId)?.name || '—'}
+                    {selectedCategory?.name || '—'}
                   </span>
                 </div>
               )}

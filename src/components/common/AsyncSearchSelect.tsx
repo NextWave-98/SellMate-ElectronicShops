@@ -44,6 +44,10 @@ export interface AsyncSearchSelectProps<T> {
   emptyMessage?: string;
   /** Debounce in ms (default 300). */
   debounceMs?: number;
+  /** Minimum characters before a server search runs (default 0 = search on focus/open). */
+  minChars?: number;
+  /** Shown in the dropdown while waiting for minChars. */
+  minCharsMessage?: string;
   /** aria/name for the input. */
   name?: string;
   onBlur?: () => void;
@@ -62,6 +66,8 @@ export default function AsyncSearchSelect<T>({
   footer,
   emptyMessage = 'No results found',
   debounceMs = 300,
+  minChars = 0,
+  minCharsMessage,
   name,
   onBlur,
 }: AsyncSearchSelectProps<T>) {
@@ -81,6 +87,11 @@ export default function AsyncSearchSelect<T>({
     (item: T) => (getOptionKey ? getOptionKey(item) : getOptionLabel(item)),
     [getOptionKey, getOptionLabel]
   );
+
+  const waitingForInput = query.trim().length < minChars;
+  const hintMessage =
+    minCharsMessage ??
+    (minChars > 0 ? `Type at least ${minChars} character${minChars === 1 ? '' : 's'} to search` : emptyMessage);
 
   const runSearch = useCallback((search: string) => {
     const seq = ++requestSeq.current;
@@ -103,11 +114,21 @@ export default function AsyncSearchSelect<T>({
   useEffect(() => {
     if (!open) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => runSearch(query.trim()), query ? debounceMs : 0);
+
+    const trimmed = query.trim();
+    if (trimmed.length < minChars) {
+      requestSeq.current += 1; // invalidate in-flight requests
+      setLoading(false);
+      setOptions([]);
+      setHighlighted(-1);
+      return;
+    }
+
+    debounceRef.current = setTimeout(() => runSearch(trimmed), trimmed ? debounceMs : 0);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, open, debounceMs, runSearch]);
+  }, [query, open, debounceMs, minChars, runSearch]);
 
   // Close on outside click
   useEffect(() => {
@@ -167,7 +188,7 @@ export default function AsyncSearchSelect<T>({
           onFocus={() => {
             if (disabled) return;
             setOpen(true);
-            runSearch('');
+            if (minChars === 0) runSearch('');
           }}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -190,7 +211,9 @@ export default function AsyncSearchSelect<T>({
 
       {open && (
         <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-          {loading && options.length === 0 ? (
+          {waitingForInput ? (
+            <div className="px-4 py-3 text-sm text-gray-500">{hintMessage}</div>
+          ) : loading && options.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" /> Searching...
             </div>
