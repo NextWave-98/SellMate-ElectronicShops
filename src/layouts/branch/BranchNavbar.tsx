@@ -182,22 +182,31 @@ const BranchNavbar = ({
             <span className="hidden md:inline">Quick Courier</span>
           </button>
 
-          {/* Fullscreen */}
-          <button
-            onClick={toggleFullscreen}
-            title={
-              isPosRoute
-                ? isFullscreenActive
-                  ? 'Exit POS fullscreen'
-                  : 'Enter POS fullscreen'
-                : isFullscreenActive
-                  ? 'Exit Fullscreen'
-                  : 'Enter Fullscreen'
-            }
-            className="flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-white/60 rounded-lg transition-colors"
-          >
-            {isFullscreenActive ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-          </button>
+          {/* POS Fullscreen — only on POS routes; labeled so exit is obvious */}
+          {isPosRoute ? (
+            <button
+              onClick={toggleFullscreen}
+              title={isPosFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 text-xs font-semibold rounded-xl transition-colors ${
+                isPosFullscreen
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-[0_2px_10px_rgba(245,158,11,0.35)]'
+                  : 'bg-slate-700/90 hover:bg-slate-800 text-white shadow-[0_2px_10px_rgba(51,65,85,0.35)]'
+              }`}
+            >
+              {isPosFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">
+                {isPosFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreenActive ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              className="hidden sm:flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-white/60 rounded-lg transition-colors"
+            >
+              {isFullscreenActive ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </button>
+          )}
 
           {/* Profile */}
           <div className="relative" ref={profileRef}>

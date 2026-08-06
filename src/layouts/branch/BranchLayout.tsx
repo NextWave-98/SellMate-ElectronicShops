@@ -53,8 +53,21 @@ const BranchLayout = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    setIsPosFullscreen(isPosRoute);
+    if (!isPosRoute) setIsPosFullscreen(false);
   }, [isPosRoute]);
+
+  useEffect(() => {
+    if (!hideChrome) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setIsPosFullscreen(false);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [hideChrome]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = 'branch';

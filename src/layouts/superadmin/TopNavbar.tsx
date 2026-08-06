@@ -166,21 +166,30 @@ export default function TopNavbar({
             </button>
           )}
 
-          <button
-            onClick={toggleFullscreen}
-            title={
-              isPosRoute
-                ? isFullscreenActive
-                  ? 'Exit POS fullscreen'
-                  : 'Enter POS fullscreen'
-                : isFullscreenActive
-                  ? 'Exit Fullscreen'
-                  : 'Enter Fullscreen'
-            }
-            className="flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-white/60 rounded-lg transition-colors"
-          >
-            {isFullscreenActive ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-          </button>
+          {isPosRoute ? (
+            <button
+              onClick={toggleFullscreen}
+              title={isPosFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
+                isPosFullscreen
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-[0_2px_10px_rgba(245,158,11,0.3)]'
+                  : 'bg-slate-700/90 hover:bg-slate-800 text-white shadow-[0_2px_10px_rgba(51,65,85,0.3)]'
+              }`}
+            >
+              {isPosFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">
+                {isPosFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreenActive ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              className="hidden sm:flex w-8 h-8 items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-white/60 rounded-lg transition-colors"
+            >
+              {isFullscreenActive ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </button>
+          )}
 
           {/* Quick Courier */}
           {canQuickCourier && (
