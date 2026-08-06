@@ -39,6 +39,7 @@ import {
   Clock,
   Truck,
   Briefcase,
+  Monitor,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatCurrency } from "../../utils/currency";
@@ -56,6 +57,12 @@ import { getPrinterConfig } from "../../lib/printerConfig";
 import useCashDrawer from "../../hooks/useCashDrawer";
 import useCourier, { CourierMode } from "../../hooks/useCourier";
 import useBusinessProfile from "../../hooks/useBusinessProfile";
+import {
+  clearCustomerDisplay,
+  createCustomerDisplaySessionId,
+  publishCustomerDisplay,
+  type CustomerDisplayStatus,
+} from "../../lib/customerDisplaySync";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -308,6 +315,9 @@ const QuickPOSPage: React.FC = () => {
 
   // ── Cart
   const [cart, setCart] = useState<CartItem[]>([]);
+  const customerDisplaySessionRef = useRef<string | null>(null);
+  const customerDisplayWindowRef = useRef<Window | null>(null);
+  const [customerDisplayActive, setCustomerDisplayActive] = useState(false);
 
   // ── Checkout wizard
   const [step, setStep] = useState<CheckoutStep>("cart");
@@ -500,6 +510,8 @@ const QuickPOSPage: React.FC = () => {
   }, [productPage]);
 
   const staffDiscountHidden = businessData?.posStaffDiscountHidden ?? false;
+  const customerDisplayEnabled =
+    businessData?.posCustomerDisplayEnabled ?? false;
   const orgDefaultDiscountType =
     businessData?.posDefaultDiscountType ?? ("FIXED" as const);
   const orgDefaultDiscountValue = Number(businessData?.posDefaultDiscountValue ?? 0);
@@ -650,6 +662,99 @@ const QuickPOSPage: React.FC = () => {
     paymentMethod === "CASH" && !isAdvancePayment
       ? Math.max(0, (parseFloat(cashReceived) || 0) - total)
       : 0;
+
+  const mapStepToDisplayStatus = useCallback(
+    (currentStep: CheckoutStep): CustomerDisplayStatus => {
+      if (currentStep === "success") return "success";
+      if (currentStep === "payment") return "payment";
+      if (cart.length === 0) return "idle";
+      return "cart";
+    },
+    [cart.length],
+  );
+
+  const syncCustomerDisplay = useCallback(() => {
+    const sessionId = customerDisplaySessionRef.current;
+    if (!sessionId || !customerDisplayEnabled) return;
+
+    const win = customerDisplayWindowRef.current;
+    if (win && win.closed) {
+      customerDisplaySessionRef.current = null;
+      customerDisplayWindowRef.current = null;
+      setCustomerDisplayActive(false);
+      return;
+    }
+
+    publishCustomerDisplay({
+      sessionId,
+      businessName: businessData?.name,
+      items: cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        lineTotal: item.price * item.quantity,
+      })),
+      itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
+      subtotal,
+      discount: discountVal,
+      total,
+      status: mapStepToDisplayStatus(step),
+      updatedAt: Date.now(),
+    });
+  }, [
+    businessData?.name,
+    cart,
+    customerDisplayEnabled,
+    discountVal,
+    mapStepToDisplayStatus,
+    step,
+    subtotal,
+    total,
+  ]);
+
+  useEffect(() => {
+    syncCustomerDisplay();
+  }, [syncCustomerDisplay]);
+
+  const openCustomerDisplay = useCallback(() => {
+    if (!customerDisplayEnabled) return;
+
+    const existing = customerDisplayWindowRef.current;
+    if (existing && !existing.closed && customerDisplaySessionRef.current) {
+      existing.focus();
+      syncCustomerDisplay();
+      return;
+    }
+
+    const sessionId = createCustomerDisplaySessionId();
+    customerDisplaySessionRef.current = sessionId;
+    const popup = window.open(
+      `/pos/customer-display?session=${encodeURIComponent(sessionId)}`,
+      "pos_customer_display",
+      "width=1024,height=768",
+    );
+    if (!popup) {
+      customerDisplaySessionRef.current = null;
+      toast.error("Pop-up blocked. Allow pop-ups to open the customer display.");
+      return;
+    }
+    customerDisplayWindowRef.current = popup;
+    setCustomerDisplayActive(true);
+    syncCustomerDisplay();
+    // Re-broadcast after the new window has time to subscribe.
+    window.setTimeout(() => {
+      syncCustomerDisplay();
+    }, 300);
+  }, [customerDisplayEnabled, syncCustomerDisplay]);
+
+  useEffect(() => {
+    return () => {
+      const sessionId = customerDisplaySessionRef.current;
+      if (sessionId) clearCustomerDisplay(sessionId);
+    };
+  }, []);
+
   // Partial payment derived values. Quick POS keeps walk-in full payment fast,
   // but supports cash advances and non-cash partial payments when requested.
   const parsedPartialAmount = parseFloat(partialAmountInput) || 0;
@@ -1765,6 +1870,21 @@ const QuickPOSPage: React.FC = () => {
         <div className="p-4 border-b border-gray-100 flex items-center gap-3">
           <Zap className="w-5 h-5 text-[#1e3a8a]" />
           <h1 className="text-lg font-bold text-gray-900">Quick POS</h1>
+          {customerDisplayEnabled && (
+            <button
+              type="button"
+              onClick={openCustomerDisplay}
+              title="Open customer display on second screen"
+              className={`ml-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                customerDisplayActive
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-transparent"
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              {customerDisplayActive ? "Display on" : "Customer display"}
+            </button>
+          )}
           <span className="ml-auto text-xs text-gray-400">
             {totalProducts} products
           </span>

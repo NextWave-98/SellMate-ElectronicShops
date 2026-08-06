@@ -63,7 +63,7 @@ const BranchSidebar = ({
   onMobileClose,
 }: BranchSidebarProps) => {
   const { branchCode } = useParams();
-  const { hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, isAdmin, hasAnyRole } = usePermissions();
+  const { hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, hasAnyRole } = usePermissions();
   const { supplierOrdersEnabled } = useOrgFeatures();
   const { industryType } = useBusinessContext();
 
@@ -108,9 +108,10 @@ const BranchSidebar = ({
   ];
 
   const menuItems = useMemo(() => {
+    // Fail-closed: missing config hides the item. SuperAdmin bypass only (matches PermissionRoute).
     const checkPermissionConfig = (config: SidebarPermissionConfig | undefined): boolean => {
-      if (!config) return true;
-      if (isSuperAdmin || isAdmin) return true;
+      if (!config) return false;
+      if (isSuperAdmin) return true;
       if (config.allowedRoles?.length && !hasAnyRole(config.allowedRoles)) return false;
       if (config.requiredModule && !canAccessModule(config.requiredModule)) return false;
       if (config.requiredPermission && !hasPermission(config.requiredPermission)) return false;
@@ -145,7 +146,7 @@ const BranchSidebar = ({
       const permConfig = BRANCH_SIDEBAR_PERMISSIONS.find(p => p.id === item.id);
       return checkPermissionConfig(permConfig);
     });
-  }, [allMenuItems, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, isAdmin, hasAnyRole, industryType, supplierOrdersEnabled]);
+  }, [allMenuItems, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, isSuperAdmin, hasAnyRole, industryType, supplierOrdersEnabled]);
 
   const showExpanded = isMobileOpen || !isCollapsed;
 

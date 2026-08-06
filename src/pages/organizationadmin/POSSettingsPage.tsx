@@ -13,6 +13,7 @@ import {
   Receipt,
   MessageCircle,
   Truck,
+  Monitor,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useFetch from "../../hooks/useFetch";
@@ -202,6 +203,8 @@ const POSSettingsPage: React.FC = () => {
   const [centralLocations, setCentralLocations] = useState<Branch[]>([]);
   const { fetchData: fetchAllLocationsData } = useFetch();
   const [orgStaffDiscountHidden, setOrgStaffDiscountHidden] = useState(false);
+  const [orgCustomerDisplayEnabled, setOrgCustomerDisplayEnabled] =
+    useState(false);
   const [orgDefaultDiscountType, setOrgDefaultDiscountType] = useState<
     "FIXED" | "PERCENTAGE"
   >("FIXED");
@@ -232,6 +235,9 @@ const POSSettingsPage: React.FC = () => {
       );
       setOrgCentralLocationId(businessData.centralInventoryLocationId ?? "");
       setOrgStaffDiscountHidden(businessData.posStaffDiscountHidden ?? false);
+      setOrgCustomerDisplayEnabled(
+        businessData.posCustomerDisplayEnabled ?? false,
+      );
       setOrgDefaultDiscountType(
         businessData.posDefaultDiscountType ?? "FIXED",
       );
@@ -267,6 +273,7 @@ const POSSettingsPage: React.FC = () => {
         ? orgCentralLocationId
         : undefined,
       posStaffDiscountHidden: orgStaffDiscountHidden,
+      posCustomerDisplayEnabled: orgCustomerDisplayEnabled,
       posDefaultDiscountType: orgStaffDiscountHidden
         ? orgDefaultDiscountType
         : undefined,
@@ -292,6 +299,7 @@ const POSSettingsPage: React.FC = () => {
     orgCentralizedInventory,
     orgCentralLocationId,
     orgStaffDiscountHidden,
+    orgCustomerDisplayEnabled,
     orgDefaultDiscountType,
     orgDefaultDiscountValue,
     orgDefaultFormat,
@@ -728,6 +736,51 @@ const POSSettingsPage: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Customer-facing second display */}
+              <label className="flex items-center gap-4 cursor-pointer select-none">
+                <div className="relative shrink-0">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={orgCustomerDisplayEnabled}
+                    onChange={(e) =>
+                      setOrgCustomerDisplayEnabled(e.target.checked)
+                    }
+                  />
+                  <div
+                    className={`w-12 h-6 rounded-full transition-colors ${
+                      orgCustomerDisplayEnabled
+                        ? "bg-[#1e3a8a]"
+                        : "bg-gray-300"
+                    }`}
+                  />
+                  <div
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      orgCustomerDisplayEnabled
+                        ? "translate-x-6"
+                        : "translate-x-0"
+                    }`}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Monitor
+                    className={`w-4 h-4 ${orgCustomerDisplayEnabled ? "text-[#1e3a8a]" : "text-gray-400"}`}
+                  />
+                  <div>
+                    <p
+                      className={`text-sm font-semibold ${orgCustomerDisplayEnabled ? "text-[#1e3a8a]" : "text-gray-700"}`}
+                    >
+                      Customer display screen
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Default is OFF. When ON, Quick POS can open a second screen
+                      for the customer showing selected products, quantities, and
+                      totals only.
+                    </p>
+                  </div>
+                </div>
+              </label>
 
               {/* Default paper format */}
               <div>

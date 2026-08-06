@@ -7,6 +7,8 @@ import useNotification, { type Notification as NotificationItem } from '../../ho
 import useCourier from '../../hooks/useCourier';
 import { CourierShipmentModal } from '../../components/courier/modals';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../hooks/usePermissions';
+import { PERMISSIONS } from '../../store/types';
 
 interface TopNavbarProps {
   title: string;
@@ -24,6 +26,9 @@ export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileM
   const navigate = useNavigate();
   const { getMyNotifications } = useNotification();
   const { courierServices, fetchCourierServices, createCourierShipment } = useCourier();
+  const { hasPermission, canAccessModule, isSuperAdmin } = usePermissions();
+  const canQuickPos = isSuperAdmin || hasPermission(PERMISSIONS.SALES_CREATE);
+  const canQuickCourier = isSuperAdmin || canAccessModule('couriers');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
@@ -103,24 +108,28 @@ export default function TopNavbar({ title, isSidebarCollapsed = false, onMobileM
         <div className="flex items-center gap-1.5">
 
           {/* Quick POS */}
-          <button
-            onClick={() => navigate('/superadmin/quick-pos')}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1e3a8a]/90 hover:bg-[#162d6e] text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(30,58,138,0.25)]"
-            title="Quick POS"
-          >
-            <ShoppingCart className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Quick POS</span>
-          </button>
+          {canQuickPos && (
+            <button
+              onClick={() => navigate('/superadmin/quick-pos')}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1e3a8a]/90 hover:bg-[#162d6e] text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(30,58,138,0.25)]"
+              title="Quick POS"
+            >
+              <ShoppingCart className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Quick POS</span>
+            </button>
+          )}
 
           {/* Quick Courier */}
-          <button
-            onClick={() => { fetchCourierServices(); setShowCourierModal(true); }}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600/90 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(5,150,105,0.25)]"
-            title="Quick Courier"
-          >
-            <Truck className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Quick Courier</span>
-          </button>
+          {canQuickCourier && (
+            <button
+              onClick={() => { fetchCourierServices(); setShowCourierModal(true); }}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600/90 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(5,150,105,0.25)]"
+              title="Quick Courier"
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Quick Courier</span>
+            </button>
+          )}
 
           {/* Search — desktop */}
           <div className="relative hidden md:block">

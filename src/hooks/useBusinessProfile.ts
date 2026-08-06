@@ -25,6 +25,7 @@ export interface BusinessProfileData {
   centralizedInventoryEnabled?: boolean;
   centralInventoryLocationId?: string;
   posStaffDiscountHidden?: boolean;
+  posCustomerDisplayEnabled?: boolean;
   posDefaultDiscountType?: 'FIXED' | 'PERCENTAGE';
   posDefaultDiscountValue?: number;
   staffManagementEnabled?: boolean;
@@ -90,6 +91,7 @@ const useBusinessProfile = () => {
     centralizedInventoryEnabled?: boolean;
     centralInventoryLocationId?: string;
     posStaffDiscountHidden?: boolean;
+    posCustomerDisplayEnabled?: boolean;
     posDefaultDiscountType?: 'FIXED' | 'PERCENTAGE';
     posDefaultDiscountValue?: number;
     staffManagementEnabled?: boolean;

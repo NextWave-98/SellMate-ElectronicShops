@@ -83,6 +83,7 @@ const UnauthorizedPage = lazy(() => import('../pages/UnauthorizedPage'));
 const BranchDashboardPage = lazy(() => import('../pages/branch/BranchDashboardPage'));
 const POSPage = lazy(() => import('../pages/branch/POSPage'));
 const QuickPOSPage = lazy(() => import('../pages/branch/QuickPOSPage'));
+const CustomerDisplayPage = lazy(() => import('../pages/branch/CustomerDisplayPage'));
 const ProductsPage = lazy(() => import('../pages/branch/ProductsPage'));
 const BranchAddonRequestsPage = lazy(() => import('../pages/branch/AddonRequestsPage'));
 const BranchCustomersPage = lazy(() => import('../pages/branch/CustomersPage'));
@@ -191,6 +192,7 @@ const AppRouter = () => (
       <Route path="/admin/login" element={<AuthRedirect><AdminLoginPage /></AuthRedirect>} />
       <Route path="/select-branch" element={<BranchSelectPage />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
+      <Route path="/pos/customer-display" element={<CustomerDisplayPage />} />
 
       {/* PUBLIC: garage estimate approval from SMS/WhatsApp link (token-secured) */}
       <Route path="/estimate-approval/:id" element={<EstimateApprovalPage />} />

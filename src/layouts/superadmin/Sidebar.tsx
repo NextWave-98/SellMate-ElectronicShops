@@ -248,8 +248,10 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
   const { industryType } = useBusinessContext();
 
   return useMemo(() => {
+    // Fail-closed: missing config hides the item. Intentionally open items
+    // (e.g. dashboard) must have an explicit entry with no requirements.
     const check = (config: SidebarPermissionConfig | undefined): boolean => {
-      if (!config) return true;
+      if (!config) return false;
       if (isSuperAdmin) return true;
       if (config.allowedRoles?.length && !hasAnyRole(config.allowedRoles)) return false;
       if (config.requiredModule && !canAccessModule(config.requiredModule)) return false;
@@ -263,7 +265,7 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
       return true;
     };
 
-    const filter = (list: MenuItem[]): MenuItem[] =>
+    const filter = (list: MenuItem[], parentChildConfigs?: SidebarPermissionConfig[]): MenuItem[] =>
       list.map(item => {
         if (item.id === 'staff' && orgFeatures?.staffManagementEnabled === false) return null;
         if (item.id === 'suppliers' && orgFeatures?.supplierOrdersEnabled === false) return null;
@@ -284,23 +286,25 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
           'stock', 'goods-receipts', 'product-usage', 'addon-requests', 'woocommerce',
         ];
         if (retailOnlyIds.includes(item.id) && !industryAllowsFeature(industryType, 'retail')) return null;
-        const permConfig = SUPERADMIN_SIDEBAR_PERMISSIONS.find(p => p.id === item.id);
+
+        const permConfig = parentChildConfigs
+          ? parentChildConfigs.find(p => p.id === item.id)
+          : SUPERADMIN_SIDEBAR_PERMISSIONS.find(p => p.id === item.id);
+
         if (item.children?.length) {
-          const childPerms = permConfig?.children ?? [];
-          const filteredChildren = item.children.filter(child => {
-            const childCfg = childPerms.find(c => c.id === child.id);
-            if (childCfg) return check(childCfg);
-            if (permConfig) return check(permConfig);
-            return true;
-          });
-          if (!filteredChildren.length) return null;
-          // Per-child rules: show parent when any child is visible (e.g. WhatsApp vs Channel Credentials)
-          if (childPerms.length > 0) {
+          const childConfigs = permConfig?.children;
+          const filteredChildren = filter(item.children, childConfigs);
+
+          if (childConfigs !== undefined) {
+            if (!filteredChildren.length) return null;
             return { ...item, children: filteredChildren };
           }
+
           if (!check(permConfig)) return null;
+          if (!filteredChildren.length) return null;
           return { ...item, children: filteredChildren };
         }
+
         if (!check(permConfig)) return null;
         return item;
       }).filter((item): item is MenuItem => item !== null);

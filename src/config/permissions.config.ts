@@ -54,12 +54,104 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requireAnyPermission: true,
   },
   {
-    id: 'goodsreceipts',
+    id: 'goods-receipts',
     requiredModule: 'goodsreceipts',
   },
   {
     id: 'addon-requests',
     requiredPermission: PERMISSIONS.PRODUCTS_READ,
+  },
+  {
+    id: 'quick-pos',
+    requiredPermission: PERMISSIONS.SALES_CREATE,
+  },
+  {
+    id: 'advance-payments',
+    requiredModule: 'sales',
+  },
+  {
+    id: 'orders',
+    requiredModule: 'sales',
+  },
+  {
+    id: 'staff-skills',
+    requiredModule: 'staff',
+  },
+  {
+    id: 'product-usage',
+    requiredModule: 'inventory',
+  },
+  {
+    id: 'rental',
+    requiredModule: 'rental',
+    children: [
+      { id: 'rental-dashboard', requiredModule: 'rental' },
+      { id: 'rental-fleet', requiredModule: 'rental' },
+      { id: 'rental-bookings', requiredModule: 'rental' },
+      { id: 'rental-maintenance', requiredModule: 'rental' },
+      { id: 'rental-fuel', requiredModule: 'rental' },
+      { id: 'rental-claims', requiredModule: 'rental' },
+      { id: 'rental-pricing', requiredModule: 'rental' },
+    ],
+  },
+  {
+    id: 'carwash',
+    requiredModule: 'carwash',
+    children: [
+      { id: 'carwash-queue', requiredModule: 'carwash' },
+      { id: 'carwash-services', requiredModule: 'carwash' },
+      { id: 'carwash-memberships', requiredModule: 'carwash' },
+      { id: 'carwash-performance', requiredModule: 'carwash' },
+    ],
+  },
+  {
+    id: 'garage',
+    requiredModule: 'garage',
+    children: [
+      { id: 'garage-estimates', requiredModule: 'garage' },
+      { id: 'garage-vehicles', requiredModule: 'garage' },
+      { id: 'garage-reminders', requiredModule: 'garage' },
+    ],
+  },
+  {
+    id: 'trade-ins',
+    requiredModule: 'tradein',
+    children: [
+      { id: 'trade-ins-list', requiredModule: 'tradein' },
+      { id: 'trade-ins-rules', requiredModule: 'tradein' },
+    ],
+  },
+  {
+    id: 'appointments',
+    requiredModule: 'appointment',
+  },
+  {
+    id: 'towing',
+    requiredModule: 'towing',
+  },
+  {
+    id: 'accounting',
+    requiredModule: 'accounting',
+    children: [
+      { id: 'accounting-accounts', requiredModule: 'accounting' },
+      { id: 'accounting-journals', requiredModule: 'accounting' },
+      { id: 'accounting-reports', requiredModule: 'accounting' },
+    ],
+  },
+  {
+    id: 'website',
+    requiredModule: 'cms',
+    children: [
+      { id: 'website-settings', requiredModule: 'cms' },
+      { id: 'website-pages', requiredModule: 'cms' },
+      { id: 'website-blog', requiredModule: 'cms' },
+      { id: 'website-testimonials', requiredModule: 'cms' },
+      { id: 'website-payments', requiredModule: 'cms' },
+    ],
+  },
+  {
+    id: 'crm-tasks',
+    requiredModule: 'crm',
   },
   {
     id: 'stock',
@@ -74,12 +166,20 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
         requiredPermission: PERMISSIONS.INVENTORY_READ,
       },
       {
+        id: 'barcodes',
+        requiredModule: 'products',
+      },
+      {
         id: 'inventory',
         requiredModule: 'inventory',
       },
       {
-        id: 'productcategories',
+        id: 'categories',
         requiredModule: 'productcategories',
+      },
+      {
+        id: 'discounts',
+        requiredModule: 'products',
       },
     ],
   },
@@ -122,10 +222,21 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   {
     id: 'courier',
     requiredModule: 'couriers',
+    children: [
+      { id: 'courier-services', requiredModule: 'couriers' },
+      { id: 'shipment-tracking', requiredModule: 'couriers' },
+    ],
+  },
+  {
+    id: 'woocommerce',
+    requiredModule: 'products',
+    children: [
+      { id: 'woocommerce-settings', requiredModule: 'products' },
+      { id: 'woocommerce-orders', requiredModule: 'products' },
+    ],
   },
   {
     id: 'reports',
-
     requiredPermissions: [PERMISSIONS.REPORTS_VIEW, PERMISSIONS.REPORTS_EXPORT],
     requireAnyPermission: true,
   },
@@ -163,10 +274,26 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
         requiredPermissions: [PERMISSIONS.SMS_AUTOMATION_VIEW, PERMISSIONS.SMS_AUTOMATION_MANAGE],
         requireAnyPermission: true,
       },
-      { id: 'whatsapp-settings', requiredModule: 'whatsapp' },
-      { id: 'whatsapp-ai', requiredModule: 'whatsapp' },
-      { id: 'whatsapp-inbox', requiredModule: 'whatsapp' },
-      { id: 'whatsapp-orders', requiredModule: 'whatsapp' },
+      {
+        id: 'whatsapp-settings',
+        requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'whatsapp-ai',
+        requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'whatsapp-inbox',
+        requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'whatsapp-orders',
+        requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
+        requireAnyPermission: true,
+      },
       {
         id: 'facebook-leads',
         requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
@@ -197,6 +324,14 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     id: 'payroll',
     requiredModule: 'payroll',
   },
+  {
+    id: 'pos-settings',
+    requiredPermission: PERMISSIONS.SETTINGS_READ,
+  },
+  {
+    id: 'subscription-checkout',
+    requiredPermission: PERMISSIONS.SETTINGS_READ,
+  },
 ];
 
 /**
@@ -213,7 +348,7 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   },
   {
     id: 'advance-payments',
-    requiredPermission: PERMISSIONS.PAYMENTS_READ,
+    requiredModule: 'sales',
   },
   {
     id: 'orders',
@@ -273,7 +408,7 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   },
   {
     id: 'returns',
-    requiredModule: 'returns',
+    requiredModule: 'productreturns',
   },
   {
     id: 'warranty',
@@ -294,6 +429,42 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   {
     id: 'attendance',
     // Accessible to all authenticated branch staff
+  },
+  {
+    id: 'rental',
+    requiredModule: 'rental',
+  },
+  {
+    id: 'carwash',
+    requiredModule: 'carwash',
+  },
+  {
+    id: 'garage',
+    requiredModule: 'garage',
+  },
+  {
+    id: 'trade-ins',
+    requiredModule: 'tradein',
+  },
+  {
+    id: 'appointments',
+    requiredModule: 'appointment',
+  },
+  {
+    id: 'towing',
+    requiredModule: 'towing',
+  },
+  {
+    id: 'accounting',
+    requiredModule: 'accounting',
+  },
+  {
+    id: 'website',
+    requiredModule: 'cms',
+  },
+  {
+    id: 'crm-tasks',
+    requiredModule: 'crm',
   },
   {
     id: 'leads',
