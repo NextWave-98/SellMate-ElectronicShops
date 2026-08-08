@@ -327,7 +327,7 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   },
   {
     id: 'pos-settings',
-    requiredPermission: PERMISSIONS.SETTINGS_READ,
+    // Always visible to authenticated admin users
   },
   {
     id: 'subscription-checkout',

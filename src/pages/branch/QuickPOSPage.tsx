@@ -317,6 +317,7 @@ const QuickPOSPage: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const customerDisplaySessionRef = useRef<string | null>(null);
   const customerDisplayWindowRef = useRef<Window | null>(null);
+  const lastDisplayItemIdRef = useRef<string | null>(null);
   const [customerDisplayActive, setCustomerDisplayActive] = useState(false);
 
   // ── Checkout wizard
@@ -695,6 +696,21 @@ const QuickPOSPage: React.FC = () => {
         price: item.price,
         lineTotal: item.price * item.quantity,
       })),
+      lastItem: (() => {
+        const lastId = lastDisplayItemIdRef.current;
+        const match = lastId
+          ? cart.find((item) => item.id === lastId)
+          : undefined;
+        const item = match ?? cart[cart.length - 1];
+        if (!item) return null;
+        return {
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          lineTotal: item.price * item.quantity,
+        };
+      })(),
       itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
       subtotal,
       discount: discountVal,
@@ -953,6 +969,7 @@ const QuickPOSPage: React.FC = () => {
       toast.error(`${product.name} is out of stock`);
       return;
     }
+    lastDisplayItemIdRef.current = product.id;
     setCart((prev) => {
       const existing = prev.find((i) => i.id === product.id);
       if (existing) {
@@ -1018,6 +1035,7 @@ const QuickPOSPage: React.FC = () => {
     }
     const unitPrice =
       Number(product.price) > 0 ? Number(product.price) : 1;
+    lastDisplayItemIdRef.current = cartId;
     setCart((prev) => {
       const existing = prev.find((i) => i.id === cartId);
       if (existing) {
@@ -1091,6 +1109,7 @@ const QuickPOSPage: React.FC = () => {
       toast.error(`Only ${product.stock} units available`);
       return;
     }
+    lastDisplayItemIdRef.current = id;
     setCart((prev) =>
       prev.map((i) => (i.id === id ? { ...i, quantity: qty } : i)),
     );
@@ -1098,6 +1117,7 @@ const QuickPOSPage: React.FC = () => {
 
   const updateServicePrice = (id: string, value: number) => {
     if (!Number.isFinite(value) || value < 0) return;
+    lastDisplayItemIdRef.current = id;
     setCart((prev) =>
       prev.map((i) =>
         i.id === id && i.isService ? { ...i, price: value } : i,
@@ -1105,10 +1125,18 @@ const QuickPOSPage: React.FC = () => {
     );
   };
 
-  const removeFromCart = (id: string) =>
-    setCart((prev) => prev.filter((i) => i.id !== id));
+  const removeFromCart = (id: string) => {
+    setCart((prev) => {
+      const next = prev.filter((i) => i.id !== id);
+      if (lastDisplayItemIdRef.current === id) {
+        lastDisplayItemIdRef.current = next[next.length - 1]?.id ?? null;
+      }
+      return next;
+    });
+  };
 
   const clearCart = () => {
+    lastDisplayItemIdRef.current = null;
     setCart([]);
     setStep("cart");
     setSelectedCustomer(null);

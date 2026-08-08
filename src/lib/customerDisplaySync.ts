@@ -1,5 +1,5 @@
 /**
- * Syncs Quick POS cart state to a second customer-facing window.
+ * Syncs POS / Quick POS cart state to a second customer-facing window.
  * Uses BroadcastChannel + localStorage (same-origin only). No server/DB writes.
  */
 
@@ -23,6 +23,8 @@ export interface CustomerDisplayState {
   sessionId: string;
   businessName?: string;
   items: CustomerDisplayItem[];
+  /** Most recently scanned / selected line — shown large on the pole display. */
+  lastItem?: CustomerDisplayItem | null;
   itemCount: number;
   subtotal: number;
   discount: number;
@@ -77,6 +79,7 @@ export function clearCustomerDisplay(sessionId: string): void {
   const empty: CustomerDisplayState = {
     sessionId,
     items: [],
+    lastItem: null,
     itemCount: 0,
     subtotal: 0,
     discount: 0,

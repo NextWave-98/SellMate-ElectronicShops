@@ -530,13 +530,25 @@ export default function AddProductPage() {
     }
   }, [variantRows, uploadProductImages]);
 
+  const variantPrices = variantRows
+    .map(r => Number(r.unitPrice))
+    .filter(n => !isNaN(n) && n >= 0);
+  const derivedUnitPrice =
+    hasVariants && variantPrices.length > 0 ? Math.min(...variantPrices) : null;
+  const derivedUnitPriceMax =
+    hasVariants && variantPrices.length > 0 ? Math.max(...variantPrices) : null;
+
   // ─── Validation ───────────────────────────────────────────────────────────────
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'Product name is required';
     if (!categoryId.trim()) errs.categoryId = 'Category is required';
-    if (!unitPrice || isNaN(Number(unitPrice)) || Number(unitPrice) < 0)
-      errs.unitPrice = 'Valid unit price is required';
+    // Parent unit price is only required for simple (non-variant) products;
+    // variant products take selling price from each variant row.
+    if (!hasVariants) {
+      if (!unitPrice || isNaN(Number(unitPrice)) || Number(unitPrice) < 0)
+        errs.unitPrice = 'Valid unit price is required';
+    }
     if (hasVariants && variantRows.length === 0)
       errs.variants = 'Add at least one variant or disable the variants toggle';
     variantRows.forEach((row, i) => {
@@ -566,10 +578,16 @@ export default function AddProductPage() {
       const primaryEntry = images.find(i => i.id === primaryImageId);
       const primaryUrl = primaryEntry && !primaryEntry.isLocal ? primaryEntry.url : imageUrls[0];
 
+      // Parent selling price: from variants when enabled, otherwise the top-level field
+      const parentUnitPrice =
+        hasVariants && variantRows.length > 0
+          ? Math.min(...variantRows.map(r => Number(r.unitPrice)))
+          : Number(unitPrice);
+
       // 1. Create parent product
       const parentData: Record<string, unknown> = {
         name: name.trim(),
-        unitPrice: Number(unitPrice),
+        unitPrice: parentUnitPrice,
         ...(description && { description }),
         ...(categoryId && { categoryId }),
         ...(brand && { brand }),
@@ -913,20 +931,26 @@ export default function AddProductPage() {
           {/* ── Pricing & Identifiers ── */}
           <Section id="pricing" collapsed={collapsed.pricing} onToggle={() => toggle('pricing')}>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label={isReload ? 'Price per LKR (usually 1)' : 'Unit Price (Selling)'} required error={errors.unitPrice}>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={unitPrice}
-                    onChange={e => setUnitPrice(e.target.value)}
-                    placeholder="0.00"
-                    className={inputCls + ' pl-7' + (errors.unitPrice ? ' border-red-400' : '')}
-                  />
+              {hasVariants ? (
+                <div className="sm:col-span-2 md:col-span-3 rounded-lg border border-orange-200 bg-orange-50/60 px-3 py-2.5 text-sm text-gray-600">
+                  Unit price is set on each variant below. The parent product will use the lowest variant price.
                 </div>
-              </Field>
+              ) : (
+                <Field label={isReload ? 'Price per LKR (usually 1)' : 'Unit Price (Selling)'} required error={errors.unitPrice}>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={unitPrice}
+                      onChange={e => setUnitPrice(e.target.value)}
+                      placeholder="0.00"
+                      className={inputCls + ' pl-7' + (errors.unitPrice ? ' border-red-400' : '')}
+                    />
+                  </div>
+                </Field>
+              )}
               <Field label="Cost Price">
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
@@ -1605,7 +1629,15 @@ export default function AddProductPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Unit Price</span>
                 <span className="font-medium text-gray-800">
-                  {unitPrice ? formatCurrency(Number(unitPrice)) : '—'}
+                  {hasVariants
+                    ? derivedUnitPrice != null
+                      ? derivedUnitPriceMax != null && derivedUnitPriceMax !== derivedUnitPrice
+                        ? `${formatCurrency(derivedUnitPrice)} – ${formatCurrency(derivedUnitPriceMax)}`
+                        : formatCurrency(derivedUnitPrice)
+                      : '—'
+                    : unitPrice
+                      ? formatCurrency(Number(unitPrice))
+                      : '—'}
                 </span>
               </div>
               {costPrice && (

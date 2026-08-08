@@ -17,13 +17,19 @@ import POSSettingsBlocker from "../../components/branch/pos/POSSettingsBlocker";
 import { usePOSSettings } from "../../hooks/usePOSSettings";
 import { usePrinter } from "../../hooks/usePrinter";
 import { getPrinterConfig } from "../../lib/printerConfig";
-import { Loader2, ScanLine } from "lucide-react";
+import { Loader2, ScanLine, Monitor } from "lucide-react";
 import toast from "react-hot-toast";
 import useBarcode from "../../hooks/useBarcode";
 import type { ScannedProduct } from "../../hooks/useBarcode";
 import BarcodeScannerModal from "../../components/common/BarcodeScannerModal";
 import BarcodeProductSelectModal from "../../components/common/BarcodeProductSelectModal";
 import useCashDrawer from "../../hooks/useCashDrawer";
+import useBusinessProfile from "../../hooks/useBusinessProfile";
+import {
+  clearCustomerDisplay,
+  createCustomerDisplaySessionId,
+  publishCustomerDisplay,
+} from "../../lib/customerDisplaySync";
 
 export interface CartItem {
   id: string;
@@ -132,6 +138,7 @@ const POSPage: React.FC = () => {
   } = usePOSSettings();
   const posSettings = getPOSSettings();
   const { tryPrintESCPOS, tryOpenDrawer } = usePrinter();
+  const { businessData, loadBusinessProfile } = useBusinessProfile();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +169,16 @@ const POSPage: React.FC = () => {
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
   const [showCashDrawer, setShowCashDrawer] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const customerDisplaySessionRef = useRef<string | null>(null);
+  const customerDisplayWindowRef = useRef<Window | null>(null);
+  const lastDisplayItemIdRef = useRef<string | null>(null);
+  const [customerDisplayActive, setCustomerDisplayActive] = useState(false);
+  const [customerDisplayStatus, setCustomerDisplayStatus] = useState<
+    "idle" | "cart" | "payment" | "success"
+  >("idle");
+
+  const customerDisplayEnabled =
+    businessData?.posCustomerDisplayEnabled ?? false;
 
   const playScanSuccessBeep = useCallback(() => {
     try {
@@ -386,6 +403,113 @@ const POSPage: React.FC = () => {
     0,
   );
 
+  useEffect(() => {
+    loadBusinessProfile();
+  }, [loadBusinessProfile]);
+
+  const syncCustomerDisplay = useCallback(() => {
+    const sessionId = customerDisplaySessionRef.current;
+    if (!sessionId || !customerDisplayEnabled) return;
+
+    const win = customerDisplayWindowRef.current;
+    if (win && win.closed) {
+      customerDisplaySessionRef.current = null;
+      customerDisplayWindowRef.current = null;
+      setCustomerDisplayActive(false);
+      return;
+    }
+
+    const status =
+      customerDisplayStatus === "success"
+        ? "success"
+        : customerDisplayStatus === "payment" || isPaymentModalOpen
+          ? "payment"
+          : cartItems.length === 0
+            ? "idle"
+            : "cart";
+
+    publishCustomerDisplay({
+      sessionId,
+      businessName: businessData?.name,
+      items: cartItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        lineTotal: item.price * item.quantity,
+      })),
+      lastItem: (() => {
+        const lastId = lastDisplayItemIdRef.current;
+        const match = lastId
+          ? cartItems.find((item) => item.id === lastId)
+          : undefined;
+        const item = match ?? cartItems[cartItems.length - 1];
+        if (!item) return null;
+        return {
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          lineTotal: item.price * item.quantity,
+        };
+      })(),
+      itemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+      subtotal: total,
+      discount: 0,
+      total,
+      status,
+      updatedAt: Date.now(),
+    });
+  }, [
+    businessData?.name,
+    cartItems,
+    customerDisplayEnabled,
+    customerDisplayStatus,
+    isPaymentModalOpen,
+    total,
+  ]);
+
+  useEffect(() => {
+    syncCustomerDisplay();
+  }, [syncCustomerDisplay]);
+
+  const openCustomerDisplay = useCallback(() => {
+    if (!customerDisplayEnabled) return;
+
+    const existing = customerDisplayWindowRef.current;
+    if (existing && !existing.closed && customerDisplaySessionRef.current) {
+      existing.focus();
+      syncCustomerDisplay();
+      return;
+    }
+
+    const sessionId = createCustomerDisplaySessionId();
+    customerDisplaySessionRef.current = sessionId;
+    const popup = window.open(
+      `/pos/customer-display?session=${encodeURIComponent(sessionId)}`,
+      "pos_customer_display",
+      "width=1024,height=768",
+    );
+    if (!popup) {
+      customerDisplaySessionRef.current = null;
+      toast.error("Pop-up blocked. Allow pop-ups to open the customer display.");
+      return;
+    }
+    customerDisplayWindowRef.current = popup;
+    setCustomerDisplayActive(true);
+    syncCustomerDisplay();
+    window.setTimeout(() => {
+      syncCustomerDisplay();
+    }, 300);
+  }, [customerDisplayEnabled, syncCustomerDisplay]);
+
+  useEffect(() => {
+    return () => {
+      const sessionId = customerDisplaySessionRef.current;
+      if (sessionId) clearCustomerDisplay(sessionId);
+    };
+  }, []);
+
   const resolveProductFromScan = (scanned: ScannedProduct): Product =>
     products.find(
       (p) => p.productId === scanned.productId || p.id === scanned.id,
@@ -508,6 +632,8 @@ const POSPage: React.FC = () => {
     }
 
     const existingItem = cartItems.find((item) => item.id === product.id);
+    lastDisplayItemIdRef.current = product.id;
+    setCustomerDisplayStatus("cart");
 
     if (existingItem) {
       if (product.isService || existingItem.quantity < product.stock) {
@@ -548,7 +674,13 @@ const POSPage: React.FC = () => {
   // Update cart item quantity
   const handleUpdateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems(cartItems.filter((item) => item.id !== id));
+      setCartItems((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        if (lastDisplayItemIdRef.current === id) {
+          lastDisplayItemIdRef.current = next[next.length - 1]?.id ?? null;
+        }
+        return next;
+      });
       toast.success("Item removed from cart", { duration: 2000 });
       return;
     }
@@ -561,6 +693,7 @@ const POSPage: React.FC = () => {
       return;
     }
 
+    lastDisplayItemIdRef.current = id;
     setCartItems(
       cartItems.map((item) => (item.id === id ? { ...item, quantity } : item)),
     );
@@ -573,6 +706,7 @@ const POSPage: React.FC = () => {
     const safePrice = Number.isFinite(price) ? Number(price) : 0;
     if (safePrice < 0) return;
 
+    lastDisplayItemIdRef.current = id;
     setCartItems((prev) =>
       prev.map((i) =>
         i.id === id && i.isService ? { ...i, price: safePrice } : i,
@@ -582,11 +716,19 @@ const POSPage: React.FC = () => {
 
   // Remove item from cart
   const handleRemoveItem = (id: string) => {
-    setCartItems(cartItems.filter((item) => item.id !== id));
+    setCartItems((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      if (lastDisplayItemIdRef.current === id) {
+        lastDisplayItemIdRef.current = next[next.length - 1]?.id ?? null;
+      }
+      return next;
+    });
   };
 
   // Clear cart
   const handleClearCart = () => {
+    lastDisplayItemIdRef.current = null;
+    setCustomerDisplayStatus("idle");
     setCartItems([]);
   };
 
@@ -598,6 +740,7 @@ const POSPage: React.FC = () => {
       });
       return;
     }
+    setCustomerDisplayStatus("payment");
 
     // Validate stock availability for all cart items (skip for service products)
     const outOfStock = cartItems.filter((item) => {
@@ -893,7 +1036,10 @@ const POSPage: React.FC = () => {
     setResponseData(apiResponseData);
 
     // Reset cart
+    lastDisplayItemIdRef.current = null;
+    setCustomerDisplayStatus("success");
     setCartItems([]);
+    window.setTimeout(() => setCustomerDisplayStatus("idle"), 4000);
 
     // If this was an advance/partial payment → auto-download the acknowledgement PDF
     if (orderData.isPartialPayment && apiResponseData?.saleId) {
@@ -968,7 +1114,22 @@ const POSPage: React.FC = () => {
         {/* Product Selection Area - 2 columns */}
         <div className="lg:col-span-2">
           {/* Scan button row */}
-          <div className="flex justify-end mb-2">
+          <div className="flex justify-end mb-2 gap-2">
+            {customerDisplayEnabled && (
+              <button
+                type="button"
+                onClick={openCustomerDisplay}
+                title="Open customer display on second screen"
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm border ${
+                  customerDisplayActive
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-transparent"
+                }`}
+              >
+                <Monitor className="w-4 h-4" />
+                {customerDisplayActive ? "Display on" : "Customer display"}
+              </button>
+            )}
             <button
               onClick={() => setShowScanner(true)}
               disabled={scanning}
@@ -1014,7 +1175,10 @@ const POSPage: React.FC = () => {
       {isPaymentModalOpen && (
         <PaymentModal
           isOpen={isPaymentModalOpen}
-          onClose={() => setIsPaymentModalOpen(false)}
+          onClose={() => {
+            setIsPaymentModalOpen(false);
+            setCustomerDisplayStatus(cartItems.length ? "cart" : "idle");
+          }}
           onPaymentComplete={handlePaymentComplete}
           onPaymentSuccess={handlePaymentSuccess}
           cartItems={cartItems}
