@@ -20,10 +20,8 @@ import {
   Inbox,
 } from 'lucide-react';
 import { useAuthRedux } from '../../hooks/useAuthRedux';
-import useWhatsAppSettings, {
-  WhatsAppMode,
-  WhatsAppReplyTemplate,
-} from '../../hooks/useWhatsAppSettings';
+import useWhatsAppSettings from '../../hooks/useWhatsAppSettings';
+import type { WhatsAppMode, WhatsAppReplyTemplate } from '../../hooks/useWhatsAppSettings';
 import EmbeddedSignupButton from '../../components/WhatsApp/EmbeddedSignupButton';
 import {
   Card,

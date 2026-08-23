@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 type Variant = 'orange' | 'blue';
 type LabelSize = 'xsm' | 'sm' | 'md';
 type LabelFormat = 'standard' | 'fragile' | 'normal_post';
+type KoombiyoPodFormat = 'A6' | 'THERMAL' | 'POD' | 'DOT';
 
 const getThemeClasses = (variant: Variant) => {
   if (variant === 'blue') {
@@ -45,35 +46,47 @@ export const LabelDownloadModal = ({
   variant?: Variant;
 }) => {
   const theme = getThemeClasses(variant);
+  const isKoombiyo = shipment.courier?.provider === 'KOOMBIYO';
   const [selectedSize, setSelectedSize] = useState<LabelSize>('md');
   const [selectedFormat, setSelectedFormat] = useState<LabelFormat>('fragile');
+  const [koombiyoFormat, setKoombiyoFormat] = useState<KoombiyoPodFormat | null>(isKoombiyo ? 'A6' : null);
   const [isDownloading, setIsDownloading] = useState(false);
   const { fetchData } = useFetch('');
+  const usingKoombiyoPod = isKoombiyo && !!koombiyoFormat;
 
-  const handleDownload = async () => {
+  const handleDownload = async (inline = false) => {
     setIsDownloading(true);
     try {
       const labelIdentifier = encodeURIComponent(shipment.shipmentNumber || shipment.id);
+      const endpoint = usingKoombiyoPod
+        ? `/courier/shipments/${labelIdentifier}/koombiyo-pod?format=${koombiyoFormat}${inline ? '&inline=1' : ''}`
+        : `/courier/shipments/${labelIdentifier}/label?size=${selectedSize}&format=${selectedFormat}`;
       const response = await fetchData({
-        endpoint: `/courier/shipments/${labelIdentifier}/label?size=${selectedSize}&format=${selectedFormat}`,
+        endpoint,
         responseType: 'blob',
         method: 'GET'
       });
       if (response) {
         const blob = response as unknown as Blob;
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `label-${shipment.shipmentNumber}-${selectedFormat}-${selectedSize}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        if (inline) {
+          window.open(url, '_blank');
+        } else {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = usingKoombiyoPod
+            ? `koombiyo-${koombiyoFormat}-${shipment.trackingNumber || shipment.shipmentNumber}.pdf`
+            : `label-${shipment.shipmentNumber}-${selectedFormat}-${selectedSize}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
         window.URL.revokeObjectURL(url);
-        toast.success('Label downloaded successfully');
+        toast.success(inline ? 'Label opened for print' : 'Label downloaded successfully');
         onClose();
       }
     } catch {
-      toast.error('Failed to download label');
+      toast.error(usingKoombiyoPod ? 'Failed to fetch Koombiyo waybill' : 'Failed to download label');
     } finally {
       setIsDownloading(false);
     }
@@ -92,12 +105,35 @@ export const LabelDownloadModal = ({
               Select Label Format
             </label>
             <div className="space-y-2">
+              {isKoombiyo && (
+                <>
+                  {([
+                    { value: 'A6', label: 'Koombiyo A6 waybill' },
+                    { value: 'THERMAL', label: 'Koombiyo thermal label' },
+                    { value: 'POD', label: 'Koombiyo POD' },
+                    { value: 'DOT', label: 'Koombiyo DOT matrix' },
+                  ] as Array<{ value: KoombiyoPodFormat; label: string }>).map((opt) => (
+                    <label key={opt.value} className="flex items-center gap-2 p-3 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-50">
+                      <input
+                        type="radio"
+                        checked={koombiyoFormat === opt.value}
+                        onChange={() => setKoombiyoFormat(opt.value)}
+                        className={theme.radioInput}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </>
+              )}
               <label className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
                 <input
                   type="radio"
                   value="standard"
-                  checked={selectedFormat === 'standard'}
-                  onChange={(e) => setSelectedFormat(e.target.value as LabelFormat)}
+                  checked={!koombiyoFormat && selectedFormat === 'standard'}
+                  onChange={(e) => {
+                    setKoombiyoFormat(null);
+                    setSelectedFormat(e.target.value as LabelFormat);
+                  }}
                   className={theme.radioInput}
                 />
                 <span>Standard courier label</span>
@@ -106,8 +142,11 @@ export const LabelDownloadModal = ({
                 <input
                   type="radio"
                   value="fragile"
-                  checked={selectedFormat === 'fragile'}
-                  onChange={(e) => setSelectedFormat(e.target.value as LabelFormat)}
+                  checked={!koombiyoFormat && selectedFormat === 'fragile'}
+                  onChange={(e) => {
+                    setKoombiyoFormat(null);
+                    setSelectedFormat(e.target.value as LabelFormat);
+                  }}
                   className={theme.radioInput}
                 />
                 <span>Fragile Sinhala label (A5 landscape)</span>
@@ -116,8 +155,11 @@ export const LabelDownloadModal = ({
                 <input
                   type="radio"
                   value="normal_post"
-                  checked={selectedFormat === 'normal_post'}
-                  onChange={(e) => setSelectedFormat(e.target.value as LabelFormat)}
+                  checked={!koombiyoFormat && selectedFormat === 'normal_post'}
+                  onChange={(e) => {
+                    setKoombiyoFormat(null);
+                    setSelectedFormat(e.target.value as LabelFormat);
+                  }}
                   className={theme.radioInput}
                 />
                 <span>Normal Post label (A4 — 8 per page)</span>
@@ -125,7 +167,11 @@ export const LabelDownloadModal = ({
             </div>
           </div>
 
-          {selectedFormat === 'standard' ? (
+          {usingKoombiyoPod ? (
+            <p className="text-sm text-gray-600 rounded-lg border border-orange-200 bg-orange-50 p-3">
+              Printed from Koombiyo&apos;s POD API using waybill {shipment.trackingNumber || shipment.shipmentNumber}. Formats: POD, A6, THERMAL, DOT.
+            </p>
+          ) : selectedFormat === 'standard' ? (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Label Size
@@ -176,10 +222,17 @@ export const LabelDownloadModal = ({
 
         <DialogFooter className="border-t border-gray-200 sm:justify-stretch gap-3">
           <Button variant="outline" className="flex-1" onClick={onClose} disabled={isDownloading}>Cancel</Button>
-          <Button variant="outline" className={`flex-1 flex items-center justify-center gap-2 ${theme.printButton}`} onClick={() => { onPrint?.(selectedSize, selectedFormat); onClose(); }} disabled={isDownloading}>
+          <Button variant="outline" className={`flex-1 flex items-center justify-center gap-2 ${theme.printButton}`} onClick={() => {
+            if (usingKoombiyoPod) {
+              void handleDownload(true);
+              return;
+            }
+            onPrint?.(selectedSize, selectedFormat);
+            onClose();
+          }} disabled={isDownloading}>
             <Printer className="w-4 h-4" />Print Label
           </Button>
-          <Button className={`flex-1 text-white flex items-center justify-center gap-2 ${theme.downloadButton}`} onClick={handleDownload} disabled={isDownloading}>
+          <Button className={`flex-1 text-white flex items-center justify-center gap-2 ${theme.downloadButton}`} onClick={() => handleDownload(false)} disabled={isDownloading}>
             {isDownloading ? (
               <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>Generating...</>
             ) : (

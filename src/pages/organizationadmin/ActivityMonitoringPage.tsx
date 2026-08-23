@@ -3,7 +3,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Activity, RefreshCw, Save } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
-import activityMonitoringService, {
+import activityMonitoringService from '../../services/activityMonitoringService';
+import type {
   ActivityDailyRow,
   ActivitySettings,
   LiveActivityRow,

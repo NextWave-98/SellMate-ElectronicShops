@@ -99,6 +99,9 @@ const CourierSettingsModal = ({
   const [curfoxOriginCity, setCurfoxOriginCity] = useState('');
   const [curfoxOriginState, setCurfoxOriginState] = useState('');
 
+  // Koombiyo-specific credential state
+  const [koombiyoApiKey, setKoombiyoApiKey] = useState('');
+
   // City autocomplete state
   const { getCourierCities } = useCourier();
   const [courierCities, setCourierCities] = useState<Array<{ id: number; name: string; stateName: string }>>([]);
@@ -108,6 +111,7 @@ const CourierSettingsModal = ({
 
   const selectedService = courierServices.find(s => s.id === defaultCourierServiceId);
   const isCurfox = selectedService?.provider === CourierServiceProvider.CURFOX;
+  const isKoombiyo = selectedService?.provider === CourierServiceProvider.KOOMBIYO;
 
   // Pre-fill Curfox fields from existing preference when service changes
   useEffect(() => {
@@ -127,6 +131,15 @@ const CourierSettingsModal = ({
       }
     }
   }, [defaultCourierServiceId, isCurfox, businessPreferences]);
+
+  useEffect(() => {
+    if (isKoombiyo && businessPreferences) {
+      const existing = businessPreferences.find(p => p.courierServiceId === defaultCourierServiceId);
+      setKoombiyoApiKey(existing?.customConfig?.apiKey || '');
+    } else if (!isKoombiyo) {
+      setKoombiyoApiKey('');
+    }
+  }, [defaultCourierServiceId, isKoombiyo, businessPreferences]);
 
   // Fetch Curfox city list when a Curfox service is selected
   useEffect(() => {
@@ -179,6 +192,11 @@ const CourierSettingsModal = ({
       }
     }
 
+    if (isKoombiyo && onSavePreference && !koombiyoApiKey.trim()) {
+      toast.error('Please enter the Koombiyo API key');
+      return;
+    }
+
     try {
       setSaving(true);
       await onSave(courierMode, defaultCourierServiceId || undefined, {
@@ -201,6 +219,13 @@ const CourierSettingsModal = ({
           }
         };
         await onSavePreference(defaultCourierServiceId, curfoxConfig);
+      }
+
+      if (isKoombiyo && onSavePreference && defaultCourierServiceId) {
+        await onSavePreference(defaultCourierServiceId, {
+          apiKey: koombiyoApiKey.trim(),
+          apiEndpoint: 'https://application.koombiyodelivery.lk/api',
+        });
       }
 
       toast.success('Courier settings updated successfully');
@@ -497,6 +522,49 @@ const CourierSettingsModal = ({
                   <li>
                     Optional header: <code className="bg-orange-50 px-1 rounded">X-Webhook-Secret</code> matching backend{' '}
                     <code className="bg-orange-50 px-1 rounded">CURFOX_WEBHOOK_SECRET</code>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Koombiyo-specific credentials */}
+          {courierMode === CourierMode.API_ENABLED && isKoombiyo && (
+            <div className="space-y-4 border border-orange-200 bg-orange-50 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-orange-800">Koombiyo Delivery Credentials</h3>
+              <p className="text-xs text-orange-700">
+                Paste the API key issued by Koombiyo IT. It is stored per-organization and used to create orders, cancel waybills, and print POD / A6 / thermal labels.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">API Key *</label>
+                <input
+                  type="password"
+                  value={koombiyoApiKey}
+                  onChange={e => setKoombiyoApiKey(e.target.value)}
+                  placeholder="Enter Koombiyo API key"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="rounded-lg border border-orange-300 bg-white p-3 space-y-2">
+                <h4 className="text-xs font-semibold text-orange-900">Koombiyo Webhook Setup</h4>
+                <p className="text-xs text-orange-800">
+                  Give this URL to Koombiyo IT as the reverse API / webhook endpoint (POST):
+                </p>
+                <code className="block text-[11px] bg-orange-50 border border-orange-200 rounded px-2 py-1.5 break-all text-gray-800">
+                  {`${(import.meta.env.VITE_BASE_URL || 'https://api.sellmate.lk/api').replace(/\/$/, '')}/courier/webhooks/koombiyo`}
+                </code>
+                <ul className="text-xs text-orange-800 list-disc pl-4 space-y-1">
+                  <li>Method: <strong>POST</strong></li>
+                  <li>
+                    Parameters:{' '}
+                    <code className="bg-orange-50 px-1 rounded">status_id</code>,{' '}
+                    <code className="bg-orange-50 px-1 rounded">status</code>,{' '}
+                    <code className="bg-orange-50 px-1 rounded">waybill_id</code>,{' '}
+                    <code className="bg-orange-50 px-1 rounded">weight</code>,{' '}
+                    <code className="bg-orange-50 px-1 rounded">status_date</code>,{' '}
+                    <code className="bg-orange-50 px-1 rounded">del_charge</code>
                   </li>
                 </ul>
               </div>

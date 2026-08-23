@@ -1,9 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from 'react';
 import { Activity, RefreshCw } from 'lucide-react';
-import activityMonitoringService, {
-  ActivityDailyRow,
-} from '../../services/activityMonitoringService';
+import activityMonitoringService from '../../services/activityMonitoringService';
+import type { ActivityDailyRow } from '../../services/activityMonitoringService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';

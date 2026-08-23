@@ -1,10 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Phone, MessageSquare, StickyNote, RefreshCw, Send } from 'lucide-react';
-import leadFormsService, {
-  CallOutcome,
-  LeadInteraction,
-} from '../../services/leadFormsService';
+import leadFormsService from '../../services/leadFormsService';
+import type { CallOutcome, LeadInteraction } from '../../services/leadFormsService';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
 import { Button } from '../ui/button';

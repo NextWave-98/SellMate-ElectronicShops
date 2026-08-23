@@ -1,0 +1,89 @@
+name: Deploy Contabo Frontend (Docker)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+concurrency:
+  group: contabo-sellmate-frontend-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & deploy SellMate frontend to Contabo
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write build env for compose
+        run: |
+          cat > .env <<EOF
+          VITE_BASE_URL=https://api2.sellmate.lk/api
+          VITE_CLOUDINARY_URL=https://res.cloudinary.com
+          VITE_SUPER_ADMIN_SECRET=${{ secrets.VITE_SUPER_ADMIN_SECRET }}
+          VITE_SHOP_SITE_URL=http://169.58.206.94:4173
+          VITE_PUBLIC_SITE_URL=https://rental.sellmate.lk
+          VITE_SOCKET_URL=https://api2.sellmate.lk
+          VITE_META_APP_ID=${{ secrets.VITE_META_APP_ID }}
+          VITE_FB_LEADS_SCOPE=${{ secrets.VITE_FB_LEADS_SCOPE }}
+          EOF
+          sed -i 's/^[[:space:]]*//' .env
+
+      - name: Copy app files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          port: 22
+          source: "Dockerfile,docker-compose.prod.yml,.dockerignore,.env,docker/,package.json,package-lock.json,vite.config.ts,tsconfig.json,tsconfig.app.json,tsconfig.node.json,index.html,public/,src/"
+          target: /var/www/gadgetchain-frontend
+          overwrite: true
+
+      - name: Docker compose up (sellmate frontend only)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            set -e
+            cd /var/www/gadgetchain-frontend
+
+            # Host nginx: :4173 → Docker :4174 (replaces old static root)
+            cp docker/host-nginx-gadgetchain-frontend.conf /etc/nginx/sites-available/gadgetchain-frontend
+            ln -sfn /etc/nginx/sites-available/gadgetchain-frontend /etc/nginx/sites-enabled/gadgetchain-frontend
+            nginx -t
+            systemctl reload nginx
+
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+
+            for i in $(seq 1 40); do
+              if curl -fsS http://127.0.0.1:4174/ >/dev/null 2>&1; then
+                echo CONTAINER_OK
+                break
+              fi
+              sleep 3
+              if [ "$i" -eq 40 ]; then
+                echo "Container health check failed" >&2
+                docker compose -f docker-compose.prod.yml logs --tail=80
+                exit 1
+              fi
+            done
+
+            curl -fsS -o /dev/null -w 'front_4173=%{http_code}\n' http://127.0.0.1:4173/
+            curl -fsS http://127.0.0.1:3000/health >/dev/null && echo GADGET_API_OK
+            curl -fsS http://127.0.0.1:3001/health >/dev/null && echo SHIPEX_OK
+            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'

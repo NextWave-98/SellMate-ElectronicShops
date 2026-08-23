@@ -75,6 +75,8 @@ interface InventoryFilters {
   sortOrder?: 'asc' | 'desc';
   includeDiscount?: boolean;
   includeServices?: boolean;
+  /** POS tab filter applied on the server before pagination: all | products | services | reload */
+  itemType?: 'all' | 'products' | 'services' | 'reload';
   /** When true, filter by the exact locationId (inventory monitor). Skips centralized-inventory remapping. */
   exactLocation?: boolean;
 }

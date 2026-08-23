@@ -8,7 +8,8 @@ import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import type { ProductItem } from '../../../hooks/useProduct';
 import { useProduct } from '../../../hooks/useProduct';
-import { useProductVariantType, ProductVariantType } from '../../../hooks/useProductVariantType';
+import { useProductVariantType } from '../../../hooks/useProductVariantType';
+import type { ProductVariantType } from '../../../hooks/useProductVariantType';
 import { useLocation } from '../../../hooks/useLocation';
 
 interface Props {

@@ -4,11 +4,8 @@ import { Copy, Plus, RefreshCw, RotateCcw, Trash2, Link2 } from 'lucide-react';
 import { useShopAPI } from '../../hooks/useShopAPI';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
-import leadFormsService, {
-  LeadForm,
-  LeadFormField,
-  publicSubmitUrl,
-} from '../../services/leadFormsService';
+import leadFormsService, { publicSubmitUrl } from '../../services/leadFormsService';
+import type { LeadForm, LeadFormField } from '../../services/leadFormsService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';

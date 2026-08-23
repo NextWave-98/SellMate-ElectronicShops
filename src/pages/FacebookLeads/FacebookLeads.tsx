@@ -17,13 +17,13 @@ import {
 } from 'lucide-react';
 import { useAuthRedux } from '../../hooks/useAuthRedux';
 import { useShopAPI } from '../../hooks/useShopAPI';
-import facebookLeadsService, {
+import facebookLeadsService, { LEAD_STATUSES } from '../../services/facebookLeadsService';
+import type {
   FacebookLead,
   FacebookLeadStatus,
   FacebookLeadStats,
   StaffOption,
   CreateOrderPayload,
-  LEAD_STATUSES,
 } from '../../services/facebookLeadsService';
 import LeadInteractionPanel from '../../components/FacebookLeads/LeadInteractionPanel';
 import { Card, CardContent } from '../../components/ui/card';

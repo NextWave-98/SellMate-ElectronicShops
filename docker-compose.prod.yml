@@ -1,0 +1,29 @@
+# Contabo production — SellMate Electronic Shops frontend only.
+# Host nginx on :4173 proxies to this container (:4174).
+# API calls go to https://api2.sellmate.lk (VITE_BASE_URL).
+# Does NOT touch gadgetchain-api / shipex containers.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE_URL: ${VITE_BASE_URL:-https://api2.sellmate.lk/api}
+        VITE_CLOUDINARY_URL: ${VITE_CLOUDINARY_URL:-https://res.cloudinary.com}
+        VITE_SUPER_ADMIN_SECRET: ${VITE_SUPER_ADMIN_SECRET:-}
+        VITE_SHOP_SITE_URL: ${VITE_SHOP_SITE_URL:-http://169.58.206.94:4173}
+        VITE_PUBLIC_SITE_URL: ${VITE_PUBLIC_SITE_URL:-https://rental.sellmate.lk}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-}
+        VITE_META_APP_ID: ${VITE_META_APP_ID:-}
+        VITE_FB_LEADS_SCOPE: ${VITE_FB_LEADS_SCOPE:-}
+    container_name: sellmate-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4174:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3

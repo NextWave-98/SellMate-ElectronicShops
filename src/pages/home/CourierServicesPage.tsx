@@ -648,7 +648,19 @@ export  const CourierServiceModal = ({
               </label>
               <select
                 value={formData.provider}
-                onChange={(e) => setFormData({ ...formData, provider: e.target.value as CourierServiceProvider })}
+                onChange={(e) => {
+                  const provider = e.target.value as CourierServiceProvider;
+                  const isKoombiyo = provider === CourierServiceProvider.KOOMBIYO;
+                  setFormData({
+                    ...formData,
+                    provider,
+                    ...(isKoombiyo ? {
+                      apiEnabled: true,
+                      apiEndpoint: formData.apiEndpoint || 'https://application.koombiyodelivery.lk/api',
+                      website: formData.website || 'https://koombiyodelivery.lk',
+                    } : {}),
+                  });
+                }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-400"
                 required
               >

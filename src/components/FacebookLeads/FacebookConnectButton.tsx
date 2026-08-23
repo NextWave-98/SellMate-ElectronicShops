@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import alert from '../../utils/alert';
-import facebookLeadsService, { FacebookPage } from '../../services/facebookLeadsService';
+import facebookLeadsService from '../../services/facebookLeadsService';
+import type { FacebookPage } from '../../services/facebookLeadsService';
 
 declare global {
   interface Window {

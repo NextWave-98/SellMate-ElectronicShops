@@ -565,6 +565,7 @@ const QuickPOSPage: React.FC = () => {
         includeDiscount: true,
         availableOnly: true,
         includeServices: selectedItemType !== "products" && selectedItemType !== "reload",
+        itemType: selectedItemType,
         page: productPage,
         limit: pageSize,
       };
@@ -1009,16 +1010,12 @@ const QuickPOSPage: React.FC = () => {
       return;
     }
     const phone = reloadPhone.trim();
-    if (!phone) {
-      toast.error("Phone number is required");
-      return;
-    }
     const amount = Math.floor(Number(reloadAmount));
     if (!Number.isFinite(amount) || amount < 1) {
       toast.error("Enter a valid reload amount (whole LKR)");
       return;
     }
-    const cartId = `${product.id}:${phone}`;
+    const cartId = `${product.id}:${phone || "_"}`;
     const otherAmt = cart
       .filter(
         (i) =>
@@ -1065,12 +1062,14 @@ const QuickPOSPage: React.FC = () => {
           warrantyMonths: 0,
           isService: false,
           isReload: true,
-          reloadPhone: phone,
+          ...(phone ? { reloadPhone: phone } : {}),
         },
       ];
     });
     toast.success(
-      `${product.name} · ${phone} · Rs.${amount.toLocaleString()} added`,
+      phone
+        ? `${product.name} · ${phone} · Rs.${amount.toLocaleString()} added`
+        : `${product.name} · Rs.${amount.toLocaleString()} added`,
       { duration: 1500 },
     );
     setReloadAmount("");
@@ -1522,7 +1521,7 @@ const QuickPOSPage: React.FC = () => {
         const itemDescription = cart
           .map((item) =>
             item.isReload
-              ? `${item.name} · ${item.reloadPhone} · Rs.${item.quantity}`
+              ? `${item.name}${item.reloadPhone ? ` · ${item.reloadPhone}` : ""} · Rs.${item.quantity}`
               : `${item.name} x${item.quantity}`,
           )
           .join(", ");
@@ -2048,7 +2047,10 @@ const QuickPOSPage: React.FC = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Phone number
+                            Phone number{" "}
+                            <span className="font-normal text-gray-400">
+                              (optional)
+                            </span>
                           </label>
                           <input
                             type="tel"
@@ -2312,7 +2314,9 @@ const QuickPOSPage: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-gray-800 truncate">
                           {item.isReload
-                            ? `${item.name} · ${item.reloadPhone}`
+                            ? item.reloadPhone
+                              ? `${item.name} · ${item.reloadPhone}`
+                              : item.name
                             : item.name}
                         </p>
                         {item.isReload ? (

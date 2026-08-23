@@ -3,11 +3,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Trophy, RefreshCw, Save } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
-import scorecardService, {
-  EmployeeScorecard,
-  ScorecardSettings,
-  currentPeriod,
-} from '../../services/scorecardService';
+import scorecardService, { currentPeriod } from '../../services/scorecardService';
+import type { EmployeeScorecard, ScorecardSettings } from '../../services/scorecardService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';

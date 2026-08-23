@@ -42,6 +42,10 @@ const CourierShipmentModal = ({
   const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const catalogProductsRef = React.useRef<any[]>([]);
+  const productSearchRequestId = React.useRef(0);
+  const getAllProductsRef = React.useRef(getAllProducts);
+  getAllProductsRef.current = getAllProducts;
   const [paymentMethod, setPaymentMethod] = useState<'bank' | 'online' | 'cod' | 'koko' | 'mintpay' | 'payzy'>('cod');
   const [loadingProducts, setLoadingProducts] = useState(false);
 
@@ -189,7 +193,7 @@ const CourierShipmentModal = ({
   React.useEffect(() => {
     if (!formData.courierServiceId || !businessData?.id) return;
     const svc = courierServices.find(s => s.id === formData.courierServiceId);
-    if (svc?.provider === CourierServiceProvider.CURFOX) {
+    if (svc?.provider === CourierServiceProvider.CURFOX || svc?.provider === CourierServiceProvider.KOOMBIYO) {
       getCourierCities(businessData.id, formData.courierServiceId).then(cities => {
         setCourierCities(cities);
       });
@@ -200,29 +204,77 @@ const CourierShipmentModal = ({
 
   // Fetch products on component mount
   React.useEffect(() => {
+    let cancelled = false;
     const fetchProducts = async () => {
       setLoadingProducts(true);
       try {
-        const response = await getAllProducts({
+        const response = await getAllProductsRef.current({
           isActive: true,
-          limit: 100
+          limit: 100,
         });
-        if (response?.success && response.data) {
-          const productList = (response.data as any).data || (response.data as any).products || response.data || [];
-          setProducts(productList);
-        }
+        if (cancelled) return;
+        const productList =
+          (response?.data as any)?.data ||
+          (response?.data as any)?.products ||
+          (Array.isArray(response?.data) ? response.data : []) ||
+          [];
+        const list = Array.isArray(productList) ? productList : [];
+        catalogProductsRef.current = list;
+        setProducts(list);
       } catch (error) {
         console.error('Failed to fetch products:', error);
       } finally {
-        setLoadingProducts(false);
+        if (!cancelled) setLoadingProducts(false);
       }
     };
     fetchProducts();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  React.useEffect(() => {
+    const term = productSearchTerm.trim();
+    if (!term) {
+      productSearchRequestId.current += 1;
+      setProducts(catalogProductsRef.current);
+      return;
+    }
+
+    const requestId = ++productSearchRequestId.current;
+    const timeoutId = setTimeout(async () => {
+      setLoadingProducts(true);
+      try {
+        const response = await getAllProductsRef.current({
+          search: term,
+          isActive: true,
+          limit: 50,
+        });
+        if (requestId !== productSearchRequestId.current) return;
+        const productList =
+          (response?.data as any)?.data ||
+          (response?.data as any)?.products ||
+          (Array.isArray(response?.data) ? response.data : []) ||
+          [];
+        const list = Array.isArray(productList) ? productList : [];
+        setProducts(list.length > 0 ? list : catalogProductsRef.current);
+      } catch (error) {
+        console.error('Failed to search products:', error);
+        if (requestId === productSearchRequestId.current) {
+          setProducts(catalogProductsRef.current);
+        }
+      } finally {
+        if (requestId === productSearchRequestId.current) setLoadingProducts(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [productSearchTerm]);
 
   const filteredProducts = products.filter(p =>
     p.name?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(productSearchTerm.toLowerCase())
+    p.sku?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+    p.productCode?.toLowerCase().includes(productSearchTerm.toLowerCase())
   );
 
   const handleAddProduct = (product: any) => {
@@ -679,6 +731,7 @@ const CourierShipmentModal = ({
                   )}
                 </div>
               )}
+            </div>
 
             {/* Products Section */}
             <div className="col-span-2 border-t pt-4 mt-2">

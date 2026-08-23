@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
-import smsAutomationService, {
+import smsAutomationService from '../../services/smsAutomationService';
+import type {
   SmsAutomationSettings,
   SmsOutboxItem,
   SmsOutboxStatus,

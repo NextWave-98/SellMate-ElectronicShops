@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ShoppingBag } from "lucide-react";
 import { formatCurrency } from "../../utils/currency";
 import {
   CUSTOMER_DISPLAY_CHANNEL,
@@ -20,12 +19,26 @@ const emptyState = (sessionId: string): CustomerDisplayState => ({
   updatedAt: 0,
 });
 
+const FONT_HREF =
+  "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap";
+
 const CustomerDisplayPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session")?.trim() ?? "";
   const [state, setState] = useState<CustomerDisplayState | null>(
     sessionId ? readCustomerDisplayState(sessionId) : null,
   );
+  const [tick, setTick] = useState(0);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const existing = document.querySelector(`link[href="${FONT_HREF}"]`);
+    if (existing) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = FONT_HREF;
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -33,6 +46,7 @@ const CustomerDisplayPage: React.FC = () => {
     const apply = (next: CustomerDisplayState) => {
       if (next.sessionId !== sessionId) return;
       setState(next);
+      setTick((t) => t + 1);
     };
 
     const cached = readCustomerDisplayState(sessionId);
@@ -64,12 +78,26 @@ const CustomerDisplayPage: React.FC = () => {
     };
   }, [sessionId]);
 
+  // Scroll only the product list — keep total pinned at top
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [state?.items.length, state?.lastItem?.id, state?.updatedAt]);
+
   if (!sessionId) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center p-8">
-        <p className="text-xl text-slate-400 text-center">
+      <div
+        className="h-dvh flex items-center justify-center p-8 overflow-hidden"
+        style={{
+          fontFamily: '"DM Sans", system-ui, sans-serif',
+          background: "#0a0c10",
+          color: "#e8eaef",
+        }}
+      >
+        <p className="text-xl text-center opacity-60">
           Open this screen from POS using{" "}
-          <span className="text-white font-semibold">Customer display</span>.
+          <span className="font-semibold opacity-100">Customer display</span>.
         </p>
       </div>
     );
@@ -78,150 +106,315 @@ const CustomerDisplayPage: React.FC = () => {
   const display = state ?? emptyState(sessionId);
   const isSuccess = display.status === "success";
   const hasItems = display.items.length > 0;
-  const lastItem =
-    display.lastItem ??
-    (hasItems ? display.items[display.items.length - 1] : null);
+  const lastItemId =
+    display.lastItem?.id ??
+    (hasItems ? display.items[display.items.length - 1]?.id : undefined);
+  const showCart = hasItems || (isSuccess && hasItems);
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col select-none">
-      {/* Shop header */}
-      <header className="px-6 sm:px-10 py-5 border-b border-zinc-800 flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.25em] text-zinc-500">
-            Customer Display
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-bold truncate mt-0.5">
-            {display.businessName || "Your Order"}
-          </h1>
-        </div>
-        {isSuccess && (
-          <span className="shrink-0 px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-300 text-sm font-semibold">
-            Payment complete
-          </span>
-        )}
-        {display.status === "payment" && !isSuccess && (
-          <span className="shrink-0 px-4 py-2 rounded-full bg-amber-500/20 text-amber-300 text-sm font-semibold">
-            Processing payment…
-          </span>
-        )}
-      </header>
+    <div
+      className="h-dvh max-h-dvh flex flex-col select-none overflow-hidden relative"
+      style={
+        {
+          fontFamily: '"DM Sans", system-ui, sans-serif',
+          background: "#07090d",
+          color: "#f2f3f7",
+          ["--cfd-gold" as string]: "#e8b86d",
+        } as React.CSSProperties
+      }
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 80% 50% at 15% -10%, rgba(232,184,109,0.14), transparent 55%),
+            radial-gradient(ellipse 60% 40% at 95% 20%, rgba(90,140,180,0.10), transparent 50%),
+            radial-gradient(ellipse 50% 35% at 50% 100%, rgba(232,184,109,0.06), transparent 60%)
+          `,
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
 
-      <main className="flex-1 flex flex-col px-6 sm:px-10 py-6 sm:py-8 overflow-hidden">
-        {!hasItems && !isSuccess ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 gap-4">
-            <ShoppingBag className="w-16 h-16 opacity-40" />
-            <p className="text-2xl font-medium text-zinc-400">
-              Waiting for items…
+      {/* Fixed top: brand + always-visible total */}
+      <div className="relative z-10 shrink-0 px-6 sm:px-10 lg:px-14 pt-5 sm:pt-6 pb-3">
+        <header className="flex items-start justify-between gap-4 mb-4">
+          <div className="min-w-0">
+            <p
+              className="text-[10px] sm:text-[11px] uppercase tracking-[0.35em] mb-1"
+              style={{ color: "rgba(232,184,109,0.75)" }}
+            >
+              Your order
             </p>
-            <p className="text-zinc-600">
-              Selected products will appear here.
+            <h1
+              className="text-2xl sm:text-3xl lg:text-4xl leading-[1.05] truncate"
+              style={{
+                fontFamily: '"Instrument Serif", Georgia, serif',
+                fontWeight: 400,
+              }}
+            >
+              {display.businessName || "Welcome"}
+            </h1>
+          </div>
+
+          {(isSuccess || display.status === "payment") && (
+            <div
+              className="shrink-0 mt-1 px-3 py-1.5 text-xs sm:text-sm font-medium tracking-wide"
+              style={{
+                borderRadius: 999,
+                background: isSuccess
+                  ? "rgba(52, 211, 153, 0.12)"
+                  : "rgba(251, 191, 36, 0.12)",
+                color: isSuccess ? "#6ee7b7" : "#fcd34d",
+                border: `1px solid ${isSuccess ? "rgba(52,211,153,0.25)" : "rgba(251,191,36,0.25)"}`,
+              }}
+            >
+              {isSuccess ? "Paid — thank you" : "Payment in progress"}
+            </div>
+          )}
+        </header>
+
+        {/* TOTAL pinned at top — never pushed off-screen */}
+        {(hasItems || isSuccess) && (
+          <div
+            key={tick}
+            className="rounded-2xl px-5 sm:px-7 py-4 sm:py-5"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              backdropFilter: "blur(12px)",
+              animation: "cfdRise 0.35s ease-out",
+            }}
+          >
+            <div className="flex items-end justify-between gap-4">
+              <div className="min-w-0">
+                <p
+                  className="text-[10px] sm:text-[11px] uppercase tracking-[0.3em] mb-1"
+                  style={{ color: "rgba(242,243,247,0.4)" }}
+                >
+                  Total due
+                </p>
+                <div
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+                  style={{ color: "rgba(242,243,247,0.45)" }}
+                >
+                  <span>
+                    {display.itemCount} item
+                    {display.itemCount === 1 ? "" : "s"}
+                  </span>
+                  {hasItems && (
+                    <span className="tabular-nums">
+                      Subtotal {formatCurrency(display.subtotal)}
+                    </span>
+                  )}
+                  {display.discount > 0 && (
+                    <span className="tabular-nums" style={{ color: "#6ee7b7" }}>
+                      −{formatCurrency(display.discount)} off
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p
+                className="tabular-nums tracking-tight leading-none shrink-0"
+                style={{
+                  fontFamily: '"Instrument Serif", Georgia, serif',
+                  fontSize: "clamp(2.25rem, 6vw, 3.75rem)",
+                  color: "#f07167",
+                  textShadow: "0 0 40px rgba(240,113,103,0.25)",
+                }}
+              >
+                {formatCurrency(display.total)}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Products: only this area scrolls */}
+      <main className="relative z-10 flex-1 min-h-0 flex flex-col px-6 sm:px-10 lg:px-14 pb-5 sm:pb-6">
+        {!hasItems && !isSuccess ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+            <p
+              className="text-3xl sm:text-4xl"
+              style={{
+                fontFamily: '"Instrument Serif", Georgia, serif',
+                color: "rgba(242,243,247,0.85)",
+              }}
+            >
+              Ready when you are
+            </p>
+            <p
+              className="text-base sm:text-lg"
+              style={{ color: "rgba(242,243,247,0.4)" }}
+            >
+              Items will appear here as they are scanned
             </p>
           </div>
         ) : isSuccess && !hasItems ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3">
-            <p className="text-5xl font-bold text-emerald-400">Thank you!</p>
-            <p className="text-xl text-zinc-400">Have a great day.</p>
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
+            <p
+              className="text-5xl sm:text-6xl"
+              style={{
+                fontFamily: '"Instrument Serif", Georgia, serif',
+                color: "#6ee7b7",
+              }}
+            >
+              Thank you
+            </p>
+            <p className="text-xl" style={{ color: "rgba(242,243,247,0.45)" }}>
+              Have a wonderful day
+            </p>
           </div>
-        ) : (
-          <>
-            {/* Last selected product — pole-display style */}
-            <section className="flex-1 flex flex-col justify-center min-h-0">
-              {lastItem ? (
-                <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 px-6 sm:px-10 py-8 sm:py-12 text-center">
-                  <p className="text-xs sm:text-sm uppercase tracking-[0.3em] text-zinc-500 mb-4">
-                    Selected item
-                  </p>
-                  <p className="text-3xl sm:text-5xl lg:text-6xl font-bold leading-tight break-words">
-                    {lastItem.name}
-                  </p>
-                  <div className="mt-6 sm:mt-8 flex flex-wrap items-end justify-center gap-x-10 gap-y-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-1">
-                        Price
-                      </p>
-                      <p className="text-3xl sm:text-4xl font-semibold tabular-nums text-zinc-100">
-                        {formatCurrency(lastItem.price)}
+        ) : showCart ? (
+          <section className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div
+              className="hidden sm:grid grid-cols-[minmax(0,1fr)_7.5rem_5rem_8.5rem] gap-3 px-1 pb-2.5 text-[10px] uppercase tracking-[0.22em] shrink-0"
+              style={{
+                color: "rgba(242,243,247,0.35)",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <span>Product</span>
+              <span className="text-right">Price</span>
+              <span className="text-right">Qty</span>
+              <span className="text-right">Amount</span>
+            </div>
+
+            <div
+              ref={listRef}
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain mt-2.5 space-y-2 pr-1"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {display.items.map((item, index) => {
+                const isLatest = item.id === lastItemId;
+                return (
+                  <div
+                    key={`${item.id}-${index}`}
+                    className="px-4 sm:px-5 py-3 sm:py-3.5 transition-all duration-300"
+                    style={{
+                      borderRadius: 16,
+                      background: isLatest
+                        ? "linear-gradient(135deg, rgba(232,184,109,0.14), rgba(255,255,255,0.04))"
+                        : "rgba(255,255,255,0.025)",
+                      border: isLatest
+                        ? "1px solid rgba(232,184,109,0.35)"
+                        : "1px solid rgba(255,255,255,0.05)",
+                      boxShadow: isLatest
+                        ? "0 0 0 1px rgba(232,184,109,0.08), 0 12px 40px rgba(0,0,0,0.25)"
+                        : "none",
+                      animation: isLatest
+                        ? `cfdPulse 0.55s ease-out`
+                        : undefined,
+                    }}
+                  >
+                    <div className="sm:hidden space-y-1.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p
+                            className="font-semibold leading-snug break-words text-base"
+                            style={{
+                              color: isLatest
+                                ? "#fff"
+                                : "rgba(242,243,247,0.9)",
+                            }}
+                          >
+                            {item.name}
+                          </p>
+                          {isLatest && (
+                            <p
+                              className="text-[10px] uppercase tracking-[0.2em] mt-1"
+                              style={{ color: "var(--cfd-gold)" }}
+                            >
+                              Just added
+                            </p>
+                          )}
+                        </div>
+                        <p
+                          className="tabular-nums font-semibold shrink-0 text-base"
+                          style={{
+                            color: isLatest ? "var(--cfd-gold)" : "#fff",
+                          }}
+                        >
+                          {formatCurrency(item.lineTotal)}
+                        </p>
+                      </div>
+                      <p
+                        className="text-sm tabular-nums"
+                        style={{ color: "rgba(242,243,247,0.45)" }}
+                      >
+                        {formatCurrency(item.price)} × {item.quantity}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-1">
-                        Qty
+
+                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_7.5rem_5rem_8.5rem] gap-3 items-center">
+                      <div className="min-w-0">
+                        <p
+                          className="font-semibold truncate"
+                          style={{
+                            fontSize: isLatest ? "1.2rem" : "1.05rem",
+                            color: isLatest
+                              ? "#fff"
+                              : "rgba(242,243,247,0.88)",
+                          }}
+                        >
+                          {item.name}
+                        </p>
+                        {isLatest && (
+                          <p
+                            className="text-[10px] uppercase tracking-[0.2em] mt-0.5"
+                            style={{ color: "var(--cfd-gold)" }}
+                          >
+                            Just added
+                          </p>
+                        )}
+                      </div>
+                      <p
+                        className="text-right tabular-nums text-base"
+                        style={{ color: "rgba(242,243,247,0.55)" }}
+                      >
+                        {formatCurrency(item.price)}
                       </p>
-                      <p className="text-3xl sm:text-4xl font-semibold tabular-nums text-zinc-100">
-                        × {lastItem.quantity}
+                      <p
+                        className="text-right tabular-nums text-base"
+                        style={{ color: "rgba(242,243,247,0.55)" }}
+                      >
+                        × {item.quantity}
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-1">
-                        Line
-                      </p>
-                      <p className="text-3xl sm:text-4xl font-semibold tabular-nums text-amber-300">
-                        {formatCurrency(lastItem.lineTotal)}
+                      <p
+                        className="text-right tabular-nums font-semibold text-lg"
+                        style={{
+                          color: isLatest ? "var(--cfd-gold)" : "#fff",
+                        }}
+                      >
+                        {formatCurrency(item.lineTotal)}
                       </p>
                     </div>
                   </div>
-                </div>
-              ) : null}
-
-              {/* Compact recent lines */}
-              {display.items.length > 1 && (
-                <div className="mt-5 max-h-36 overflow-y-auto space-y-1.5 pr-1">
-                  {display.items
-                    .slice(-5)
-                    .reverse()
-                    .map((item) => (
-                      <div
-                        key={item.id}
-                        className={`flex items-center justify-between gap-4 text-sm sm:text-base px-3 py-2 rounded-xl ${
-                          lastItem?.id === item.id
-                            ? "bg-zinc-900 text-white"
-                            : "text-zinc-500"
-                        }`}
-                      >
-                        <span className="truncate">
-                          {item.name}{" "}
-                          <span className="text-zinc-600">×{item.quantity}</span>
-                        </span>
-                        <span className="tabular-nums shrink-0">
-                          {formatCurrency(item.lineTotal)}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </section>
-
-            {/* LED-style total — matches classic pole / rear display */}
-            <footer className="mt-6 pt-6 border-t border-zinc-800">
-              {display.discount > 0 && (
-                <div className="flex justify-between text-base text-emerald-400 mb-3">
-                  <span>Discount</span>
-                  <span className="tabular-nums">
-                    − {formatCurrency(display.discount)}
-                  </span>
-                </div>
-              )}
-              <div className="rounded-2xl bg-zinc-950 border border-zinc-800 px-6 py-5 flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">
-                    Total
-                  </p>
-                  <p className="text-zinc-500 text-sm mt-1">
-                    {display.itemCount} item
-                    {display.itemCount === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <p
-                  className="text-5xl sm:text-6xl lg:text-7xl font-bold tabular-nums tracking-tight text-red-500"
-                  style={{ fontVariantNumeric: "tabular-nums" }}
-                >
-                  {formatCurrency(display.total)}
-                </p>
-              </div>
-            </footer>
-          </>
-        )}
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
       </main>
+
+      <style>{`
+        @keyframes cfdPulse {
+          0% { transform: scale(0.985); opacity: 0.7; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes cfdRise {
+          0% { transform: translateY(4px); opacity: 0.75; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 };

@@ -17,7 +17,8 @@ import {
 import { useAuthRedux } from '../../hooks/useAuthRedux';
 import { useShopAPI } from '../../hooks/useShopAPI';
 import FacebookConnectButton from '../../components/FacebookLeads/FacebookConnectButton';
-import facebookLeadsService, {
+import facebookLeadsService from '../../services/facebookLeadsService';
+import type {
   FacebookPage,
   FacebookLeadForm,
   FacebookLeadFormQuestion,

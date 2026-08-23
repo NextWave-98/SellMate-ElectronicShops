@@ -113,6 +113,70 @@ const toSafeNumber = (value: unknown, fallback = 0): number => {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 };
 
+const parseInventoryList = (response: any): any[] => {
+  const candidates = [
+    response?.data?.inventory,
+    response?.data?.items,
+    response?.data?.data?.inventory,
+    response?.inventory,
+    response?.data?.data,
+    response?.data,
+    response,
+  ];
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    if (
+      candidate.length === 0 ||
+      candidate[0]?.productId ||
+      candidate[0]?.product_id ||
+      candidate[0]?.product ||
+      candidate[0]?.id
+    ) {
+      return candidate;
+    }
+  }
+  return [];
+};
+
+const mapInventoryRowsToProducts = (inventoryList: any[]): any[] => {
+  const productMap = new Map<string, any>();
+  for (const item of inventoryList) {
+    if (!item || typeof item !== 'object') continue;
+    const nestedProduct = item.product && typeof item.product === 'object' ? item.product : null;
+    const productId = item.productId || item.product_id || nestedProduct?.id || (nestedProduct ? null : item.id);
+    if (!productId) continue;
+    if (nestedProduct?.isActive === false || item.isActive === false) continue;
+    const qty = Number(item.availableQuantity ?? item.quantity ?? nestedProduct?.stock ?? 0) || 0;
+    if (productMap.has(productId)) {
+      productMap.get(productId).stock += qty;
+      continue;
+    }
+    const unitPrice = Number(nestedProduct?.unitPrice ?? item.unitPrice ?? item.price) || 0;
+    const discountInfo = nestedProduct?.discountInfo ?? item.discountInfo ?? null;
+    productMap.set(productId, {
+      id: productId,
+      name: nestedProduct?.name || item.name || 'Unknown Product',
+      sku: nestedProduct?.sku || item.sku || nestedProduct?.productCode || item.productCode || '',
+      barcode: nestedProduct?.barcode || item.barcode || '',
+      productCode: nestedProduct?.productCode || item.productCode || '',
+      price: discountInfo ? discountInfo.effectivePrice : unitPrice,
+      originalPrice: discountInfo ? unitPrice : undefined,
+      discountInfo,
+      costPrice: Number(nestedProduct?.costPrice ?? item.costPrice) || 0,
+      stock: qty,
+      isActive: nestedProduct?.isActive ?? item.isActive ?? true,
+    });
+  }
+  return [...productMap.values()];
+};
+
+const productMatchesQuery = (product: any, query: string) => {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [product.name, product.sku, product.productCode, product.barcode]
+    .some((value) => String(value || '').toLowerCase().includes(q));
+};
+
 type ShipmentPaymentMethod = 'bank' | 'online' | 'cod' | 'koko' | 'mintpay' | 'payzy';
 
 export const CourierShipmentModal = ({
@@ -172,6 +236,13 @@ export const CourierShipmentModal = ({
   const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const catalogProductsRef = React.useRef<any[]>([]);
+  const productSearchRequestId = React.useRef(0);
+  const getAllInventoryRef = React.useRef(getAllInventory);
+  getAllInventoryRef.current = getAllInventory;
+  const productSearchTermRef = React.useRef(productSearchTerm);
+  productSearchTermRef.current = productSearchTerm;
+  const [serverSearchResults, setServerSearchResults] = useState<any[] | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<ShipmentPaymentMethod>(initialPaymentMethod ?? 'cod');
   const [_manualSenderEdit, _setManualSenderEdit] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -396,7 +467,7 @@ export const CourierShipmentModal = ({
   React.useEffect(() => {
     if (!formData.courierServiceId || !user?.businessId) return;
     const svc = courierServices.find(s => s.id === formData.courierServiceId);
-    if (svc?.provider === CourierServiceProvider.CURFOX) {
+    if (svc?.provider === CourierServiceProvider.CURFOX || svc?.provider === CourierServiceProvider.KOOMBIYO) {
       getCourierCities(user.businessId, formData.courierServiceId).then(cities => {
         setCourierCities(cities);
       });
@@ -415,46 +486,36 @@ export const CourierShipmentModal = ({
 
   // Fetch products on component mount
   React.useEffect(() => {
+    let cancelled = false;
     const fetchAllProducts = async () => {
       setLoadingProducts(true);
       try {
-        const response = await getAllInventory({ limit: 500, includeDiscount: true });
-        if (response?.data) {
-          const inventoryList: any[] = (response as any).data?.inventory || (response as any).data?.items || (response as any).data?.data || (response as any).data || [];
-          // De-duplicate by productId, summing availableQuantity across locations
-          const productMap = new Map<string, any>();
-          for (const item of inventoryList) {
-            if (!item.productId) continue;
-            if (productMap.has(item.productId)) {
-              productMap.get(item.productId).stock += item.availableQuantity || 0;
-            } else {
-              const unitPrice = Number(item.product?.unitPrice) || 0;
-              const discountInfo = item.product?.discountInfo ?? null;
-              productMap.set(item.productId, {
-                id: item.productId,
-                name: item.product?.name || 'Unknown Product',
-                sku: item.product?.sku || item.product?.productCode || '',
-                price: discountInfo ? discountInfo.effectivePrice : unitPrice,
-                originalPrice: discountInfo ? unitPrice : undefined,
-                discountInfo,
-                costPrice: Number(item.product?.costPrice) || 0,
-                stock: item.availableQuantity || 0,
-                isActive: item.product?.isActive ?? true,
-              });
-            }
-          }
-          setProducts([...productMap.values()]);
-        } else {
-          setProducts([]);
+        const response = await getAllInventoryRef.current({
+          limit: 500,
+          includeDiscount: true,
+          sortBy: 'name',
+          sortOrder: 'asc',
+        });
+        if (cancelled) return;
+        const mapped = mapInventoryRowsToProducts(parseInventoryList(response));
+        catalogProductsRef.current = mapped;
+        if (!productSearchTermRef.current.trim()) {
+          setProducts(mapped);
         }
       } catch (error) {
         console.error('Failed to fetch all products:', error);
-        setProducts([]);
+        if (!cancelled) {
+          catalogProductsRef.current = [];
+          setProducts([]);
+        }
       } finally {
-        setLoadingProducts(false);
+        if (!cancelled) setLoadingProducts(false);
       }
     };
     fetchAllProducts();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Pre-select products from initialProducts once inventory is loaded
@@ -497,51 +558,52 @@ export const CourierShipmentModal = ({
     if (matched.length > 0) setSelectedProducts(matched);
   }, [products]);
 
-  // Search products when productSearchTerm changes
+  // Wait until the user pauses typing, then search the server once.
   React.useEffect(() => {
-    if (!productSearchTerm.trim()) return;
-    const fetchProductsBySearch = async () => {
-      setLoadingProducts(true);
+    const term = productSearchTerm.trim();
+    if (term.length < 2) {
+      productSearchRequestId.current += 1;
+      setServerSearchResults(null);
+      setLoadingProducts(false);
+      return;
+    }
+
+    const requestId = ++productSearchRequestId.current;
+    setLoadingProducts(true);
+    const timeoutId = setTimeout(async () => {
       try {
-        const response = await getAllInventory({ search: productSearchTerm, limit: 50, includeDiscount: true });
-        if (response?.data) {
-          const inventoryList: any[] = (response as any).data?.inventory || (response as any).data?.items || (response as any).data?.data || (response as any).data || [];
-          const productMap = new Map<string, any>();
-          for (const item of inventoryList) {
-            if (!item.productId || !item.product?.isActive) continue;
-            if (productMap.has(item.productId)) {
-              productMap.get(item.productId).stock += item.availableQuantity || 0;
-            } else {
-              const unitPrice = Number(item.product?.unitPrice) || 0;
-              const discountInfo = item.product?.discountInfo ?? null;
-              productMap.set(item.productId, {
-                id: item.productId,
-                name: item.product?.name || 'Unknown Product',
-                sku: item.product?.sku || item.product?.productCode || '',
-                price: discountInfo ? discountInfo.effectivePrice : unitPrice,
-                originalPrice: discountInfo ? unitPrice : undefined,
-                discountInfo,
-                costPrice: Number(item.product?.costPrice) || 0,
-                stock: item.availableQuantity || 0,
-              });
-            }
-          }
-          setProducts([...productMap.values()]);
-        } else {
-          setProducts([]);
-        }
+        const response = await getAllInventoryRef.current({
+          search: term,
+          limit: 50,
+          includeDiscount: true,
+          sortBy: 'name',
+          sortOrder: 'asc',
+        });
+        if (requestId !== productSearchRequestId.current) return;
+        setServerSearchResults(mapInventoryRowsToProducts(parseInventoryList(response)));
       } catch (error) {
         console.error('Failed to search products:', error);
-        setProducts([]);
+        if (requestId === productSearchRequestId.current) {
+          setServerSearchResults([]);
+        }
       } finally {
-        setLoadingProducts(false);
+        if (requestId === productSearchRequestId.current) setLoadingProducts(false);
       }
+    }, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
     };
-    const timeoutId = setTimeout(fetchProductsBySearch, 300);
-    return () => clearTimeout(timeoutId);
   }, [productSearchTerm]);
 
-  const filteredProducts = products;
+  const filteredProducts = useMemo(() => {
+    const term = productSearchTerm.trim();
+    if (term.length >= 2 && serverSearchResults !== null && !loadingProducts) {
+      return serverSearchResults;
+    }
+    if (!term) return products;
+    return products.filter((product) => productMatchesQuery(product, term));
+  }, [products, productSearchTerm, serverSearchResults, loadingProducts]);
 
   const handleAddProduct = (product: any) => {
     const existingProduct = selectedProducts.find(p => p.id === product.id);
@@ -1014,11 +1076,14 @@ export const CourierShipmentModal = ({
                 </div>
 
                 {showProductDropdown && filteredProducts.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredProducts.slice(0, 10).map((product) => (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredProducts.slice(0, 50).map((product) => (
                       <div
                         key={product.id}
-                        onClick={() => handleAddProduct(product)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleAddProduct(product);
+                        }}
                         className={cn('cursor-pointer border-b px-4 py-3 last:border-b-0', theme.dropdownItemHover)}
                       >
                         <div className="flex items-center gap-2">
@@ -1049,9 +1114,11 @@ export const CourierShipmentModal = ({
                   </div>
                 )}
 
-                {showProductDropdown && productSearchTerm && filteredProducts.length === 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
-                    No products found matching "{productSearchTerm}"
+                {showProductDropdown && productSearchTerm.trim().length >= 2 && filteredProducts.length === 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                    {loadingProducts || serverSearchResults === null
+                      ? 'Searching products...'
+                      : `No products found matching "${productSearchTerm}"`}
                   </div>
                 )}
               </div>
