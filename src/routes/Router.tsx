@@ -128,6 +128,7 @@ const LeadFormsPage = lazy(() => import('../pages/FacebookLeads/LeadFormsPage'))
 const AttendancePage = lazy(() => import('../pages/organizationadmin/AttendancePage'));
 const PayrollPage = lazy(() => import('../pages/organizationadmin/PayrollPage'));
 const StaffAttendancePage = lazy(() => import('../pages/branch/StaffAttendancePage'));
+const KioskAttendancePage = lazy(() => import('../pages/branch/KioskAttendancePage'));
 const WooCommercePage = lazy(() => import('../pages/organizationadmin/WooCommercePage'));
 const WooCommerceOrdersPage = lazy(() => import('../pages/organizationadmin/WooCommerceOrdersPage'));
 const DiscountsPage = lazy(() => import('../pages/organizationadmin/DiscountsPage'));
@@ -904,6 +905,7 @@ const AppRouter = () => (
           </PermissionRoute>
         } />
         <Route path="attendance" element={<StaffAttendancePage />} />
+        <Route path="attendance/kiosk" element={<KioskAttendancePage />} />
         <Route path="suppliers/management" element={
           <PermissionRoute
             permissions={[

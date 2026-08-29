@@ -52,7 +52,7 @@ import { todayColombo } from '@/utils/dateUtils';
 // import { useBusinessProfile, useProduct } from '../../hooks';
 // import useCustomer, { type Customer as CustomerType } from '../../hooks/useCustomer';
 import toast from 'react-hot-toast';
-import { printPdfBlob } from '@/utils/printPdf';
+import { printPdfBlob, ensurePdfBlob } from '@/utils/printPdf';
 import { CourierShipmentModal, TrackingModal, LabelDownloadModal, BulkLabelModal, StatusUpdateModal, ScanBulkStatusModal } from '../../components/courier/modals';
 import PendingApprovalShipments from '../../components/courier/PendingApprovalShipments';
 import { formatCurrency } from '@/utils/currency';
@@ -410,20 +410,25 @@ const ShipmentTrackingPage = () => {
         endpoint: `/courier/shipments/${labelIdentifier}/label/print?size=${size}&format=${format}`,
         method: 'GET',
         responseType: 'blob',
-        silent: true
+        silent: true,
+        showToastOnError: false,
       });
 
-      if (response) {
-        const blob = new Blob([response as any], { type: 'application/pdf' });
+      if (response instanceof Blob) {
+        const blob = await ensurePdfBlob(response);
         try {
           printPdfBlob(blob, format === 'fragile' ? { pageSize: 'A5-landscape' } : undefined);
-        } catch {
-          toast.error('Please allow popups to print labels');
+        } catch (err) {
+          toast.error(err instanceof Error && err.message.includes('popup')
+            ? 'Please allow popups to print labels'
+            : (err instanceof Error ? err.message : 'Failed to print label'));
         }
+      } else {
+        toast.error((response as { message?: string })?.message || 'Failed to print label');
       }
     } catch (error) {
       console.error('Error printing label:', error);
-      toast.error('Failed to print label');
+      toast.error(error instanceof Error ? error.message : 'Failed to print label');
     }
   };
 
@@ -591,23 +596,27 @@ const ShipmentTrackingPage = () => {
         endpoint: `/courier/shipments/bulk-labels/download`,
         method: 'POST',
         data: { shipmentIds: Array.from(selectedIds), size, format },
-        responseType: 'blob'
+        responseType: 'blob',
+        silent: true,
+        showToastOnError: false,
       });
-      if (response) {
-        const blob = response as unknown as Blob;
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bulk-labels-${selectedIds.size}-${format}-${size}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        toast.success(`Downloaded ${selectedIds.size} labels`);
-        setShowBulkLabelModal(false);
+      if (!(response instanceof Blob)) {
+        toast.error((response as { message?: string })?.message || 'Failed to download bulk labels');
+        return;
       }
-    } catch {
-      toast.error('Failed to download bulk labels');
+      const blob = await ensurePdfBlob(response);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bulk-labels-${selectedIds.size}-${format}-${size}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${selectedIds.size} labels`);
+      setShowBulkLabelModal(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to download bulk labels');
     } finally {
       setBulkLoading(false);
     }
@@ -624,19 +633,25 @@ const ShipmentTrackingPage = () => {
         endpoint: `/courier/shipments/bulk-labels/print`,
         method: 'POST',
         data: { shipmentIds: Array.from(selectedIds), size, format },
-        responseType: 'blob'
+        responseType: 'blob',
+        silent: true,
+        showToastOnError: false,
       });
-      if (response) {
-        const blob = response as unknown as Blob;
-        try {
-          printPdfBlob(blob, format === 'fragile' ? { pageSize: 'A5-landscape' } : undefined);
-          setShowBulkLabelModal(false);
-        } catch {
-          toast.error('Please allow popups to print labels');
-        }
+      if (!(response instanceof Blob)) {
+        toast.error((response as { message?: string })?.message || 'Failed to print bulk labels');
+        return;
       }
-    } catch {
-      toast.error('Failed to print bulk labels');
+      const blob = await ensurePdfBlob(response);
+      try {
+        printPdfBlob(blob, format === 'fragile' ? { pageSize: 'A5-landscape' } : undefined);
+        setShowBulkLabelModal(false);
+      } catch (err) {
+        toast.error(err instanceof Error && err.message.includes('popup')
+          ? 'Please allow popups to print labels'
+          : (err instanceof Error ? err.message : 'Failed to print bulk labels'));
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to print bulk labels');
     } finally {
       setBulkLoading(false);
     }

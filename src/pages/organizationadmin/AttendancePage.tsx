@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-import { Calendar, Users, CheckCircle, RefreshCw, Edit, Search, Plus, Upload, Monitor, Trash2, AlertCircle, CheckSquare, XSquare } from 'lucide-react';
+import { Calendar, Users, CheckCircle, RefreshCw, Edit, Search, Plus, Upload, Monitor, Trash2, AlertCircle, CheckSquare, XSquare, ScanFace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import toast from 'react-hot-toast';
 import useFetch from '../../hooks/useFetch';
 import { useAuthRedux } from '../../hooks/useAuthRedux';
+import { BiometricAttendanceAdmin } from '@/components/attendance/BiometricAttendanceAdmin';
 
 interface AttendanceLog {
   id: string;
@@ -471,6 +472,7 @@ export default function AttendancePage() {
           <TabsTrigger value="logs"><Calendar className="h-4 w-4 mr-2" />Attendance Logs</TabsTrigger>
           <TabsTrigger value="corrections"><AlertCircle className="h-4 w-4 mr-2" />Pending Fixes {pendingTotal > 0 ? `(${pendingTotal})` : ''}</TabsTrigger>
           <TabsTrigger value="devices"><Monitor className="h-4 w-4 mr-2" />Registered Devices</TabsTrigger>
+          <TabsTrigger value="biometric"><ScanFace className="h-4 w-4 mr-2" />Face / PIN</TabsTrigger>
         </TabsList>
         </div>
 
@@ -707,6 +709,10 @@ export default function AttendancePage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="biometric">
+          <BiometricAttendanceAdmin staffList={staffList} />
         </TabsContent>
       </Tabs>
 

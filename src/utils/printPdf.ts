@@ -1,6 +1,38 @@
 export type PrintPdfPageSize = 'A5-landscape';
 
 /**
+ * Ensures a blob response is a PDF. When responseType is "blob", Axios error
+ * bodies (JSON) also arrive as Blobs — printing those shows
+ * {"success":false,"message":"Internal server error"} in the print dialog.
+ */
+export async function ensurePdfBlob(blob: Blob): Promise<Blob> {
+  const head = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
+  const isPdf =
+    head.length >= 5 &&
+    head[0] === 0x25 && // %
+    head[1] === 0x50 && // P
+    head[2] === 0x44 && // D
+    head[3] === 0x46 && // F
+    head[4] === 0x2d; // -
+
+  if (isPdf) {
+    return blob.type === 'application/pdf'
+      ? blob
+      : new Blob([blob], { type: 'application/pdf' });
+  }
+
+  let message = 'Failed to generate PDF label';
+  try {
+    const text = await blob.text();
+    const parsed = JSON.parse(text) as { message?: string; success?: boolean };
+    if (parsed?.message) message = parsed.message;
+  } catch {
+    // not JSON — keep generic message
+  }
+  throw new Error(message);
+}
+
+/**
  * Opens a PDF blob for printing. For fragile courier labels, wraps the PDF in a
  * minimal HTML document with @page { size: A5 landscape } so browser print preview
  * defaults to landscape instead of portrait A5.
