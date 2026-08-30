@@ -53,7 +53,7 @@ import CashDrawerOpenOverlay from "../../components/branch/pos/CashDrawerOpenOve
 import CashDrawerBlocker from "../../components/branch/pos/CashDrawerBlocker";
 import POSSettingsBlocker from "../../components/branch/pos/POSSettingsBlocker";
 import { usePOSSettings } from "../../hooks/usePOSSettings";
-import { getPrinterConfig } from "../../lib/printerConfig";
+import { getPrinterConfig, resolveThermalPaperFormat } from "../../lib/printerConfig";
 import useCashDrawer from "../../hooks/useCashDrawer";
 import useCourier, { CourierMode } from "../../hooks/useCourier";
 import useBusinessProfile from "../../hooks/useBusinessProfile";
@@ -303,6 +303,12 @@ const QuickPOSPage: React.FC = () => {
       user?.locationId || user?.branchId || selectedLocationId || "";
     return locId ? getPrinterConfig(locId) : null;
   }, [user?.locationId, user?.branchId, selectedLocationId]);
+
+  const resolveThermalFormat = useCallback(
+    () =>
+      resolveThermalPaperFormat(resolvePrinterConf(), posSettings.defaultFormat),
+    [resolvePrinterConf, posSettings.defaultFormat],
+  );
 
   // ── Scanner
   const [showScanner, setShowScanner] = useState(false);
@@ -1651,14 +1657,14 @@ const QuickPOSPage: React.FC = () => {
         );
         if (!isDeferredMethod && (posSettings.autoPrintOnSale || isPartialPayment)) {
           if (isPartialPayment || (paymentMethod === "CASH" && isAdvancePayment)) {
-            await printAcknowledgement(saleId, "80mm");
+            await printAcknowledgement(saleId, resolveThermalFormat());
           } else {
             const cashAmt =
               paymentMethod === "CASH" && !isAdvancePayment
                 ? parseFloat(cashReceived) || 0
                 : 0;
             await silentPrintInvoice(saleId, {
-              format: "80mm",
+              format: resolveThermalFormat(),
               cashReceived: cashAmt > 0 ? cashAmt : undefined,
               printerConf: resolvePrinterConf(),
               openDrawer: paymentMethod === "CASH",
@@ -1751,10 +1757,10 @@ const QuickPOSPage: React.FC = () => {
             ? parseFloat(cashReceived) || 0
             : 0;
         if (isPartialPayment) {
-          await printAcknowledgement(saleId, "80mm");
+          await printAcknowledgement(saleId, resolveThermalFormat());
         } else {
           await silentPrintInvoice(saleId, {
-            format: "80mm",
+            format: resolveThermalFormat(),
             cashReceived: cashAmt > 0 ? cashAmt : undefined,
             printerConf: resolvePrinterConf(),
             openDrawer: paymentMethod === "CASH",
@@ -1778,8 +1784,9 @@ const QuickPOSPage: React.FC = () => {
       format === "a4"
         ? "a4"
         : format === "thermal"
-          ? "80mm"
-          : ((format as "a4" | "80mm" | "58mm" | undefined) ?? "80mm");
+          ? resolveThermalFormat()
+          : ((format as "a4" | "80mm" | "58mm" | undefined) ??
+            resolveThermalFormat());
 
     try {
       if (saleResult.paymentStatus === "PARTIAL") {

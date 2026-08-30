@@ -1,11 +1,8 @@
 name: Deploy Contabo Frontend (Docker)
 
+# Primary Contabo frontend is GadgetChain-Manager (NextWave-98/GadgetChain-Manager).
+# This workflow is manual-only so pushes here do not overwrite /var/www/gadgetchain-frontend.
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
   workflow_dispatch:
 
 concurrency:

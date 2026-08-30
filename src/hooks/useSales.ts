@@ -709,10 +709,14 @@ const useSales = () => {
         openDrawer?: boolean;
       } = {},
     ): Promise<void> => {
-      const format = options.format ?? "58mm";
       const printerConf =
         options.printerConf ??
         (isMobilePOSDevice() ? { ...DEFAULT_PRINTER_CONFIG } : null);
+      const format =
+        options.format ??
+        (printerConf?.paperWidth === "58mm" || printerConf?.paperWidth === "80mm"
+          ? printerConf.paperWidth
+          : "58mm");
       console.log(
         `[AutoPrint] saleId=${saleId}, format=${format}, mobile=${isMobilePOSDevice()}`,
       );

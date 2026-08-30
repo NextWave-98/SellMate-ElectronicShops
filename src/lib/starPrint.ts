@@ -40,6 +40,24 @@ function passPrntPaperSize(paperWidth: "58mm" | "80mm"): string {
   return paperWidth === "58mm" ? "2" : "3";
 }
 
+/**
+ * PassPRNT renders the supplied HTML itself. Browser receipt HTML also contains
+ * window.print(), which would open Android's "Save as PDF" dialog inside that
+ * renderer, so scripts and inline load handlers must not be handed to PassPRNT.
+ */
+export function sanitizePassPrntHtml(html: string): string {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/\s+on(?:load|afterprint|beforeprint)\s*=\s*(["']).*?\1/gi, "");
+}
+
+/** URLSearchParams encodes spaces as '+', while PassPRNT requires RFC3986. */
+function encodeRfc3986(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
 export function buildPassPrntUrl(
   html: string,
   options: {
@@ -48,24 +66,22 @@ export function buildPassPrntUrl(
     backUrl?: string;
   } = {},
 ): string {
-  const params = new URLSearchParams();
-  params.set("back", options.backUrl ?? window.location.href);
-  params.set("html", html);
-  params.set("size", passPrntPaperSize(options.paperWidth ?? "80mm"));
+  const printableHtml = sanitizePassPrntHtml(html);
+  const params = [
+    `back=${encodeRfc3986(options.backUrl ?? window.location.href)}`,
+    `html=${encodeRfc3986(printableHtml)}`,
+    `size=${passPrntPaperSize(options.paperWidth ?? "80mm")}`,
+  ];
   if (options.openDrawer) {
-    params.set("drawer", "ahead");
+    params.push("drawer=ahead");
   }
-  return PASSPRNT_BASE + params.toString();
+  return PASSPRNT_BASE + params.join("&");
 }
 
 function openExternalUrl(url: string): void {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.rel = "noopener noreferrer";
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
+  // Star's integration guide uses a top-level navigation. This is more
+  // reliable than a synthetic anchor after an async sale request on Android.
+  window.location.href = url;
 }
 
 /**

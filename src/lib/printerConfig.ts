@@ -68,7 +68,7 @@ export function clearPrinterConfig(locationId: string): void {
 
 export const DEFAULT_PRINTER_CONFIG: PrinterConfig = {
   printerName: "",
-  paperWidth: "80mm",
+  paperWidth: "58mm",
   autoOpenDrawer: true,
   autoPrintOnSale: false,
   mobilePrintMode: "auto",
@@ -76,3 +76,17 @@ export const DEFAULT_PRINTER_CONFIG: PrinterConfig = {
   starWebPrntPort: 8001,
   starWebPrntSecure: false,
 };
+
+/** Resolve thermal width from device settings (mPOP is usually 58mm). */
+export function resolveThermalPaperFormat(
+  printerConf?: PrinterConfig | null,
+  orgDefaultFormat?: string | null,
+): "58mm" | "80mm" {
+  if (printerConf?.paperWidth === "58mm" || printerConf?.paperWidth === "80mm") {
+    return printerConf.paperWidth;
+  }
+  if (orgDefaultFormat === "58mm" || orgDefaultFormat === "80mm") {
+    return orgDefaultFormat;
+  }
+  return "58mm";
+}
