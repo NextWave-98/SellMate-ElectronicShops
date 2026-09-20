@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://gadget-chain-manager-backend.vercel.app/api';
 
 /**
- * PUBLIC online service booking — /book/:businessId
+ * PUBLIC online service booking   /book/:businessId
  * Customer picks a preferred date/time and submits a service request. No login.
  */
 export default function AppointmentBookingPage() {
@@ -63,7 +63,7 @@ export default function AppointmentBookingPage() {
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
             <Wrench className="w-7 h-7" /> {business?.name || 'Book a Service'}
           </h1>
-          <p className="text-blue-100 text-sm mt-1">Request a service appointment — we'll confirm the slot by phone.</p>
+          <p className="text-blue-100 text-sm mt-1">Request a service appointment   we'll confirm the slot by phone.</p>
         </div>
       </div>
 

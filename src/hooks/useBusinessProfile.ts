@@ -17,6 +17,8 @@ export interface BusinessProfileData {
   industryType?: IndustryType;
   reportIncludeJobsheet?: boolean;
   reportIncludeSupplierPayment?: boolean;
+  /** Deduct damaged / expired / internally consumed stock in profit & loss. */
+  reportIncludeStockLoss?: boolean;
   posAutoPrintOnSale?: boolean;
   posAutoCashDrawer?: boolean;
   posDefaultFormat?: '80mm' | '58mm' | 'a4';
@@ -30,6 +32,10 @@ export interface BusinessProfileData {
   posDefaultDiscountValue?: number;
   staffManagementEnabled?: boolean;
   supplierOrdersEnabled?: boolean;
+  /** Master switch for the warranty feature. Off until the org turns it on. */
+  warrantyEnabled?: boolean;
+  /** Create a warranty card automatically when a warrantied product is sold. */
+  warrantyAutoGenerate?: boolean;
   website?: string;
   whatsappGroupLink?: string;
   createdAt?: string;
@@ -96,6 +102,8 @@ const useBusinessProfile = () => {
     posDefaultDiscountValue?: number;
     staffManagementEnabled?: boolean;
     supplierOrdersEnabled?: boolean;
+    warrantyEnabled?: boolean;
+    warrantyAutoGenerate?: boolean;
   }) => {
     try {
       const response = await updateBusinessFetch({
@@ -117,7 +125,7 @@ const useBusinessProfile = () => {
   };
 
   // Update report settings (JSON, no file upload needed)
-  const updateReportSettings = async (settings: { reportIncludeJobsheet?: boolean; reportIncludeSupplierPayment?: boolean }) => {
+  const updateReportSettings = async (settings: { reportIncludeJobsheet?: boolean; reportIncludeSupplierPayment?: boolean; reportIncludeStockLoss?: boolean }) => {
     try {
       const response = await updateBusinessFetch({
         method: 'PUT',

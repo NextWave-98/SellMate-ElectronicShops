@@ -145,7 +145,7 @@ export default function VehicleFormPage() {
             <ArrowLeft className="w-4 h-4" /> Back to Fleet
           </button>
           <h2 className="text-xl font-bold flex items-center gap-2 mt-1">
-            <Car className="w-5 h-5" /> {isEdit ? `Edit Vehicle — ${form.registrationNo}` : 'Add Vehicle to Fleet'}
+            <Car className="w-5 h-5" /> {isEdit ? `Edit Vehicle   ${form.registrationNo}` : 'Add Vehicle to Fleet'}
           </h2>
         </div>
         <Button onClick={submit} disabled={saving || !form.registrationNo || !form.make || !form.model}>
@@ -273,7 +273,7 @@ export default function VehicleFormPage() {
         </div>
       </CardContent></Card>
 
-      {/* Bottom actions (page scrolls naturally — no more cramped modal) */}
+      {/* Bottom actions (page scrolls naturally   no more cramped modal) */}
       <div className="flex justify-end gap-2 pb-8">
         <Button variant="outline" onClick={() => navigate(isEdit ? '../..' : '..', { relative: 'path' })}>Cancel</Button>
         <Button onClick={submit} disabled={saving || !form.registrationNo || !form.make || !form.model}>

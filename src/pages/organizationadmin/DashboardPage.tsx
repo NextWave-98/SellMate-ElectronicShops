@@ -39,6 +39,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import DashboardPeriodSelector from '../../components/common/DashboardPeriodSelector';
 import toast from 'react-hot-toast';
 import { useDashboard, type DashboardStats, type RecentActivity, type TopPerformer } from '../../hooks/useDashboard';
+import useOrgFeatures from '../../hooks/useOrgFeatures';
 import { useTradeIn } from '../../hooks/useTradeIn';
 import useSMS from '../../hooks/useSMS';
 import useActivityLog, { type OrgDashboardActivity, type ActivityLogEntry } from '../../hooks/useActivityLog';
@@ -78,13 +79,14 @@ const quickActions = [
   { to: '/superadmin/sales/monitor', icon: ShoppingCart, label: 'Sales', color: 'text-indigo-600', bg: 'bg-indigo-50 hover:bg-indigo-100', border: 'border-indigo-200' },
   // { to: '/superadmin/job-sheets/monitor', icon: Wrench, label: 'Job Sheets', color: 'text-red-600', bg: 'bg-red-50 hover:bg-red-100', border: 'border-red-200' },
   { to: '/superadmin/customers/management', icon: UserCircle, label: 'Customers', color: 'text-cyan-600', bg: 'bg-cyan-50 hover:bg-cyan-100', border: 'border-cyan-200' },
-  { to: '/superadmin/warranty/management', icon: Shield, label: 'Warranty', color: 'text-teal-600', bg: 'bg-teal-50 hover:bg-teal-100', border: 'border-teal-200' },
+  { to: '/superadmin/warranty/management', icon: Shield, label: 'Warranty', color: 'text-teal-600', bg: 'bg-teal-50 hover:bg-teal-100', border: 'border-teal-200', feature: 'warranty' },
   { to: '/superadmin/suppliers/management', icon: Truck, label: 'Suppliers', color: 'text-yellow-600', bg: 'bg-yellow-50 hover:bg-yellow-100', border: 'border-yellow-200' },
   { to: '/superadmin/reports', icon: FileText, label: 'Reports', color: 'text-violet-600', bg: 'bg-violet-50 hover:bg-violet-100', border: 'border-violet-200' },
   { to: '/superadmin/notifications/dashboard', icon: Bell, label: 'Notifications', color: 'text-rose-600', bg: 'bg-rose-50 hover:bg-rose-100', border: 'border-rose-200' },
 ];
 
 export default function DashboardPage() {
+  const { warrantyEnabled } = useOrgFeatures();
   const { getDashboardStats } = useDashboard();
   const { checkSMSBalance } = useSMS();
   const { getOrgDashboardActivity } = useActivityLog();
@@ -490,9 +492,11 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Link to="/superadmin/warranty/management" className="flex-1 text-center text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg py-2 transition-colors">
-                <Shield className="w-3.5 h-3.5 inline mr-1" />Warranty
-              </Link>
+              {warrantyEnabled && (
+                <Link to="/superadmin/warranty/management" className="flex-1 text-center text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg py-2 transition-colors">
+                  <Shield className="w-3.5 h-3.5 inline mr-1" />Warranty
+                </Link>
+              )}
               <Link to="/superadmin/installments" className="flex-1 text-center text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg py-2 transition-colors">
                 Installments
               </Link>
@@ -501,7 +505,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* ── Courier (collapsed — secondary for electronics shops) ── */}
+      {/* ── Courier (collapsed   secondary for electronics shops) ── */}
       {canViewCourier && (<>
       <Card className="rounded-2xl">
         <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
@@ -638,7 +642,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-gray-900">Courier Success by Branch</h3>
-                <p className="text-xs text-gray-400">{periodLabel} — shipments created or updated in period</p>
+                <p className="text-xs text-gray-400">{periodLabel}   shipments created or updated in period</p>
               </div>
             </div>
 
@@ -702,7 +706,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-gray-900">Staff Success Rate</h3>
-                <p className="text-xs text-gray-400">{periodLabel} — courier shipments created or updated in period</p>
+                <p className="text-xs text-gray-400">{periodLabel}   courier shipments created or updated in period</p>
               </div>
             </div>
 
@@ -1192,7 +1196,9 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2">
           {[
-            ...quickActions,
+            // A tile tagged with a `feature` only appears when the organization
+            // has that feature switched on. Warranty is hidden by default.
+            ...quickActions.filter((a) => !('feature' in a) || (a as any).feature !== 'warranty' || warrantyEnabled),
             ...(showJobSheets
               ? [{ to: '/superadmin/job-sheets/monitor', icon: Wrench, label: 'Job Sheets', color: 'text-red-600', bg: 'bg-red-50 hover:bg-red-100', border: 'border-red-200' }]
               : []),

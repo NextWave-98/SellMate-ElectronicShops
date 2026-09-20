@@ -265,7 +265,7 @@ export default function CreateGoodsReceiptModal({
                       );
                     })}
                     {availableLocations.length === 0 && (
-                      <p className="text-sm text-amber-600">No locations found — goods will go to the main warehouse.</p>
+                      <p className="text-sm text-amber-600">No locations found   goods will go to the main warehouse.</p>
                     )}
                   </div>
                 )}

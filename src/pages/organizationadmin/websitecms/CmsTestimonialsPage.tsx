@@ -10,7 +10,7 @@ import { useCms } from '../../../hooks/useCms';
 
 const emptyForm = { author: '', role: '', content: '', rating: 5, isPublished: true };
 
-/** Customer testimonials — create, edit, delete. */
+/** Customer testimonials   create, edit, delete. */
 export default function CmsTestimonialsPage() {
   const { listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial } = useCms();
   const [testimonials, setTestimonials] = useState<any[]>([]);
@@ -106,7 +106,7 @@ export default function CmsTestimonialsPage() {
               <div className="min-w-0">
                 <p className="text-sm">&ldquo;{r.content}&rdquo;</p>
                 <p className="text-xs text-muted-foreground">
-                  — {r.author}{r.role ? `, ${r.role}` : ''} {'★'.repeat(r.rating || 0)}
+                    {r.author}{r.role ? `, ${r.role}` : ''} {'★'.repeat(r.rating || 0)}
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">

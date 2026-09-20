@@ -64,7 +64,7 @@ const BranchSidebar = ({
 }: BranchSidebarProps) => {
   const { branchCode } = useParams();
   const { hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, hasCourierAccess, isSuperAdmin, hasAnyRole } = usePermissions();
-  const { supplierOrdersEnabled } = useOrgFeatures();
+  const { supplierOrdersEnabled, warrantyEnabled } = useOrgFeatures();
   const { industryType } = useBusinessContext();
 
   const allMenuItems: MenuItemConfig[] = [
@@ -128,8 +128,10 @@ const BranchSidebar = ({
       if (item.id === 'suppliers' && supplierOrdersEnabled === false) return false;
       if (item.id === 'jobsheets' && !industryAllowsFeature(industryType, 'jobsheets')) return false;
       if (item.id === 'parts' && !industryAllowsFeature(industryType, 'parts')) return false;
-      if (item.id === 'warranty' && !industryAllowsFeature(industryType, 'warranty')) return false;
-      // New verticals — only for their own industry (GENERAL sees all)
+      // Organization setting, not industry. Defaults to hidden, so `!== true`
+      // rather than `=== false`   an undefined flag must hide the menu.
+      if (item.id === 'warranty' && warrantyEnabled !== true) return false;
+      // New verticals   only for their own industry (GENERAL sees all)
       if (item.id === 'rental' && !industryAllowsFeature(industryType, 'rental')) return false;
       if (item.id === 'carwash' && !industryAllowsFeature(industryType, 'carwash')) return false;
       if (item.id === 'garage' && !industryAllowsFeature(industryType, 'garage')) return false;
@@ -138,11 +140,14 @@ const BranchSidebar = ({
       if (item.id === 'towing' && !industryAllowsFeature(industryType, 'towing')) return false;
       // Retail-only menus hidden for rental / car wash / garage orgs
       const branchRetailOnlyIds = [
-        'pos', 'quick-pos', 'advance-payments', 'sales', 'orders', 'courier', 'products',
-        'stock-dashboard', 'product-usage', 'returns', 'barcodes', 'addon-requests',
-        'sale-jobs', 'installments', 'woocommerce-orders', 'suppliers',
+        'pos', 'quick-pos', 'advance-payments', 'sales', 'orders', 'courier',
+        'returns', 'addon-requests',
+        'sale-jobs', 'installments', 'woocommerce-orders',
       ];
       if (branchRetailOnlyIds.includes(item.id) && !industryAllowsFeature(industryType, 'retail')) return false;
+      // Stock screens: retail shops AND garages (spare parts issued to job sheets)
+      const branchInventoryIds = ['products', 'stock-dashboard', 'product-usage', 'barcodes', 'suppliers'];
+      if (branchInventoryIds.includes(item.id) && !industryAllowsFeature(industryType, 'inventory')) return false;
       // Courier + WooCommerce are tied: no courier access → hide both
       if (
         (item.id === 'courier' || item.id === 'woocommerce-orders') &&
@@ -153,7 +158,7 @@ const BranchSidebar = ({
       const permConfig = BRANCH_SIDEBAR_PERMISSIONS.find(p => p.id === item.id);
       return checkPermissionConfig(permConfig);
     });
-  }, [allMenuItems, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, hasCourierAccess, isSuperAdmin, hasAnyRole, industryType, supplierOrdersEnabled]);
+  }, [allMenuItems, hasPermission, hasAnyPermission, hasAllPermissions, canAccessModule, hasCourierAccess, isSuperAdmin, hasAnyRole, industryType, supplierOrdersEnabled, warrantyEnabled]);
 
   const showExpanded = isMobileOpen || !isCollapsed;
 

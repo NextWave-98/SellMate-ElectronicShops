@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
-import { RefreshCw, UserPlus, Search, Loader2, Eye, Edit, Trash2, MessageSquare } from 'lucide-react';
+import { RefreshCw, UserPlus, Search, Loader2, Eye, Edit, Trash2, MessageSquare, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import CustomerStatsCards from '../../components/superadmin/customers/CustomerSt
 import CustomerTable from '../../components/superadmin/customers/CustomerTable';
 import AddCustomerModal from '../../components/superadmin/customers/AddCustomerModal';
 import EditCustomerModal from '../../components/superadmin/customers/EditCustomerModal';
+import BulkUploadModal from '../../components/superadmin/customers/BulkUploadModal';
 import BulkSMSSameModal from '../../components/superadmin/customers/BulkSMSSameModal';
 import BulkSMSDifferentModal from '../../components/superadmin/customers/BulkSMSDifferentModal';
 import ConfirmModal from '../../components/common/ConfirmModal';
@@ -57,6 +58,7 @@ export default function BranchCustomersPage() {
   const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([]);
   const [isBulkSMSSameModalOpen, setIsBulkSMSSameModalOpen] = useState(false);
   const [isBulkSMSDifferentModalOpen, setIsBulkSMSDifferentModalOpen] = useState(false);
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
 
   const mapApiCustomersToLocal = (apiCustomers: ApiCustomer[]): Customer[] => {
     return apiCustomers.map((customer) => ({
@@ -313,13 +315,13 @@ export default function BranchCustomersPage() {
     const result = await updateCustomer(customerId, data);
     
     if (result?.success === false) {
-      setIsEditModalOpen(true);
-    } else {
-      setIsEditModalOpen(false);
-      setSelectedCustomer(null);
-      await loadCustomers();
-      await loadStats();
+      throw new Error(result?.message || 'Failed to update customer');
     }
+
+    setIsEditModalOpen(false);
+    setSelectedCustomer(null);
+    await loadCustomers();
+    await loadStats();
   };
 
   const handleBulkSMSSame = () => {
@@ -369,6 +371,14 @@ export default function BranchCustomersPage() {
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsBulkUploadModalOpen(true)}
+            className="border-orange-300 text-orange-700 hover:bg-orange-50"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Bulk Upload
           </Button>
           <Button
             onClick={handleAddCustomer}
@@ -487,6 +497,14 @@ export default function BranchCustomersPage() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleAddCustomerSubmit}
+      />
+
+      <BulkUploadModal
+        isOpen={isBulkUploadModalOpen}
+        onClose={() => setIsBulkUploadModalOpen(false)}
+        onSuccess={() => {
+          void handleRefresh();
+        }}
       />
 
       <EditCustomerModal

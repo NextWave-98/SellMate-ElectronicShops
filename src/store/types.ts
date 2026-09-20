@@ -108,6 +108,31 @@ export interface User {
 }
 
 // Auth state
+/**
+ * Why a login was refused for non-payment.
+ *
+ * A 403 that says only "access denied" leaves the customer with nothing to do
+ * but phone. This carries what is owed, when it was due, and the bank account
+ * to pay it into, so the login screen can tell them how to fix it themselves.
+ */
+export interface BillingBlock {
+  code: 'BILLING_BLOCKED';
+  amount: number | null;
+  dueDate: string | null;
+  invoiceNumber: string | null;
+  blockedFrom: string | null;
+  payTo?: {
+    accountName?: string;
+    accountNumber?: string;
+    bank?: string;
+    branch?: string;
+    phone?: string;
+    whatsapp?: string;
+    email?: string;
+    note?: string;
+  };
+}
+
 export interface AuthState {
   isAuthenticated: boolean;
   user: User | null;
@@ -119,6 +144,11 @@ export interface AuthState {
   // Post-login branch selection
   requiresBranchSelection: boolean;
   assignedBranches: AssignedBranch[];
+  /**
+   * Set only when a login was refused because the subscription is unpaid.
+   * Null the rest of the time, so nothing else changes shape.
+   */
+  billingBlock: BillingBlock | null;
 }
 
 // Permission check result
@@ -286,6 +316,14 @@ export const PERMISSIONS = {
   COURIER_READ: 'courier.read',
   COURIER_UPDATE: 'courier.update',
   COURIER_DELETE: 'courier.delete',
+
+  // Accounting   the names the accounting API actually checks. The menu used
+  // to be gated on reports.* while every endpoint required accounting.*, so a
+  // user could see the whole module and be refused by all of it.
+  ACCOUNTING_CREATE: 'accounting.create',
+  ACCOUNTING_READ: 'accounting.read',
+  ACCOUNTING_UPDATE: 'accounting.update',
+  ACCOUNTING_DELETE: 'accounting.delete',
 
   // Reports
   REPORTS_VIEW: 'reports.view',

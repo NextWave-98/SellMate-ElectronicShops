@@ -67,7 +67,7 @@ export interface DriverLicenseRecord {
   customer?: { id: string; name: string; phone?: string };
 }
 
-/** A duration tier on a rate plan — maxDays null means "and above". */
+/** A duration tier on a rate plan   maxDays null means "and above". */
 export interface RateDurationTier {
   minDays: number;
   maxDays: number | null;
@@ -264,6 +264,53 @@ export const useRental = () => {
     [fetchData]
   );
 
+  // Payments (rent / deposit / refunds, each with a method)
+  const getBookingPayments = useCallback(
+    async (bookingId: string) =>
+      fetchData({ endpoint: `/rental/bookings/${bookingId}/payments`, method: 'GET', silent: true }),
+    [fetchData]
+  );
+
+  const addBookingPayment = useCallback(
+    async (bookingId: string, data: { paymentType: string; paymentMethod: string; amount: number; referenceNumber?: string | null; notes?: string | null }) =>
+      fetchData({ endpoint: `/rental/bookings/${bookingId}/payments`, method: 'POST', data, successMessage: 'Payment recorded' }),
+    [fetchData]
+  );
+
+  const voidBookingPayment = useCallback(
+    async (bookingId: string, paymentId: string, reason?: string) =>
+      fetchData({ endpoint: `/rental/bookings/${bookingId}/payments/${paymentId}/void`, method: 'POST', data: { reason: reason || null }, successMessage: 'Payment voided' }),
+    [fetchData]
+  );
+
+  // Equipment: lines on a booking + quantity stock
+  const setBookingItems = useCallback(
+    async (bookingId: string, items: Array<{ rentalItemId?: string | null; assetId?: string | null; quantity?: number; unitRate?: number | null }>) =>
+      fetchData({ endpoint: `/rental/bookings/${bookingId}/items`, method: 'PUT', data: { items }, successMessage: 'Equipment updated' }),
+    [fetchData]
+  );
+
+  const getRentalItems = useCallback(
+    async (filters?: Record<string, any>) =>
+      fetchData({ endpoint: `/rental/items${toParams(filters)}`, method: 'GET', silent: true }),
+    [fetchData]
+  );
+
+  const createRentalItem = useCallback(
+    async (data: any) => fetchData({ endpoint: '/rental/items', method: 'POST', data, successMessage: 'Item created' }),
+    [fetchData]
+  );
+
+  const updateRentalItem = useCallback(
+    async (id: string, data: any) => fetchData({ endpoint: `/rental/items/${id}`, method: 'PUT', data, successMessage: 'Item updated' }),
+    [fetchData]
+  );
+
+  const deleteRentalItem = useCallback(
+    async (id: string) => fetchData({ endpoint: `/rental/items/${id}`, method: 'DELETE', successMessage: 'Item deactivated' }),
+    [fetchData]
+  );
+
   // Pricing engine
   const getPricingRules = useCallback(
     async () => fetchData({ endpoint: '/rental/pricing-rules', method: 'GET', silent: true }),
@@ -384,6 +431,8 @@ export const useRental = () => {
       getExtraFees, createExtraFee, updateExtraFee,
       getCoupons, createCoupon, updateCoupon,
       getBookingQuote, sendAgreement,
+      getBookingPayments, addBookingPayment, voidBookingPayment,
+      setBookingItems, getRentalItems, createRentalItem, updateRentalItem, deleteRentalItem,
     }),
     [
       getStats,
@@ -400,6 +449,8 @@ export const useRental = () => {
       getExtraFees, createExtraFee, updateExtraFee,
       getCoupons, createCoupon, updateCoupon,
       getBookingQuote, sendAgreement,
+      getBookingPayments, addBookingPayment, voidBookingPayment,
+      setBookingItems, getRentalItems, createRentalItem, updateRentalItem, deleteRentalItem,
     ]
   );
 };

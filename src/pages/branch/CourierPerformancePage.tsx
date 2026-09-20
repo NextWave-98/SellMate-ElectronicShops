@@ -169,7 +169,7 @@ const CourierPerformancePage = () => {
                 type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
                 className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <span className="text-gray-400 text-sm">—</span>
+              <span className="text-gray-400 text-sm"> </span>
               <input
                 type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
                 className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -363,13 +363,13 @@ const CourierPerformancePage = () => {
                       {stats.recentShipments.map((s, i) => (
                         <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                           <td className="px-4 py-3 font-medium text-blue-600">{s.shipment_number}</td>
-                          <td className="px-4 py-3 text-gray-700">{s.recipient_name || '—'}</td>
-                          <td className="px-4 py-3 text-gray-500 font-mono text-xs">{s.tracking_number || '—'}</td>
+                          <td className="px-4 py-3 text-gray-700">{s.recipient_name || ' '}</td>
+                          <td className="px-4 py-3 text-gray-500 font-mono text-xs">{s.tracking_number || ' '}</td>
                           <td className="px-4 py-3 text-right text-gray-700">
-                            {s.declared_value ? formatCurrency(Number(s.declared_value)) : '—'}
+                            {s.declared_value ? formatCurrency(Number(s.declared_value)) : ' '}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-400 text-xs">
-                            {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—'}
+                            {s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ' '}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <StatusBadge status={s.status} />

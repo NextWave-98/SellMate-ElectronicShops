@@ -13,6 +13,9 @@ import {
   useProductUsage,
   type CreateProductUsagePayload,
   type UsageType,
+  type LossBucket,
+  defaultLossBucket,
+  ALREADY_COUNTED_TYPES,
 } from '../../../hooks/useProductUsage';
 import { useInventory } from '../../../hooks/useInventory';
 import useBarcode, { type ScannedProduct } from '../../../hooks/useBarcode';
@@ -68,15 +71,57 @@ interface LogProductUsageModalProps {
   onSuccess?: () => void;
 }
 
-const USAGE_TYPE_OPTIONS: { value: UsageType; label: string; description: string }[] = [
-  { value: 'INTERNAL', label: 'Internal Use', description: 'Office supplies, packaging, operations' },
-  { value: 'MANUAL',   label: 'Manual Usage', description: 'General manual deduction' },
-  { value: 'JOB_SHEET',label: 'Job Sheet',    description: 'Used during a repair job' },
-  { value: 'REPAIR',   label: 'Repair',       description: 'Used in repair/service' },
-  { value: 'DEMO',     label: 'Demo / Display', description: 'Used for demonstration or showroom display' },
-  { value: 'DAMAGED',  label: 'Damaged / Write-off', description: 'Product damaged or written off' },
-  { value: 'OTHER',    label: 'Other',        description: 'Any other reason' },
+/**
+ * Grouped by what the entry does to the books, because that is the decision the
+ * person logging it is actually making:
+ *
+ *   LOSS      the goods are gone and nothing was earned -> cost of goods sold,
+ *             so gross profit drops.
+ *   INTERNAL  the business used its own stock -> operating expense, only net
+ *             profit drops.
+ *   COSTED    already priced into a job sheet or a sale. Logged for traceability
+ *             but never counted again, or the same cost is charged twice.
+ *   NEUTRAL   only the person logging it knows   they choose below.
+ */
+type UsageGroup = 'LOSS' | 'INTERNAL' | 'COSTED' | 'NEUTRAL';
+
+const USAGE_TYPE_OPTIONS: {
+  value: UsageType;
+  label: string;
+  description: string;
+  group: UsageGroup;
+}[] = [
+  { value: 'DAMAGED',   label: 'Damaged',            description: 'Broken, dented or unsellable', group: 'LOSS' },
+  { value: 'EXPIRED',   label: 'Expired',            description: 'Past its usable or sell-by date', group: 'LOSS' },
+  { value: 'LOST',      label: 'Lost',               description: 'Missing at stock count, unaccounted for', group: 'LOSS' },
+  { value: 'THEFT',     label: 'Theft',              description: 'Shoplifting or internal theft', group: 'LOSS' },
+  { value: 'WRITE_OFF', label: 'Write-off',          description: 'Deliberately written off the books', group: 'LOSS' },
+  { value: 'INTERNAL',  label: 'Internal Use',       description: 'Office supplies, packaging, operations', group: 'INTERNAL' },
+  { value: 'DEMO',      label: 'Demo / Display',     description: 'Showroom or demonstration unit', group: 'INTERNAL' },
+  { value: 'SAMPLE',    label: 'Sample / Giveaway',  description: 'Given to a customer free of charge', group: 'INTERNAL' },
+  { value: 'JOB_SHEET', label: 'Job Sheet',          description: 'Used during a repair job', group: 'COSTED' },
+  { value: 'REPAIR',    label: 'Repair',             description: 'Used in repair/service', group: 'COSTED' },
+  { value: 'MANUAL',    label: 'Manual Usage',       description: 'General manual deduction', group: 'NEUTRAL' },
+  { value: 'OTHER',     label: 'Other',              description: 'Any other reason', group: 'NEUTRAL' },
 ];
+
+const GROUP_LABELS: Record<UsageGroup, string> = {
+  LOSS: 'Stock loss   reduces gross profit',
+  INTERNAL: 'Internal use   operating expense',
+  COSTED: 'Already costed elsewhere',
+  NEUTRAL: 'Other',
+};
+
+const money = (v: number) =>
+  new Intl.NumberFormat('en-LK', {
+    style: 'currency',
+    currency: 'LKR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(v) ? v : 0);
+
+/** Today as yyyy-mm-dd for the date input's max attribute. */
+const todayISO = () => new Date().toISOString().split('T')[0];
 
 export default function LogProductUsageModal({
   isOpen,
@@ -103,13 +148,17 @@ export default function LogProductUsageModal({
   const [reason, setReason] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [notes, setNotes] = useState('');
+  // Stock-loss accounting
+  const [occurredOn, setOccurredOn] = useState(todayISO());
+  const [recoveredAmount, setRecoveredAmount] = useState(0);
+  const [manualBucket, setManualBucket] = useState<LossBucket | ''>('');
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [error, setError] = useState('');
   const searchRequestId = useRef(0);
   const getAllInventoryRef = useRef(getAllInventory);
   getAllInventoryRef.current = getAllInventory;
 
-  // Debounced backend search — only depends on productSearch/isOpen to avoid API loops
+  // Debounced backend search   only depends on productSearch/isOpen to avoid API loops
   useEffect(() => {
     if (!isOpen) return;
 
@@ -167,6 +216,9 @@ export default function LogProductUsageModal({
     setReason('');
     setReferenceNumber('');
     setNotes('');
+    setOccurredOn(todayISO());
+    setRecoveredAmount(0);
+    setManualBucket('');
     setError('');
     setShowScanner(false);
     setShowBarcodeSelect(false);
@@ -200,7 +252,7 @@ export default function LogProductUsageModal({
     setProductSearch(label ?? productSearch);
     setSearchResults(available);
     setProductDropdownOpen(true);
-    toast.success(`${available.length} locations found — select one`);
+    toast.success(`${available.length} locations found   select one`);
   };
 
   const loadInventoryForProduct = async (productId: string, label?: string) => {
@@ -283,6 +335,11 @@ export default function LogProductUsageModal({
       return;
     }
 
+    if (recoveredAmount > grossCost) {
+      setError('Recovered amount cannot be more than the cost of the goods');
+      return;
+    }
+
     const payload: CreateProductUsagePayload = {
       productId: selectedInventory.productId,
       locationId,
@@ -291,11 +348,26 @@ export default function LogProductUsageModal({
       reason: reason.trim(),
       referenceNumber: referenceNumber.trim() || undefined,
       notes: notes.trim() || undefined,
+      // Back-date so a write-off entered late still lands in the month it happened.
+      occurredAt: new Date(`${occurredOn}T12:00:00`).toISOString(),
+      recoveredAmount: recoveredAmount > 0 ? recoveredAmount : undefined,
+      // Only MANUAL / OTHER need an explicit bucket; everything else is implied
+      // by the usage type and the backend decides.
+      ...(isNeutralType
+        ? { isLoss: manualBucket !== '', lossBucket: manualBucket || null }
+        : {}),
     };
 
     const result = await logUsage(payload);
     if (result) {
-      toast.success(`Usage logged — ${quantity} × ${selectedInventory.product?.name}`);
+      // A write-off priced at zero saves fine and then changes nothing in any
+      // report. Saying "logged" alone would be technically true and completely
+      // misleading, so the warning takes over the toast.
+      if ((result as any).warning) {
+        toast((result as any).warning, { icon: '\u26A0\uFE0F', duration: 9000 });
+      } else {
+        toast.success(`Usage logged   ${quantity} × ${selectedInventory.product?.name}`);
+      }
       onSuccess?.();
       handleClose();
     }
@@ -303,6 +375,20 @@ export default function LogProductUsageModal({
 
   // Available qty at selected location
   const availableQty = selectedInventory?.availableQuantity ?? null;
+
+  // ---- Live profit impact --------------------------------------------------
+  // The whole point of the feature: show the rupee figure before saving, so the
+  // person logging it understands they are writing money off, not just stock.
+  const unitCost = Number(selectedInventory?.product?.costPrice ?? 0);
+  const grossCost = unitCost * (Number(quantity) || 0);
+  const netLoss = Math.max(0, grossCost - (Number(recoveredAmount) || 0));
+  const isNeutralType = usageType === 'MANUAL' || usageType === 'OTHER';
+  const isAlreadyCosted = ALREADY_COUNTED_TYPES.includes(usageType);
+  const effectiveBucket: LossBucket | null = isAlreadyCosted
+    ? null
+    : isNeutralType
+      ? (manualBucket || null)
+      : defaultLossBucket(usageType);
 
   if (!isOpen) return null;
 
@@ -396,7 +482,7 @@ export default function LogProductUsageModal({
             {selectedInventory && (
               <div className="mt-1 flex items-center gap-2 text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
                 <MapPin className="h-3 w-3" />
-                {selectedInventory.location?.name} — {availableQty} units available
+                {selectedInventory.location?.name}   {availableQty} units available
               </div>
             )}
           </div>
@@ -427,23 +513,69 @@ export default function LogProductUsageModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Usage Type <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              {USAGE_TYPE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setUsageType(opt.value)}
-                  className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
-                    usageType === opt.value
-                      ? 'border-orange-500 bg-orange-50 text-orange-900'
-                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                  }`}
-                >
-                  <div className="font-medium">{opt.label}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{opt.description}</div>
-                </button>
-              ))}
-            </div>
+            {(['LOSS', 'INTERNAL', 'COSTED', 'NEUTRAL'] as const).map((group) => (
+              <div key={group} className="mb-3">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  {GROUP_LABELS[group]}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {USAGE_TYPE_OPTIONS.filter((o) => o.group === group).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setUsageType(opt.value)}
+                      className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                        usageType === opt.value
+                          ? 'border-orange-500 bg-orange-50 text-orange-900'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <div className="font-medium">{opt.label}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{opt.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* MANUAL / OTHER carry no inherent meaning   only the person logging
+                the entry knows whether the stock was genuinely lost. */}
+            {isNeutralType && (
+              <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="mb-2 text-sm font-medium text-gray-700">
+                  How should this affect profit?
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {([
+                    { v: '', label: 'No effect', hint: 'Stock moved, nothing written off' },
+                    { v: 'COGS', label: 'Stock loss', hint: 'Reduces gross profit' },
+                    { v: 'OPEX', label: 'Business expense', hint: 'Reduces net profit' },
+                  ] as const).map((o) => (
+                    <button
+                      key={o.v || 'none'}
+                      type="button"
+                      onClick={() => setManualBucket(o.v as LossBucket | '')}
+                      className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                        manualBucket === o.v
+                          ? 'border-orange-500 bg-orange-50 text-orange-900'
+                          : 'border-gray-200 bg-white hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <div className="font-medium">{o.label}</div>
+                      <div className="mt-0.5 text-xs text-gray-400">{o.hint}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isAlreadyCosted && (
+              <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                Job sheet and repair usage is already costed against the job, so this
+                entry is recorded for traceability but will not be counted again in
+                profit reports.
+              </p>
+            )}
           </div>
 
           {/* Quantity */}
@@ -480,6 +612,92 @@ export default function LogProductUsageModal({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
             />
           </div>
+
+          {/* When it happened + what was recovered ------------------------------
+              Back-dating matters: a write-off entered a week late must still land
+              in the month it happened, or the P&L moves the loss to the wrong
+              period. Recovery matters because scrap sales and supplier credits
+              genuinely reduce what the business lost. */}
+          {effectiveBucket !== null && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  When did this happen?
+                </label>
+                <input
+                  type="date"
+                  value={occurredOn}
+                  max={todayISO()}
+                  onChange={(e) => setOccurredOn(e.target.value || todayISO())}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Reports group on this date, not on when you entered it.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Recovered amount
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  max={grossCost || undefined}
+                  value={recoveredAmount || ''}
+                  onChange={(e) => setRecoveredAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Sold as scrap or credited by the supplier? Enter it here.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Live profit impact - the number this whole feature exists for.
+              The zero-cost case gets its own branch below. It used to sit inside
+              this `grossCost > 0` gate, which can never be true when the unit
+              cost is zero   so the one case that needed a warning was the one
+              case that showed nothing, and the entry saved as a silent LKR 0.00
+              write-off that no report could ever deduct. */}
+          {selectedInventory && effectiveBucket !== null && grossCost > 0 && (
+            <div
+              className={`rounded-lg border px-4 py-3 text-sm ${
+                effectiveBucket === 'COGS'
+                  ? 'border-red-200 bg-red-50 text-red-900'
+                  : 'border-amber-200 bg-amber-50 text-amber-900'
+              }`}
+            >
+              <p className="font-semibold">
+                This will reduce {effectiveBucket === 'COGS' ? 'gross' : 'net'} profit by{' '}
+                {money(netLoss)}
+              </p>
+              <p className="mt-1 text-xs opacity-90">
+                {quantity} x {money(unitCost)} cost = {money(grossCost)}
+                {recoveredAmount > 0 && ` - ${money(recoveredAmount)} recovered`}
+                {effectiveBucket === 'COGS'
+                  ? ' - charged to cost of goods sold.'
+                  : ' - recorded as an operating expense.'}
+              </p>
+            </div>
+          )}
+
+          {selectedInventory && effectiveBucket !== null && unitCost === 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">
+                &ldquo;{selectedInventory.product?.name}&rdquo; has no cost price
+              </p>
+              <p className="mt-1 text-xs leading-relaxed">
+                The stock will be deducted, but the write-off is worth LKR 0.00, so it
+                will not reduce profit in the Sales, Profit &amp; Loss or Inventory
+                reports. Set a cost price on the product first if you want this loss to
+                count. If the product has been received through a purchase before, the
+                system will use that cost automatically.
+              </p>
+            </div>
+          )}
 
           {/* Reference Number (optional) */}
           <div>

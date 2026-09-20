@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SellMate Quotation - New Option (Pvt) Ltd</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm 14mm 14mm 14mm;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: #1f1630;
+      font-size: 10pt;
+      line-height: 1.45;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2.5px solid #ff6a00;
+    }
+
+    .logo {
+      height: 48px;
+      width: auto;
+      display: block;
+    }
+
+    .doc-meta { text-align: right; min-width: 210px; }
+
+    .doc-meta .label {
+      font-size: 8pt;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ff6a00;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+
+    .doc-meta h1 {
+      font-size: 16pt;
+      color: #3b1f6e;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 6px;
+    }
+
+    .meta-row { font-size: 9pt; color: #4a4060; }
+    .meta-row strong { color: #1f1630; }
+
+    .parties {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 14px 0 12px;
+    }
+
+    .party {
+      background: #faf7ff;
+      border: 1px solid #ebe4f7;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .party h3 {
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #ff6a00;
+      margin-bottom: 4px;
+    }
+
+    .party p { font-size: 9pt; color: #3a3150; }
+
+    .party .name {
+      font-weight: 700;
+      color: #3b1f6e;
+      font-size: 11pt;
+      margin-bottom: 2px;
+    }
+
+    .intro {
+      margin-bottom: 12px;
+      color: #3a3150;
+      font-size: 9.5pt;
+    }
+
+    .intro strong { color: #3b1f6e; }
+
+    .section-title {
+      background: linear-gradient(90deg, #3b1f6e 0%, #5a2f9e 100%);
+      color: #fff;
+      font-size: 9.5pt;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 5px;
+      margin: 12px 0 8px;
+    }
+
+    .plan-box {
+      border: 2px solid #3b1f6e;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .plan-head {
+      background: #3b1f6e;
+      color: #fff;
+      padding: 8px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .plan-head .plan-name {
+      font-weight: 800;
+      font-size: 12pt;
+    }
+
+    .plan-head .plan-price {
+      font-weight: 800;
+      font-size: 14pt;
+      color: #ffd4b0;
+    }
+
+    .plan-body { padding: 12px 14px; }
+
+    .limits {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .limit {
+      background: #f7f3ff;
+      border: 1px solid #ebe4f7;
+      border-radius: 7px;
+      padding: 8px;
+      text-align: center;
+    }
+
+    .limit .num {
+      font-weight: 800;
+      color: #3b1f6e;
+      font-size: 12pt;
+    }
+
+    .limit .lbl {
+      font-size: 7.5pt;
+      color: #6a6080;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .features {
+      columns: 2;
+      column-gap: 18px;
+    }
+
+    .features li {
+      list-style: none;
+      position: relative;
+      padding-left: 12px;
+      font-size: 9pt;
+      color: #2d2540;
+      margin: 3px 0;
+      break-inside: avoid;
+    }
+
+    .features li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #ff6a00;
+    }
+
+    table.price {
+      width: 100%;
+      border-collapse: collapse;
+      border: 2px solid #3b1f6e;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    table.price th,
+    table.price td {
+      padding: 9px 12px;
+      text-align: left;
+      border-bottom: 1px solid #ebe4f7;
+      font-size: 9.5pt;
+    }
+
+    table.price th {
+      background: #3b1f6e;
+      color: #fff;
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    table.price td.amt,
+    table.price th.amt {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    table.price tr.note td {
+      background: #fcfaff;
+      font-size: 8.5pt;
+      color: #5a5070;
+      border-bottom: none;
+    }
+
+    table.price tr.total td {
+      background: #fff7f0;
+      font-weight: 800;
+      font-size: 11pt;
+      color: #3b1f6e;
+      border-bottom: none;
+    }
+
+    table.price tr.total td.amt {
+      color: #ff6a00;
+      font-size: 13pt;
+    }
+
+    .addon-note {
+      margin-top: 10px;
+      background: #fff4eb;
+      border: 1px solid #ffd2ad;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 9pt;
+      color: #7a3a00;
+    }
+
+    .addon-note strong { color: #b34a00; }
+
+    .terms { margin-top: 14px; }
+
+    .terms h4 {
+      font-size: 10pt;
+      color: #3b1f6e;
+      margin-bottom: 5px;
+    }
+
+    .terms ol {
+      padding-left: 18px;
+      color: #3a3150;
+      font-size: 9pt;
+    }
+
+    .terms li { margin: 3px 0; }
+
+    .signoff {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-top: 28px;
+    }
+
+    .sign-box {
+      border-top: 1.5px solid #cfc4e4;
+      padding-top: 6px;
+    }
+
+    .sign-box .role {
+      font-size: 7.5pt;
+      color: #7a6f90;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .sign-box .who {
+      font-weight: 700;
+      color: #3b1f6e;
+      margin-top: 26px;
+      font-size: 10pt;
+    }
+
+    .footer {
+      margin-top: 20px;
+      padding-top: 8px;
+      border-top: 1px solid #ebe4f7;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8pt;
+      color: #7a6f90;
+    }
+
+    .footer .brand {
+      font-weight: 700;
+      color: #3b1f6e;
+    }
+
+    .validity {
+      display: inline-block;
+      margin-top: 10px;
+      background: #fff4eb;
+      color: #b34a00;
+      border: 1px solid #ffd2ad;
+      border-radius: 5px;
+      padding: 4px 9px;
+      font-size: 8pt;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <img class="logo" src="sellmate-logo.png" alt="SellMate" />
+    <div class="doc-meta">
+      <div class="label">Commercial Quotation</div>
+      <h1>Subscription Proposal</h1>
+      <div class="meta-row"><strong>Quote No:</strong> SM-QT-2026-0917</div>
+      <div class="meta-row"><strong>Date:</strong> 17 September 2026</div>
+      <div class="meta-row"><strong>Valid Until:</strong> 17 October 2026</div>
+    </div>
+  </header>
+
+  <div class="parties">
+    <div class="party">
+      <h3>From</h3>
+      <div class="name">SellMate</div>
+      <p>Sri Lanka</p>
+      <p>Tel: 078 751 4907 / 074 376 3907</p>
+      <p>Email: nextwavesoftwarehr@gmail.com</p>
+    </div>
+    <div class="party">
+      <h3>Prepared For</h3>
+      <div class="name">New Option (Pvt) Ltd</div>
+      <p>SellMate Business subscription</p>
+      <p>Monthly billing plan</p>
+    </div>
+  </div>
+
+  <p class="intro">
+    This quotation is prepared for <strong>New Option (Pvt) Ltd</strong> for the
+    <strong>SellMate Business</strong> plan at <strong>LKR 4,990.00 per month</strong>,
+    including standard plan limits and the optional add-on pack below.
+  </p>
+
+  <div class="section-title">1. Selected Plan: Business</div>
+
+  <div class="plan-box">
+    <div class="plan-head">
+      <div class="plan-name">Business</div>
+      <div class="plan-price">LKR 4,990 / mo</div>
+    </div>
+    <div class="plan-body">
+      <div class="limits">
+        <div class="limit">
+          <div class="num">5</div>
+          <div class="lbl">Branches</div>
+        </div>
+        <div class="limit">
+          <div class="num">15</div>
+          <div class="lbl">Users</div>
+        </div>
+        <div class="limit">
+          <div class="num">5,000</div>
+          <div class="lbl">Products</div>
+        </div>
+        <div class="limit">
+          <div class="num">25 GB</div>
+          <div class="lbl">Storage</div>
+        </div>
+      </div>
+      <ul class="features">
+        <li>Everything in Starter</li>
+        <li>Advanced POS &amp; Quick POS</li>
+        <li>Product &amp; inventory management</li>
+        <li>Barcode generator</li>
+        <li>Customer management</li>
+        <li>Installments &amp; advance payments</li>
+        <li>Job sheets, parts &amp; warranty</li>
+        <li>Advanced reporting &amp; AI analytics</li>
+        <li>Priority chat support</li>
+        <li>14-day free trial</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section-title">2. Investment Summary</div>
+
+  <table class="price">
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="amt">Amount (LKR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          SellMate Business plan (monthly)<br />
+          <span style="font-size:8pt;color:#6a6080;">Includes 5 branches and 15 users</span>
+        </td>
+        <td class="amt">4,990.00 / mo</td>
+      </tr>
+      <tr>
+        <td>
+          Additional pack: 1 branch + 2 users<br />
+          <span style="font-size:8pt;color:#6a6080;">Optional add-on beyond the Business plan limits</span>
+        </td>
+        <td class="amt">750.00 / mo</td>
+      </tr>
+      <tr class="total">
+        <td>Monthly Base Payable</td>
+        <td class="amt">LKR 4,990.00</td>
+      </tr>
+      <tr class="note">
+        <td colspan="2">
+          With add-on pack (1 branch + 2 users): LKR 4,990 + LKR 750 =
+          <strong>LKR 5,740.00 per month</strong>.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="addon-note">
+    <strong>Add-on pack:</strong> <strong>1 additional branch + 2 additional users = LKR 750.00 per month</strong>
+    (added to the Business plan base of LKR 4,990.00).
+  </div>
+
+  <div class="validity">Quotation validity: 30 days from issue date</div>
+
+  <div class="terms">
+    <h4>3. Commercial Terms</h4>
+    <ol>
+      <li>Base subscription is <strong>LKR 4,990.00 per month</strong> for the Business plan (5 branches, 15 users).</li>
+      <li>Optional add-on pack of <strong>1 branch + 2 users</strong> is billed at <strong>LKR 750.00 per month</strong>.</li>
+      <li>With the add-on pack, monthly total is <strong>LKR 5,740.00</strong> (LKR 4,990 + LKR 750).</li>
+      <li>Billing is monthly. A 14-day free trial is available at the start.</li>
+      <li>Hosting and SMS gateway charges (if used) may be billed separately at actual cost.</li>
+    </ol>
+  </div>
+
+  <div class="signoff">
+    <div class="sign-box">
+      <div class="role">Prepared by</div>
+      <div class="who">SellMate</div>
+      <div class="role" style="margin-top:3px;">Authorized Signature</div>
+    </div>
+    <div class="sign-box">
+      <div class="role">Accepted by</div>
+      <div class="who">New Option (Pvt) Ltd</div>
+      <div class="role" style="margin-top:3px;">Signature &amp; Date</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><span class="brand">SellMate</span></div>
+    <div>Quote SM-QT-2026-0917 | Confidential</div>
+  </div>
+</body>
+</html>

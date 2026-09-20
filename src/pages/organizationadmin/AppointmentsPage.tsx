@@ -215,7 +215,7 @@ export default function AppointmentsPage() {
                     <div className="space-y-0.5 mt-0.5">
                       {day.items.slice(0, 3).map((r: any) => (
                         <div key={r.id}
-                          title={`${new Date(r.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${r.customer?.name || r.customerName || ''} (${r.status})`}
+                          title={`${new Date(r.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}   ${r.customer?.name || r.customerName || ''} (${r.status})`}
                           className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate cursor-default ${STATUS_COLORS[r.status] || 'bg-gray-100 text-gray-700'}`}>
                           {new Date(r.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} {r.customer?.name || r.customerName || r.appointmentNo}
                         </div>
@@ -250,7 +250,7 @@ export default function AppointmentsPage() {
                     <span className="text-xs text-muted-foreground">{r.durationMinutes} min</span>
                   </td>
                   <td className="p-3">
-                    <span className="flex items-center gap-1"><User className="w-3 h-3 text-muted-foreground" />{r.customer?.name || r.customerName || '—'}</span>
+                    <span className="flex items-center gap-1"><User className="w-3 h-3 text-muted-foreground" />{r.customer?.name || r.customerName || ' '}</span>
                     {(r.customer?.phone || r.customerPhone) && <span className="block text-xs text-muted-foreground">{r.customer?.phone || r.customerPhone}</span>}
                     {r.vehicle?.registrationNo && <span className="text-xs text-muted-foreground flex items-center gap-1"><Car className="w-3 h-3" />{r.vehicle.registrationNo}</span>}
                   </td>
@@ -291,7 +291,7 @@ export default function AppointmentsPage() {
                 {(items as any[]).map((r) => (
                   <Card key={r.id}><CardContent className="p-3 flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-sm flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(r.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {r.customer?.name || r.customerName || '—'}</p>
+                      <p className="font-medium text-sm flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(r.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {r.customer?.name || r.customerName || ' '}</p>
                       {r.title && <p className="text-xs text-muted-foreground">{r.title}</p>}
                     </div>
                     <select className={`text-xs rounded px-2 py-1 border-0 ${STATUS_COLORS[r.status] || 'bg-gray-100'}`} value={r.status} onChange={(e) => changeStatus(r.id, e.target.value)}>
@@ -318,14 +318,14 @@ export default function AppointmentsPage() {
                   const c = customers.find((x) => x.id === e.target.value);
                   setForm({ ...form, customerId: e.target.value, customerName: c?.name || form.customerName, customerPhone: c?.phone || form.customerPhone });
                 }}>
-                <option value="">— Walk-in / new (type below) —</option>
+                <option value="">  Walk-in / new (type below)  </option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
               </select>
             </div>
             <div>
               <Label>Assign Staff (optional)</Label>
               <select className="block w-full h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.staffId} onChange={(e) => setForm({ ...form, staffId: e.target.value })}>
-                <option value="">— Unassigned —</option>
+                <option value="">  Unassigned  </option>
                 {staffList.map((s) => <option key={s.id} value={s.id}>{staffLabel(s)}</option>)}
               </select>
             </div>

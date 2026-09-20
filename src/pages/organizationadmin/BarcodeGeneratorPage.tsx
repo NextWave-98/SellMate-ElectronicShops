@@ -356,7 +356,7 @@ export default function BarcodeGeneratorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced search — skip initial mount (handled by the effect above)
+  // Debounced search   skip initial mount (handled by the effect above)
   useEffect(() => {
     if (!searchReadyRef.current) return;
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
@@ -621,7 +621,7 @@ export default function BarcodeGeneratorPage() {
                             )}
                           </td>
                           <td className="px-3 py-2 hidden sm:table-cell text-xs text-orange-600">
-                            {(product as any).woocommerceId || '—'}
+                            {(product as any).woocommerceId || ' '}
                           </td>
                           <td className="px-3 py-2 text-xs font-medium">
                             Rs.{product.unitPrice}

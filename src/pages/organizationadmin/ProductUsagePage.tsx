@@ -27,6 +27,10 @@ import {
   type UsageType,
   USAGE_TYPE_LABELS,
   USAGE_TYPE_COLORS,
+  COGS_LOSS_TYPES,
+  INTERNAL_USE_TYPES,
+  ALREADY_COUNTED_TYPES,
+  type LossBucket,
 } from '../../hooks/useProductUsage';
 import { useLocation } from '../../hooks/useLocation';
 
@@ -40,7 +44,7 @@ function formatDateTime(iso: string) {
 }
 
 function formatCurrency(v?: number) {
-  if (v == null) return '—';
+  if (v == null) return ' ';
   return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 }).format(v);
 }
 
@@ -53,7 +57,22 @@ const STAT_COLOR_MAP: Record<string, string> = {
   MANUAL: 'text-gray-600',
   SALE: 'text-green-600',
   OTHER: 'text-slate-600',
+  EXPIRED: 'text-orange-600',
+  LOST: 'text-rose-600',
+  THEFT: 'text-red-700',
+  SAMPLE: 'text-teal-600',
+  WRITE_OFF: 'text-red-600',
 };
+
+/** Rupee formatter with cents   loss values are small and rounding hides them. */
+function formatMoney(v?: number) {
+  return new Intl.NumberFormat('en-LK', {
+    style: 'currency',
+    currency: 'LKR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(v ?? 0));
+}
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
@@ -74,12 +93,23 @@ export default function ProductUsagePage() {
   const [filterLocation, setFilterLocation] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [lossOnly, setLossOnly] = useState(false);
+  const [filterBucket, setFilterBucket] = useState<LossBucket | ''>('');
   const [page, setPage] = useState(1);
 
   // Keep latest filter values in a ref so loadData always reads fresh values
   // without needing them as hook dependencies
-  const filtersRef = useRef({ page: 1, search: '', filterType: '' as UsageType | '', filterLocation: '', startDate: '', endDate: '' });
-  filtersRef.current = { page, search, filterType, filterLocation, startDate, endDate };
+  const filtersRef = useRef({
+    page: 1,
+    search: '',
+    filterType: '' as UsageType | '',
+    filterLocation: '',
+    startDate: '',
+    endDate: '',
+    lossOnly: false,
+    filterBucket: '' as LossBucket | '',
+  });
+  filtersRef.current = { page, search, filterType, filterLocation, startDate, endDate, lossOnly, filterBucket };
 
   async function loadData(overrides: {
     page?: number;
@@ -88,6 +118,8 @@ export default function ProductUsagePage() {
     locationId?: string;
     startDate?: string;
     endDate?: string;
+    lossOnly?: boolean;
+    lossBucket?: LossBucket | '';
   } = {}) {
     setLoading(true);
     const f = filtersRef.current;
@@ -101,6 +133,8 @@ export default function ProductUsagePage() {
           locationId: (overrides.locationId !== undefined ? overrides.locationId : f.filterLocation) || undefined,
           startDate:  (overrides.startDate  !== undefined ? overrides.startDate  : f.startDate)  || undefined,
           endDate:    (overrides.endDate    !== undefined ? overrides.endDate    : f.endDate)    || undefined,
+          isLoss:     ((overrides.lossOnly   !== undefined ? overrides.lossOnly   : f.lossOnly) ? 'true' : undefined),
+          lossBucket: (overrides.lossBucket  !== undefined ? overrides.lossBucket : f.filterBucket) || undefined,
         }),
         getStats(),
       ]);
@@ -112,7 +146,7 @@ export default function ProductUsagePage() {
     }
   }
 
-  // Mount-only initial load — avoid unstable hook deps that retrigger API calls
+  // Mount-only initial load   avoid unstable hook deps that retrigger API calls
   useEffect(() => {
     void loadData();
     void (async () => {
@@ -144,14 +178,28 @@ export default function ProductUsagePage() {
     setFilterLocation('');
     setStartDate('');
     setEndDate('');
+    setLossOnly(false);
+    setFilterBucket('');
     setPage(1);
-    void loadData({ page: 1, search: '', usageType: '', locationId: '', startDate: '', endDate: '' });
+    void loadData({ page: 1, search: '', usageType: '', locationId: '', startDate: '', endDate: '', lossOnly: false, lossBucket: '' });
   }
 
   function handleTypeChange(v: UsageType | '') {
     setFilterType(v);
     setPage(1);
     void loadData({ usageType: v, page: 1 });
+  }
+
+  function handleLossOnly(v: boolean) {
+    setLossOnly(v);
+    setPage(1);
+    void loadData({ lossOnly: v, page: 1 });
+  }
+
+  function handleBucketChange(v: LossBucket | '') {
+    setFilterBucket(v);
+    setPage(1);
+    void loadData({ lossBucket: v, page: 1 });
   }
 
   function handleLocationChange(v: string) {
@@ -183,7 +231,7 @@ export default function ProductUsagePage() {
     void loadData({ page: newPage });
   }
 
-  const hasFilters = search || filterType || filterLocation || startDate || endDate;
+  const hasFilters = search || filterType || filterLocation || startDate || endDate || lossOnly || filterBucket;
 
   return (
     <div className="p-6 space-y-6">
@@ -192,7 +240,7 @@ export default function ProductUsagePage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Product Usage</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Track manual product consumption — packaging, internal use, demos, repairs and more.
+            Track manual product consumption   packaging, internal use, demos, repairs and more.
           </p>
         </div>
         <div className="flex gap-2">
@@ -231,6 +279,72 @@ export default function ProductUsagePage() {
         </div>
       )}
 
+      {/* ── What the losses actually cost ─────────────────────────────────────
+          Entry counts are the wrong headline: ten damaged screen guards and one
+          damaged laptop are both "1 entry". These are rupee figures, net of
+          anything recovered. */}
+      {Number(stats?.loss?.allTime?.zeroCostCount ?? 0) > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-900">
+            {stats.loss.allTime.zeroCostCount} loss{' '}
+            {stats.loss.allTime.zeroCostCount === 1 ? 'entry is' : 'entries are'} worth LKR 0.00
+          </p>
+          <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+            Those products had no cost price when the usage was logged, so they reduce nothing in
+            the Sales, Profit &amp; Loss or Inventory reports no matter what the period is. Set a
+            cost price on the product, then log the usage again.
+          </p>
+        </div>
+      )}
+
+      {stats?.loss && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="shadow-sm border border-red-100 bg-red-50/40">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-red-700">Net loss this month</p>
+              <p className="text-2xl font-bold mt-1 text-red-700">
+                {formatMoney(stats.loss.thisMonth?.net)}
+              </p>
+              <p className="text-xs text-red-500/80 mt-0.5">
+                {formatMoney(stats.loss.thisMonth?.gross)} lost
+                {Number(stats.loss.thisMonth?.recovered) > 0 &&
+                  `, ${formatMoney(stats.loss.thisMonth?.recovered)} recovered`}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border border-gray-100">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-gray-500">Damaged / expired / stolen</p>
+              <p className="text-2xl font-bold mt-1 text-gray-900">
+                {formatMoney(stats.loss.thisMonthCogs?.net)}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">reduces gross profit</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border border-gray-100">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-gray-500">Internal use / demo / sample</p>
+              <p className="text-2xl font-bold mt-1 text-gray-900">
+                {formatMoney(stats.loss.thisMonthOpex?.net)}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">operating expense</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border border-gray-100">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-gray-500">All-time net loss</p>
+              <p className="text-2xl font-bold mt-1 text-gray-900">
+                {formatMoney(stats.loss.allTime?.net)}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">since records began</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Type breakdown */}
       {stats?.byType?.length > 0 && (
         <Card className="shadow-sm border border-gray-100">
@@ -249,6 +363,14 @@ export default function ProductUsagePage() {
                     {USAGE_TYPE_LABELS[t.usageType as UsageType] ?? t.usageType}
                   </span>
                   <span className="text-xs text-gray-400">{t.totalQuantity} units</span>
+                  <span className="text-xs font-medium text-gray-600">
+                    {formatMoney(Number(t.totalCost ?? 0))}
+                  </span>
+                  {Number(t.zeroCostCount ?? 0) > 0 && (
+                    <span className="text-[10px] text-amber-600 mt-0.5">
+                      {t.zeroCostCount} with no cost
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -277,9 +399,34 @@ export default function ProductUsagePage() {
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
             >
               <option value="">All Types</option>
-              {Object.entries(USAGE_TYPE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
+              <optgroup label="Stock loss (reduces gross profit)">
+                {COGS_LOSS_TYPES.map((k) => (
+                  <option key={k} value={k}>{USAGE_TYPE_LABELS[k]}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Internal use (operating expense)">
+                {INTERNAL_USE_TYPES.map((k) => (
+                  <option key={k} value={k}>{USAGE_TYPE_LABELS[k]}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Already costed elsewhere">
+                {ALREADY_COUNTED_TYPES.map((k) => (
+                  <option key={k} value={k}>{USAGE_TYPE_LABELS[k]}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Other">
+                <option value="MANUAL">{USAGE_TYPE_LABELS.MANUAL}</option>
+                <option value="OTHER">{USAGE_TYPE_LABELS.OTHER}</option>
+              </optgroup>
+            </select>
+            <select
+              value={filterBucket}
+              onChange={(e) => handleBucketChange(e.target.value as LossBucket | '')}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="">All P&amp;L buckets</option>
+              <option value="COGS">Cost of goods sold</option>
+              <option value="OPEX">Operating expense</option>
             </select>
             <select
               value={filterLocation}
@@ -306,14 +453,25 @@ export default function ProductUsagePage() {
               />
             </div>
           </div>
-          {hasFilters && (
-            <button
-              onClick={handleReset}
-              className="mt-2 text-xs text-orange-600 hover:underline flex items-center gap-1"
-            >
-              <Filter className="h-3 w-3" /> Clear filters
-            </button>
-          )}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={lossOnly}
+                onChange={(e) => handleLossOnly(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              Only entries that reduce profit
+            </label>
+            {hasFilters && (
+              <button
+                onClick={handleReset}
+                className="text-xs text-orange-600 hover:underline flex items-center gap-1"
+              >
+                <Filter className="h-3 w-3" /> Clear filters
+              </button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -350,7 +508,7 @@ export default function ProductUsagePage() {
                     <tr key={u.id} className="hover:bg-gray-50/70 transition-colors">
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900 max-w-45 truncate">
-                          {u.product?.name ?? '—'}
+                          {u.product?.name ?? ' '}
                         </div>
                         <div className="text-xs text-gray-400">{u.product?.productCode}</div>
                       </td>
@@ -381,13 +539,13 @@ export default function ProductUsagePage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 text-gray-600 text-xs">
                           <MapPin className="h-3 w-3 shrink-0" />
-                          {u.location?.name ?? '—'}
+                          {u.location?.name ?? ' '}
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 text-gray-600 text-xs">
                           <User className="h-3 w-3 shrink-0" />
-                          {u.performer ? u.performer.name : '—'}
+                          {u.performer ? u.performer.name : ' '}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -436,7 +594,7 @@ export default function ProductUsagePage() {
         </div>
       )}
 
-      {/* Modal — mount only when open to avoid extra inventory hook / API churn */}
+      {/* Modal   mount only when open to avoid extra inventory hook / API churn */}
       {showModal && (
         <LogProductUsageModal
           isOpen={showModal}

@@ -177,7 +177,7 @@ const WhatsAppAISettingsPage: React.FC = () => {
                   rows={3}
                   value={ai.orgKnowledge.productsOverview ?? ''}
                   onChange={(e) => ai.updateOrgKnowledge('productsOverview', e.target.value)}
-                  placeholder="e.g. Photo frames, crystals, refurbished phones — exact prices come from inventory"
+                  placeholder="e.g. Photo frames, crystals, refurbished phones   exact prices come from inventory"
                 />
               </div>
 

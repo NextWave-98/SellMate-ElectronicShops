@@ -259,7 +259,7 @@ export const facebookLeadsService = {
   convertLead: (orgId: string, leadId: string) =>
     apiRequest(orgId, `/leads/${leadId}/convert`, { method: 'POST' }),
 
-  /** Create an order from a lead — the backend auto-creates the courier shipment. */
+  /** Create an order from a lead   the backend auto-creates the courier shipment. */
   createOrder: (orgId: string, leadId: string, payload: CreateOrderPayload) =>
     apiRequest<{ data: { lead: FacebookLead; shipment: Record<string, unknown> } }>(
       orgId,

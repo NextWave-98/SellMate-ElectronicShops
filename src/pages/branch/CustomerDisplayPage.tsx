@@ -78,7 +78,7 @@ const CustomerDisplayPage: React.FC = () => {
     };
   }, [sessionId]);
 
-  // Scroll only the product list — keep total pinned at top
+  // Scroll only the product list   keep total pinned at top
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
@@ -176,12 +176,12 @@ const CustomerDisplayPage: React.FC = () => {
                 border: `1px solid ${isSuccess ? "rgba(52,211,153,0.25)" : "rgba(251,191,36,0.25)"}`,
               }}
             >
-              {isSuccess ? "Paid — thank you" : "Payment in progress"}
+              {isSuccess ? "Paid   thank you" : "Payment in progress"}
             </div>
           )}
         </header>
 
-        {/* TOTAL pinned at top — never pushed off-screen */}
+        {/* TOTAL pinned at top   never pushed off-screen */}
         {(hasItems || isSuccess) && (
           <div
             key={tick}

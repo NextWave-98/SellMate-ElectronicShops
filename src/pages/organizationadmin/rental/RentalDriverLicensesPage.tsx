@@ -95,16 +95,16 @@ export default function RentalDriverLicensesPage() {
             {filtered.map((l) => (
               <tr key={l.id} className="border-t">
                 <td className="p-3">
-                  <p className="font-medium">{l.customer?.name || '—'}</p>
+                  <p className="font-medium">{l.customer?.name || ' '}</p>
                   <p className="text-xs text-muted-foreground">{l.customer?.phone || ''}</p>
                 </td>
                 <td className="p-3 font-mono">{l.licenseNo}</td>
-                <td className="p-3">{l.nicNo || '—'}</td>
+                <td className="p-3">{l.nicNo || ' '}</td>
                 <td className="p-3">
-                  {l.licenseExpiry || '—'}
+                  {l.licenseExpiry || ' '}
                   {isExpired(l) && <Badge className="ml-1.5 bg-red-100 text-red-800"><AlertTriangle className="w-3 h-3 mr-1" />Expired</Badge>}
                 </td>
-                <td className="p-3">{l.yearsHeld != null ? `${l.yearsHeld}y` : '—'}</td>
+                <td className="p-3">{l.yearsHeld != null ? `${l.yearsHeld}y` : ' '}</td>
                 <td className="p-3">
                   {l.isVerified
                     ? <Badge className="bg-green-100 text-green-800"><ShieldCheck className="w-3 h-3 mr-1" />Verified</Badge>
@@ -119,7 +119,7 @@ export default function RentalDriverLicensesPage() {
             ))}
             {filtered.length === 0 && (
               <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">
-                {licenses.length === 0 ? 'No licenses on file yet — captured during bookings.' : 'No licenses match your filters'}
+                {licenses.length === 0 ? 'No licenses on file yet   captured during bookings.' : 'No licenses match your filters'}
               </td></tr>
             )}
           </tbody>
@@ -129,18 +129,18 @@ export default function RentalDriverLicensesPage() {
       {/* Detail dialog */}
       <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>License — {detail?.licenseNo}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>License   {detail?.licenseNo}</DialogTitle></DialogHeader>
           <DialogBody>
             {detail && (
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-2">
-                  <p><span className="text-muted-foreground">Customer:</span> {detail.customer?.name || '—'}</p>
-                  <p><span className="text-muted-foreground">Phone:</span> {detail.customer?.phone || '—'}</p>
-                  <p><span className="text-muted-foreground">NIC:</span> {detail.nicNo || '—'}</p>
-                  <p><span className="text-muted-foreground">DOB:</span> {detail.dateOfBirth || '—'}</p>
-                  <p><span className="text-muted-foreground">Issued:</span> {detail.licenseIssueDate || '—'}</p>
-                  <p><span className="text-muted-foreground">Expires:</span> {detail.licenseExpiry || '—'}</p>
-                  <p><span className="text-muted-foreground">Years held:</span> {detail.yearsHeld ?? '—'}</p>
+                  <p><span className="text-muted-foreground">Customer:</span> {detail.customer?.name || ' '}</p>
+                  <p><span className="text-muted-foreground">Phone:</span> {detail.customer?.phone || ' '}</p>
+                  <p><span className="text-muted-foreground">NIC:</span> {detail.nicNo || ' '}</p>
+                  <p><span className="text-muted-foreground">DOB:</span> {detail.dateOfBirth || ' '}</p>
+                  <p><span className="text-muted-foreground">Issued:</span> {detail.licenseIssueDate || ' '}</p>
+                  <p><span className="text-muted-foreground">Expires:</span> {detail.licenseExpiry || ' '}</p>
+                  <p><span className="text-muted-foreground">Years held:</span> {detail.yearsHeld ?? ' '}</p>
                 </div>
                 {detail.notes && <p className="text-xs bg-muted/40 rounded p-2">{detail.notes}</p>}
                 <div className="grid grid-cols-2 gap-2">

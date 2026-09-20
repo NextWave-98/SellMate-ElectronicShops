@@ -326,11 +326,12 @@ export default function StaffPage() {
 
   const handleAddStaffSubmit = async (data: Parameters<typeof createStaff>[0]) => {
     const response = await createStaff(data);
-   
-    if (response) {
+    if (!response) {
+      return;
+    }
     setIsAddModalOpen(false);
     await loadStaff();
-    }
+    await loadStats();
   };
 
   const handleEditStaffSubmit = async (userId: string, data: Parameters<typeof updateStaff>[1]) => {

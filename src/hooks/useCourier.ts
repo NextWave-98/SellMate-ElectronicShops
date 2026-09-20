@@ -111,7 +111,7 @@ export const STAFF_ALLOWED_COURIER_STATUSES: CourierShipmentStatus[] = [
   CourierShipmentStatus.RETURNED_TO_LOCATION,
 ];
 
-/** All shipment statuses — use for filter/view dropdowns (staff may filter any status). */
+/** All shipment statuses   use for filter/view dropdowns (staff may filter any status). */
 export const ALL_COURIER_SHIPMENT_STATUSES: CourierShipmentStatus[] =
   Object.values(CourierShipmentStatus);
 
@@ -638,6 +638,14 @@ const useCourier = () => {
     }
   }, []);
 
+  /**
+   * Edit an existing shipment.
+   *
+   * The response carries `changes` (the diff the backend actually persisted) and
+   * `warnings` (e.g. the courier API refused the update). Both are passed through
+   * so the caller can tell the user what really happened rather than assuming the
+   * whole form was saved.
+   */
   const updateCourierShipment = useCallback(async (id: string, data: Partial<CourierShipment>) => {
     try {
       setLoading(true);
@@ -1212,7 +1220,7 @@ const useCourier = () => {
           return cached.cities;
         }
       }
-    } catch { /* corrupt cache — will re-fetch below */ }
+    } catch { /* corrupt cache   will re-fetch below */ }
 
     try {
       const response: any = await fetchData({
@@ -1225,7 +1233,7 @@ const useCourier = () => {
       // Persist to localStorage for 24-hour reuse
       try {
         localStorage.setItem(cacheKey, JSON.stringify({ fetchedAt: Date.now(), cities }));
-      } catch { /* localStorage may be full — silently skip */ }
+      } catch { /* localStorage may be full   silently skip */ }
 
       return cities;
     } catch (error) {
@@ -1284,7 +1292,7 @@ const useCourier = () => {
 
   /**
    * Scan a returned parcel back in at a branch. Sets the shipment to
-   * RETURNED_TO_LOCATION (manual — not a courier webhook update). Accepts the
+   * RETURNED_TO_LOCATION (manual   not a courier webhook update). Accepts the
    * tracking / waybill / shipment number.
    */
   const scanReturnToLocation = useCallback(async (code: string, notes?: string) => {

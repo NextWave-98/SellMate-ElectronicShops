@@ -221,7 +221,7 @@ export default function EditPurchaseOrderModal({ isOpen, onClose, onSuccess, pur
     }
   };
 
-  // Server-backed searches — top 20 matches instead of 1000-row prefetches
+  // Server-backed searches   top 20 matches instead of 1000-row prefetches
   const searchSuppliers = async (search: string) => {
     const response = await supplierHook.getAllSuppliers({
       search: search || undefined,

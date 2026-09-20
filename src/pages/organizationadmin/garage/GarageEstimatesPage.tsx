@@ -13,6 +13,8 @@ import {
 import LoadingSpinner from '../../../components/common/LoadingSpinner';
 import { useGarage } from '../../../hooks/useGarage';
 import { useCustomer } from '../../../hooks';
+import useProduct from '../../../hooks/useProduct';
+import { useLocation as useLocations } from '../../../hooks/useLocation';
 import { selectCls, statusColor, type EstItem, type GarageOutletContext } from './shared';
 
 /** Repair estimates: create, send for approval, approve / reject. */
@@ -21,6 +23,13 @@ export default function GarageEstimatesPage() {
   const garage = useGarage();
   const { getEstimates, getVehicles } = garage;
   const { getCustomers } = useCustomer();
+  const productHook = useProduct();
+  const { getAllLocations } = useLocations();
+  const [products, setProducts] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  // Convert approved estimate -> job sheet
+  const [convertTarget, setConvertTarget] = useState<any>(null);
+  const [convertForm, setConvertForm] = useState({ locationId: '', expectedDate: '' });
 
   const [loading, setLoading] = useState(true);
   const [estimates, setEstimates] = useState<any[]>([]);
@@ -57,6 +66,39 @@ export default function GarageEstimatesPage() {
     ]);
     setCustomers((customersRes?.data as any)?.customers ?? (Array.isArray(customersRes?.data) ? customersRes?.data : []));
     setVehicles((vehiclesRes?.data as any)?.vehicles ?? []);
+    if (products.length === 0) {
+      const res: any = await productHook.getAllProducts({ limit: 500, isActive: true } as any);
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.products) ? res.data.products : Array.isArray(res?.products) ? res.products : [];
+      setProducts(list.filter((p: any) => !p.isService));
+    }
+  };
+
+  const openConvert = async (estimate: any) => {
+    setConvertTarget(estimate);
+    let list = locations;
+    if (list.length === 0) {
+      const res: any = await getAllLocations();
+      const raw = res?.data;
+      list = (Array.isArray(raw) ? raw : Array.isArray(raw?.locations) ? raw.locations : []).filter((l: any) => l.isActive !== false);
+      setLocations(list);
+    }
+    setConvertForm({ locationId: list.length === 1 ? list[0].id : '', expectedDate: '' });
+  };
+
+  const submitConvert = async () => {
+    if (!convertTarget || !convertForm.locationId) return;
+    setSaving(true);
+    try {
+      const res: any = await garage.convertEstimate(convertTarget.id, {
+        locationId: convertForm.locationId,
+        expectedDate: convertForm.expectedDate || null,
+      });
+      if (res?.success || res?.status || res?.data) {
+        setConvertTarget(null);
+        load();
+        refreshStats();
+      }
+    } finally { setSaving(false); }
   };
 
   const submit = async () => {
@@ -112,8 +154,8 @@ export default function GarageEstimatesPage() {
             {estimates.map((e) => (
               <tr key={e.id} className="border-t">
                 <td className="p-3 font-medium">{e.estimateNumber} {e.isInsuranceJob && <Badge variant="outline">Insurance</Badge>}</td>
-                <td className="p-3">{e.customer?.name || '—'}</td>
-                <td className="p-3">{e.vehicle ? `${e.vehicle.registrationNo}` : '—'}</td>
+                <td className="p-3">{e.customer?.name || ' '}</td>
+                <td className="p-3">{e.vehicle ? `${e.vehicle.registrationNo}` : ' '}</td>
                 <td className="p-3">Rs {Number(e.partsTotal).toLocaleString()}</td>
                 <td className="p-3">Rs {Number(e.laborTotal).toLocaleString()}</td>
                 <td className="p-3 font-semibold">Rs {Number(e.totalAmount).toLocaleString()}</td>
@@ -134,6 +176,12 @@ export default function GarageEstimatesPage() {
                       <Button size="sm" onClick={() => setEstimateStatus(e.id, 'APPROVED')}>Approve</Button>
                       <Button size="sm" variant="destructive" onClick={() => setEstimateStatus(e.id, 'REJECTED')}>Reject</Button>
                     </>
+                  )}
+                  {e.status === 'APPROVED' && (
+                    <Button size="sm" onClick={() => openConvert(e)}>Create Job Sheet</Button>
+                  )}
+                  {e.status === 'CONVERTED' && (
+                    <span className="text-xs text-muted-foreground">Job sheet created</span>
                   )}
                 </td>
               </tr>
@@ -160,7 +208,7 @@ export default function GarageEstimatesPage() {
               <select className={selectCls} value={form.customerVehicleId} onChange={(e) => setForm({ ...form, customerVehicleId: e.target.value })}>
                 <option value="">Select vehicle</option>
                 {vehicles.filter((v) => !form.customerId || v.customerId === form.customerId).map((v) => (
-                  <option key={v.id} value={v.id}>{v.registrationNo} — {v.make} {v.model}</option>
+                  <option key={v.id} value={v.id}>{v.registrationNo}   {v.make} {v.model}</option>
                 ))}
               </select>
             </div>
@@ -194,16 +242,31 @@ export default function GarageEstimatesPage() {
                     <option value="PART">Part</option><option value="LABOR">Labor</option>
                     <option value="OUTWORK">Outwork</option><option value="OTHER">Other</option>
                   </select>
-                  <Input className="col-span-4" placeholder="Description" value={item.description}
+                  {item.itemType === 'PART' && (
+                    <select className={`${selectCls} col-span-3`} value={item.productId || ''}
+                      title="Stock item   issued from inventory when the job is created"
+                      onChange={(e) => {
+                        const p = products.find((x: any) => x.id === e.target.value);
+                        const arr = [...estItems];
+                        arr[idx] = p
+                          ? { ...item, productId: p.id, description: p.name, unitPrice: Number(p.unitPrice ?? p.sellingPrice ?? item.unitPrice ?? 0) }
+                          : { ...item, productId: null };
+                        setEstItems(arr);
+                      }}>
+                      <option value="">Non-stock / free text</option>
+                      {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}{p.productCode ? ` (${p.productCode})` : ''}</option>)}
+                    </select>
+                  )}
+                  <Input className={item.itemType === 'PART' ? 'col-span-3' : 'col-span-6'} placeholder="Description" value={item.description}
                     onChange={(e) => { const arr = [...estItems]; arr[idx] = { ...item, description: e.target.value }; setEstItems(arr); }} />
                   {item.itemType === 'LABOR' ? (
-                    <Input className="col-span-2" type="number" placeholder="Hours" value={item.laborHours ?? ''}
+                    <Input className="col-span-1" type="number" placeholder="Hours" value={item.laborHours ?? ''}
                       onChange={(e) => { const arr = [...estItems]; arr[idx] = { ...item, laborHours: Number(e.target.value) }; setEstItems(arr); }} />
                   ) : (
-                    <Input className="col-span-2" type="number" placeholder="Qty" value={item.quantity}
+                    <Input className="col-span-1" type="number" placeholder="Qty" value={item.quantity}
                       onChange={(e) => { const arr = [...estItems]; arr[idx] = { ...item, quantity: Number(e.target.value) }; setEstItems(arr); }} />
                   )}
-                  <Input className="col-span-3" type="number" placeholder={item.itemType === 'LABOR' ? 'Rate/hr' : 'Unit price'} value={item.unitPrice}
+                  <Input className="col-span-2" type="number" placeholder={item.itemType === 'LABOR' ? 'Rate/hr' : 'Unit price'} value={item.unitPrice}
                     onChange={(e) => { const arr = [...estItems]; arr[idx] = { ...item, unitPrice: Number(e.target.value) }; setEstItems(arr); }} />
                   <Button size="sm" variant="ghost" className="col-span-1" onClick={() => setEstItems(estItems.filter((_, i) => i !== idx))}>
                     <Trash2 className="w-4 h-4 text-red-500" />
@@ -218,6 +281,38 @@ export default function GarageEstimatesPage() {
             <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button onClick={submit} disabled={saving || !form.customerId || !form.customerVehicleId}>
               {saving ? 'Saving...' : 'Create Estimate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approved estimate -> job sheet */}
+      <Dialog open={!!convertTarget} onOpenChange={(open) => !open && setConvertTarget(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Create Job Sheet from {convertTarget?.estimateNumber}</DialogTitle></DialogHeader>
+          {convertTarget && (
+            <div className="grid gap-3">
+              <p className="text-sm text-muted-foreground">
+                {convertTarget.vehicle?.registrationNo} · {convertTarget.customer?.name} · Total Rs {Number(convertTarget.totalAmount).toLocaleString()}
+                <br />
+                Labour lines become the job's labour charge. Parts linked to a stock item are taken out of the selected
+                branch's stock now; other lines are added as charges.
+              </p>
+              <div><Label>Branch / workshop *</Label>
+                <select className={selectCls} value={convertForm.locationId} onChange={(e) => setConvertForm({ ...convertForm, locationId: e.target.value })}>
+                  <option value="">Select branch</option>
+                  {locations.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </div>
+              <div><Label>Expected completion</Label>
+                <Input type="date" value={convertForm.expectedDate} onChange={(e) => setConvertForm({ ...convertForm, expectedDate: e.target.value })} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConvertTarget(null)}>Cancel</Button>
+            <Button onClick={submitConvert} disabled={saving || !convertForm.locationId}>
+              {saving ? 'Creating...' : 'Create Job Sheet'}
             </Button>
           </DialogFooter>
         </DialogContent>

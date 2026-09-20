@@ -614,7 +614,7 @@ export default function BarcodeGeneratorPage() {
                             )}
                           </td>
                           <td className="px-3 py-2 hidden sm:table-cell text-xs text-blue-600">
-                            {(product as any).woocommerceId || '—'}
+                            {(product as any).woocommerceId || ' '}
                           </td>
                           <td className="px-3 py-2 text-xs font-medium">
                             Rs.{product.unitPrice}

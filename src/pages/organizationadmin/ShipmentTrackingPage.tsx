@@ -52,7 +52,7 @@ import { todayColombo } from '@/utils/dateUtils';
 // import { useBusinessProfile, useProduct } from '../../hooks';
 // import useCustomer, { type Customer as CustomerType } from '../../hooks/useCustomer';
 import toast from 'react-hot-toast';
-import { printPdfBlob } from '@/utils/printPdf';
+import { printPdfBlob, ensurePdfBlob } from '@/utils/printPdf';
 import { CourierShipmentModal, TrackingModal, LabelDownloadModal, BulkLabelModal, StatusUpdateModal, ScanBulkStatusModal } from '../../components/courier/modals';
 import PendingApprovalShipments from '../../components/courier/PendingApprovalShipments';
 import { formatCurrency } from '@/utils/currency';
@@ -75,7 +75,7 @@ type DatePeriod = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 const getColomboDateString = () => todayColombo();
 
 const formatColomboDateTime = (value?: string | Date | null) => {
-  if (!value) return '—';
+  if (!value) return ' ';
   return new Date(value).toLocaleString('en-LK', {
     timeZone: 'Asia/Colombo',
     year: 'numeric',
@@ -86,7 +86,7 @@ const formatColomboDateTime = (value?: string | Date | null) => {
   });
 };
 
-/** Stable identity — must not be recreated each render. */
+/** Stable identity   must not be recreated each render. */
 const ORG_SHIPMENT_SCOPE = { scope: 'org' as const };
 
 const ShipmentTrackingPage = () => {
@@ -410,20 +410,25 @@ const ShipmentTrackingPage = () => {
         endpoint: `/courier/shipments/${labelIdentifier}/label/print?size=${size}&format=${format}`,
         method: 'GET',
         responseType: 'blob',
-        silent: true
+        silent: true,
+        showToastOnError: false,
       });
 
-      if (response) {
-        const blob = new Blob([response as any], { type: 'application/pdf' });
+      if (response instanceof Blob) {
+        const blob = await ensurePdfBlob(response);
         try {
           printPdfBlob(blob, format === 'fragile' ? { pageSize: 'A5-landscape' } : undefined);
-        } catch {
-          toast.error('Please allow popups to print labels');
+        } catch (err) {
+          toast.error(err instanceof Error && err.message.includes('popup')
+            ? 'Please allow popups to print labels'
+            : (err instanceof Error ? err.message : 'Failed to print label'));
         }
+      } else {
+        toast.error((response as { message?: string })?.message || 'Failed to print label');
       }
     } catch (error) {
       console.error('Error printing label:', error);
-      toast.error('Failed to print label');
+      toast.error(error instanceof Error ? error.message : 'Failed to print label');
     }
   };
 
@@ -591,23 +596,27 @@ const ShipmentTrackingPage = () => {
         endpoint: `/courier/shipments/bulk-labels/download`,
         method: 'POST',
         data: { shipmentIds: Array.from(selectedIds), size, format },
-        responseType: 'blob'
+        responseType: 'blob',
+        silent: true,
+        showToastOnError: false,
       });
-      if (response) {
-        const blob = response as unknown as Blob;
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bulk-labels-${selectedIds.size}-${format}-${size}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        toast.success(`Downloaded ${selectedIds.size} labels`);
-        setShowBulkLabelModal(false);
+      if (!(response instanceof Blob)) {
+        toast.error((response as { message?: string })?.message || 'Failed to download bulk labels');
+        return;
       }
-    } catch {
-      toast.error('Failed to download bulk labels');
+      const blob = await ensurePdfBlob(response);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bulk-labels-${selectedIds.size}-${format}-${size}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${selectedIds.size} labels`);
+      setShowBulkLabelModal(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to download bulk labels');
     } finally {
       setBulkLoading(false);
     }
@@ -624,19 +633,25 @@ const ShipmentTrackingPage = () => {
         endpoint: `/courier/shipments/bulk-labels/print`,
         method: 'POST',
         data: { shipmentIds: Array.from(selectedIds), size, format },
-        responseType: 'blob'
+        responseType: 'blob',
+        silent: true,
+        showToastOnError: false,
       });
-      if (response) {
-        const blob = response as unknown as Blob;
-        try {
-          printPdfBlob(blob, format === 'fragile' ? { pageSize: 'A5-landscape' } : undefined);
-          setShowBulkLabelModal(false);
-        } catch {
-          toast.error('Please allow popups to print labels');
-        }
+      if (!(response instanceof Blob)) {
+        toast.error((response as { message?: string })?.message || 'Failed to print bulk labels');
+        return;
       }
-    } catch {
-      toast.error('Failed to print bulk labels');
+      const blob = await ensurePdfBlob(response);
+      try {
+        printPdfBlob(blob, format === 'fragile' ? { pageSize: 'A5-landscape' } : undefined);
+        setShowBulkLabelModal(false);
+      } catch (err) {
+        toast.error(err instanceof Error && err.message.includes('popup')
+          ? 'Please allow popups to print labels'
+          : (err instanceof Error ? err.message : 'Failed to print bulk labels'));
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to print bulk labels');
     } finally {
       setBulkLoading(false);
     }
@@ -1168,7 +1183,7 @@ const ShipmentTrackingPage = () => {
             </button>
             <p className="text-xs text-gray-500">Click here to get actual result</p>
             {hasUnappliedSearch && (
-              <p className="text-xs text-orange-600 font-medium">Filters changed — click Search to apply</p>
+              <p className="text-xs text-orange-600 font-medium">Filters changed   click Search to apply</p>
             )}
           </div>
 
@@ -2092,7 +2107,7 @@ const CsvImportModal = ({
                 )}
                 {result.errors.length > 0 && (
                   <p className="text-sm text-red-700 mt-0.5">
-                    {result.errors.length} row{result.errors.length !== 1 ? 's' : ''} failed — see details below
+                    {result.errors.length} row{result.errors.length !== 1 ? 's' : ''} failed   see details below
                   </p>
                 )}
               </div>
@@ -2237,7 +2252,7 @@ const ShipmentsTable = ({
                         <span className="font-medium">{shipment.branchName}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-gray-400"> </span>
                     )}
                     {shipment.staffName && (
                       <div className="flex items-center gap-1.5 text-gray-600">
@@ -2252,7 +2267,7 @@ const ShipmentsTable = ({
                     const tracking = shipment.trackingNumber?.trim();
                     const awb = shipment.awb_number?.trim();
                     if (!tracking && !awb) {
-                      return <span className="text-xs text-gray-400">—</span>;
+                      return <span className="text-xs text-gray-400"> </span>;
                     }
                     const showBoth = !!(tracking && awb && tracking !== awb);
                     return (

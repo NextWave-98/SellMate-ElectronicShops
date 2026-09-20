@@ -622,7 +622,7 @@ const CourierSettingsModal = ({
               </button>
             </label>
 
-            {/* Phone number input — shown when showPhoneBelowShipment is enabled */}
+            {/* Phone number input   shown when showPhoneBelowShipment is enabled */}
             {showPhoneBelowShipment && (
               <div className="mt-1">
                 <label className="block text-xs font-medium text-gray-600 mb-1">

@@ -1,4 +1,4 @@
-// Sale Job (POS work order) types — mirrors backend SaleJob model.
+// Sale Job (POS work order) types   mirrors backend SaleJob model.
 
 export type JobStatus =
   | 'PENDING'

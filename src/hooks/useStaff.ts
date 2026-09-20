@@ -313,7 +313,13 @@ export const useStaff = () => {
         data: payload,
         successMessage: 'Staff member created successfully',
       });
-      return response?.data;
+      if (!response || response.success === false) {
+        return null;
+      }
+      if (response.success === true || response.data) {
+        return response.data ?? true;
+      }
+      return null;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to create staff member';
       setError(errorMsg);

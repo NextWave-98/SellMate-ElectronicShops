@@ -80,7 +80,7 @@ export default function CarWashLayout() {
           <div className="mt-3 text-sm">
             <p className="font-semibold">{plateResult.plate}</p>
             <p>Active memberships: {plateResult.activeMemberships?.length ?? 0}
-              {plateResult.activeMemberships?.map((m: any) => ` — ${m.plan?.name} (${m.remainingWashes ?? '∞'} left, ${m.customer?.name})`)}
+              {plateResult.activeMemberships?.map((m: any) => `   ${m.plan?.name} (${m.remainingWashes ?? '∞'} left, ${m.customer?.name})`)}
             </p>
             <p>Recent visits: {plateResult.recentJobs?.length ?? 0}</p>
           </div>

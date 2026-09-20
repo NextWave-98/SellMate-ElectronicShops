@@ -116,9 +116,9 @@ export default function RentalMaintenancePage() {
           <tbody>
             {maintenances.map((m) => (
               <tr key={m.id} className="border-t">
-                <td className="p-3">{m.vehicle ? `${m.vehicle.registrationNo}` : '—'}</td>
+                <td className="p-3">{m.vehicle ? `${m.vehicle.registrationNo}` : ' '}</td>
                 <td className="p-3">{m.title}</td>
-                <td className="p-3">{m.scheduledDate || '—'}</td>
+                <td className="p-3">{m.scheduledDate || ' '}</td>
                 <td className="p-3">Rs {Number(m.cost).toLocaleString()}</td>
                 <td className="p-3"><Badge className={statusColor[m.status] || ''}>{m.status}</Badge></td>
                 <td className="p-3 space-x-1 whitespace-nowrap">
@@ -152,7 +152,7 @@ export default function RentalMaintenancePage() {
             <div><Label>Vehicle *</Label>
               <select className={selectCls} value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
                 <option value="">Select vehicle</option>
-                {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNo} — {v.make} {v.model}</option>)}
+                {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNo}   {v.make} {v.model}</option>)}
               </select>
             </div>
             <div><Label>Title *</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. 5000km service" /></div>

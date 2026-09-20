@@ -238,7 +238,7 @@ const SaleJobsPage = () => {
                   <td className="px-3 py-2 font-medium">{job.jobNumber}</td>
                   <td className="px-3 py-2">{job.title}</td>
                   <td className="px-3 py-2">{SALE_JOB_TYPE_LABELS[job.jobType] ?? job.jobType}</td>
-                  <td className="px-3 py-2">{job.customer?.name || job.customerName || '—'}</td>
+                  <td className="px-3 py-2">{job.customer?.name || job.customerName || ' '}</td>
                   <td className="px-3 py-2">
                     <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_STYLES[job.status] || 'bg-gray-100'}`}>
                       {job.status.replace(/_/g, ' ')}
@@ -324,7 +324,7 @@ const SaleJobsPage = () => {
             />
             <label className="flex items-center gap-2 text-sm">
               <input data-testid="notify-customer" type="checkbox" checked={notifyCustomer} onChange={(e) => setNotifyCustomer(e.target.checked)} />
-              Notify customer via SMS / Email / WhatsApp — optional, off by default
+              Notify customer via SMS / Email / WhatsApp   optional, off by default
             </label>
           </div>
           <DialogFooter>

@@ -50,7 +50,7 @@ export function useActivityHeartbeat(enabled = true) {
       try {
         await activityMonitoringService.heartbeat({ minutes, source: 'WEB' });
       } catch {
-        // silently ignore — monitoring may be off / no permission
+        // silently ignore   monitoring may be off / no permission
       }
     };
 

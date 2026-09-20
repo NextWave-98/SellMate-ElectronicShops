@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://gadget-chain-manager-backend.vercel.app/api';
 
 /**
- * PUBLIC page — customers open this from the SMS/WhatsApp link to
+ * PUBLIC page   customers open this from the SMS/WhatsApp link to
  * approve or reject a repair estimate. Secured by the secret token
  * in the URL; no login required.
  */
@@ -80,7 +80,7 @@ export default function EstimateApprovalPage() {
             <>
               <p className="text-sm text-gray-500 mb-1">Estimate {estimate.estimateNumber}</p>
               <p className="font-semibold mb-3">
-                {estimate.vehicle ? `${estimate.vehicle.make} ${estimate.vehicle.model} — ${estimate.vehicle.registrationNo}` : ''}
+                {estimate.vehicle ? `${estimate.vehicle.make} ${estimate.vehicle.model}   ${estimate.vehicle.registrationNo}` : ''}
               </p>
               {estimate.customerComplaints && (
                 <p className="text-sm mb-3 bg-gray-100 rounded-md p-2">Reported issue: {estimate.customerComplaints}</p>
@@ -105,7 +105,7 @@ export default function EstimateApprovalPage() {
                 <div className={`flex items-center justify-center gap-2 py-4 rounded-md ${done === 'APPROVED' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                   {done === 'APPROVED' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
                   <span className="font-semibold">
-                    {done === 'APPROVED' ? 'Estimate approved — thank you! We will start the work.' : 'Estimate rejected. Please contact us for changes.'}
+                    {done === 'APPROVED' ? 'Estimate approved   thank you! We will start the work.' : 'Estimate rejected. Please contact us for changes.'}
                   </span>
                 </div>
               ) : (

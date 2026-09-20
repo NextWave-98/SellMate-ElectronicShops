@@ -41,6 +41,20 @@ export const useAccounting = () => {
   const syncSales = useCallback(
     async (from?: string, to?: string) => fetchData({ endpoint: `/accounting/sync/sales${toParams({ from, to })}`, method: 'POST', data: {}, successMessage: 'POS sales posted to accounting' }), [fetchData]);
 
+  // Opening balances   the figures typed in per account before any journal
+  // entry exists. They are entered one at a time, so being out mid-way is
+  // normal; what matters is being able to see it and close it.
+  const openingBalanceState = useCallback(
+    async () => fetchData({ endpoint: '/accounting/opening-balances', method: 'GET', silent: true }), [fetchData]);
+  const balanceOpeningBalances = useCallback(
+    async () => fetchData({ endpoint: '/accounting/opening-balances/balance', method: 'POST', data: {}, successMessage: 'Opening balances balanced' }), [fetchData]);
+
+  // Per-sale posting to the ledger
+  const getAutoPost = useCallback(
+    async () => fetchData({ endpoint: '/accounting/settings/auto-post', method: 'GET', silent: true }), [fetchData]);
+  const setAutoPost = useCallback(
+    async (enabled: boolean) => fetchData({ endpoint: '/accounting/settings/auto-post', method: 'PUT', data: { enabled } }), [fetchData]);
+
   // Reports
   const trialBalance = useCallback(
     async (asOf?: string) => fetchData({ endpoint: `/accounting/reports/trial-balance${toParams({ asOf })}`, method: 'GET', silent: true }), [fetchData]);
@@ -55,11 +69,13 @@ export const useAccounting = () => {
     () => ({
       listAccounts, seedChart, createAccount, updateAccount,
       listJournals, getJournal, createJournal, voidJournal, syncSales,
+      openingBalanceState, balanceOpeningBalances, getAutoPost, setAutoPost,
       trialBalance, profitAndLoss, balanceSheet, generalLedger,
     }),
     [
       listAccounts, seedChart, createAccount, updateAccount,
       listJournals, getJournal, createJournal, voidJournal, syncSales,
+      openingBalanceState, balanceOpeningBalances, getAutoPost, setAutoPost,
       trialBalance, profitAndLoss, balanceSheet, generalLedger,
     ]
   );

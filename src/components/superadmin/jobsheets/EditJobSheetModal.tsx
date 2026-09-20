@@ -23,6 +23,7 @@ const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending', color: 'text-gray-600' },
   { value: 'IN_PROGRESS', label: 'In Progress', color: 'text-orange-600' },
   { value: 'WAITING_PARTS', label: 'Waiting for Parts', color: 'text-orange-600' },
+  { value: 'WAITING_APPROVAL', label: 'Waiting for Customer Approval', color: 'text-amber-600' },
   { value: 'QUALITY_CHECK', label: 'Quality Check', color: 'text-purple-600' },
   { value: 'COMPLETED', label: 'Completed', color: 'text-green-600' },
   { value: 'READY_DELIVERY', label: 'Ready for Delivery', color: 'text-teal-600' },

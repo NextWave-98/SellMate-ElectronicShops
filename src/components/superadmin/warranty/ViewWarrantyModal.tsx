@@ -1,5 +1,6 @@
-import { X, FileText, Calendar, Package, User, Phone, MapPin, Award, Shield } from 'lucide-react';
-import type { WarrantyCard } from '../../../hooks/useWarranty';
+import { useEffect, useState } from 'react';
+import { X, FileText, Calendar, Package, User, Award, Shield, ShieldCheck, ShieldX, Truck } from 'lucide-react';
+import useWarranty, { type WarrantyCard, type CardCoverageEntry } from '../../../hooks/useWarranty';
 
 interface ViewWarrantyModalProps {
   isOpen: boolean;
@@ -8,6 +9,26 @@ interface ViewWarrantyModalProps {
 }
 
 export default function ViewWarrantyModal({ isOpen, onClose, warranty }: ViewWarrantyModalProps) {
+  const { getCardCoverage } = useWarranty();
+  const [cardCoverage, setCardCoverage] = useState<CardCoverageEntry[]>([]);
+  const [loadingCoverage, setLoadingCoverage] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !warranty?.id) {
+      setCardCoverage([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingCoverage(true);
+      const res = await getCardCoverage(warranty.id);
+      if (!cancelled && Array.isArray(res?.data)) setCardCoverage(res!.data as CardCoverageEntry[]);
+      setLoadingCoverage(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, warranty?.id]);
+
   if (!isOpen || !warranty) return null;
 
   const formatDate = (dateString: string) => {
@@ -35,6 +56,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, warranty }: ViewWar
       case 'EXTENDED': return 'bg-purple-100 text-purple-800';
       case 'LIMITED': return 'bg-yellow-100 text-yellow-800';
       case 'LIFETIME': return 'bg-green-100 text-green-800';
+      case 'SERVICE': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -150,6 +172,72 @@ export default function ViewWarrantyModal({ isOpen, onClose, warranty }: ViewWar
               </div>
             </div>
           </div>
+
+          {/* Provider, DOA & Structured Coverage */}
+          {(warranty.warrantyProvider || warranty.doaDays != null || warranty.claimLimit != null || loadingCoverage || cardCoverage.length > 0) && (
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                <Truck className="w-4 h-4 mr-2 text-orange-600" />
+                Provider &amp; Coverage
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
+                {warranty.warrantyProvider && (
+                  <div>
+                    <p className="text-xs text-gray-500">Provider</p>
+                    <p className="text-sm font-medium text-gray-900">{warranty.warrantyProvider}</p>
+                  </div>
+                )}
+                {warranty.doaDays != null && (
+                  <div>
+                    <p className="text-xs text-gray-500">DOA Window</p>
+                    <p className="text-sm font-medium text-gray-900">{warranty.doaDays} day(s)</p>
+                  </div>
+                )}
+                {warranty.doaAction && (
+                  <div>
+                    <p className="text-xs text-gray-500">DOA Action</p>
+                    <p className="text-sm font-medium text-gray-900">{warranty.doaAction}</p>
+                  </div>
+                )}
+                {warranty.claimLimit != null && (
+                  <div>
+                    <p className="text-xs text-gray-500">Claim Limit</p>
+                    <p className="text-sm font-medium text-gray-900">{warranty.claimLimit}</p>
+                  </div>
+                )}
+              </div>
+              {loadingCoverage ? (
+                <p className="text-xs text-gray-400">Loading coverage…</p>
+              ) : cardCoverage.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {cardCoverage.filter(c => c.stance === 'INCLUDED').length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Covered</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cardCoverage.filter(c => c.stance === 'INCLUDED').map(c => (
+                          <span key={c.itemName} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
+                            <ShieldCheck className="w-3 h-3" /> {c.itemName}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {cardCoverage.filter(c => c.stance === 'EXCLUDED').length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Excluded</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cardCoverage.filter(c => c.stance === 'EXCLUDED').map(c => (
+                          <span key={c.itemName} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">
+                            <ShieldX className="w-3 h-3" /> {c.itemName}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Coverage Details */}
           {(warranty.coverage || warranty.terms || warranty.exclusions) && (

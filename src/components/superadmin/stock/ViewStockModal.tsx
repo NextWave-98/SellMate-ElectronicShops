@@ -212,13 +212,13 @@ export default function ViewStockModal({ isOpen, onClose, stockItem }: ViewStock
                     <TrendingDown className="w-3 h-3 text-red-500" /> Min Level
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {data.minStockLevel ?? '—'}
+                    {data.minStockLevel ?? ' '}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 text-center">
                   <p className="text-xs text-gray-500 mb-1">Reorder At</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {data.reorderLevel ?? '—'}
+                    {data.reorderLevel ?? ' '}
                   </p>
                 </div>
               </div>

@@ -21,7 +21,7 @@ export function AuthSplitLayout({ children, title, subtitle, badge }: AuthSplitL
 
   return (
     <div className="auth-split-screen grid h-[100dvh] max-h-[100dvh] overflow-hidden lg:grid-cols-2">
-      {/* Left — brand panel */}
+      {/* Left   brand panel */}
       <div className="relative hidden overflow-hidden lg:flex lg:flex-col">
         <img
           src="/login-hero-orange.webp"
@@ -60,7 +60,7 @@ export function AuthSplitLayout({ children, title, subtitle, badge }: AuthSplitL
               </span>
             </h2>
             <p className="text-base leading-relaxed text-white/85 xl:text-lg">
-              Phones, laptops, accessories & repairs — POS, inventory, job sheets, warranty, and courier delivery in one platform built for electronics retailers.
+              Phones, laptops, accessories & repairs   POS, inventory, job sheets, warranty, and courier delivery in one platform built for electronics retailers.
             </p>
             <ul className="space-y-3">
               {HIGHLIGHTS.map((item) => (
@@ -83,7 +83,7 @@ export function AuthSplitLayout({ children, title, subtitle, badge }: AuthSplitL
         </div>
       </div>
 
-      {/* Right — form panel */}
+      {/* Right   form panel */}
       <div className="auth-form-panel relative flex min-h-0 flex-col overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50/80">
         <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-orange-200/40 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-orange-100/60 blur-3xl" />

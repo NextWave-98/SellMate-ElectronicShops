@@ -10,7 +10,7 @@ type GlassModalScrollProps = {
 }
 
 /**
- * Custom vertical scroll for modals — Radix ScrollArea with glass thumb (no native scrollbar).
+ * Custom vertical scroll for modals   Radix ScrollArea with glass thumb (no native scrollbar).
  */
 function GlassModalScroll({
   children,

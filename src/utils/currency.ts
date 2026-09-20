@@ -1,4 +1,4 @@
-/** 10 lakh LKR — amounts below this show as full numbers */
+/** 10 lakh LKR   amounts below this show as full numbers */
 const TEN_LAKH = 1_000_000;
 
 function formatMillionSuffix(amount: number): string {
@@ -32,12 +32,12 @@ export const formatCurrency = (
 };
 
 /**
- * Same as formatCurrency — full prices below 10 lakh, M abbreviation above.
+ * Same as formatCurrency   full prices below 10 lakh, M abbreviation above.
  */
 export const formatLargeCurrency = formatCurrency;
 
 /**
- * Chart axis/tooltip formatter — no compact K notation.
+ * Chart axis/tooltip formatter   no compact K notation.
  */
 export const formatChartCurrency = (value: number | undefined | null): string => {
   if (value == null || isNaN(value)) return 'LKR 0';

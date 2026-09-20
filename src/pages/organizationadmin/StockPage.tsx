@@ -24,6 +24,8 @@ import BulkUploadModal from '../../components/superadmin/stock/BulkUploadModal';
 import VariantTypeManagerModal from '../../components/organizationadmin/products/VariantTypeManagerModal';
 import ManageVariantsModal from '../../components/organizationadmin/products/ManageVariantsModal';
 import { mapStockProductStatusFilter, toCategoryOptions } from '../../utils/productListFilters';
+import { usePermissions } from '../../hooks/usePermissions';
+import { PERMISSIONS } from '../../store/types';
 
 // Import ProductItem type from hook
 import type { ProductItem } from '../../hooks/useProduct';
@@ -92,6 +94,10 @@ export default function StockPage() {
 
   // Hooks
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
+  const canCreateProduct = hasPermission(PERMISSIONS.PRODUCTS_CREATE);
+  const canEditProduct = hasPermission(PERMISSIONS.PRODUCTS_UPDATE);
+  const canDeleteProduct = hasPermission(PERMISSIONS.PRODUCTS_DELETE);
   const productHook = useProduct();
   const categoryHook = useProductCategory();
   const variantTypeHook = useProductVariantType();
@@ -383,8 +389,8 @@ export default function StockPage() {
             <VariantPOSSearch
               onSelect={handleView}
               onView={handleView}
-              onEdit={handleEdit}
-              onManageVariants={handleManageVariants}
+              onEdit={canEditProduct ? handleEdit : undefined}
+              onManageVariants={canEditProduct ? handleManageVariants : undefined}
               placeholder="Quick search: name, SKU, barcode, brand, category, tags, variants..."
             />
           </div>
@@ -413,13 +419,15 @@ export default function StockPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Transfer Products
           </Button>
-          <Button
-            onClick={handleAddProduct}
-            className="bg-orange-600 hover:bg-orange-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Product
-          </Button>
+          {canCreateProduct && (
+            <Button
+              onClick={handleAddProduct}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Product
+            </Button>
+          )}
         </div>
       </div>
 
@@ -460,6 +468,7 @@ export default function StockPage() {
         <Button
           onClick={() => setIsBulkUploadModalOpen(true)}
           variant="outline"
+          disabled={!canCreateProduct}
         >
           <Upload className="w-4 h-4 mr-2" />
           Bulk Upload
@@ -499,11 +508,11 @@ export default function StockPage() {
       {/* Product Table with Pagination */}
       <StockTable
         items={filteredProducts}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
+        onEdit={canEditProduct ? handleEdit : undefined}
+        onDelete={canDeleteProduct ? handleDelete : undefined}
         onView={handleView}
-        onRestock={handleEdit}
-        onManageVariants={handleManageVariants}
+        onRestock={canEditProduct ? handleEdit : undefined}
+        onManageVariants={canEditProduct ? handleManageVariants : undefined}
         currentPage={currentPage}
         itemsPerPage={itemsPerPage}
         totalItems={totalItems}

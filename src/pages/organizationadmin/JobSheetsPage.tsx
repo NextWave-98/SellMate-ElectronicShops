@@ -88,7 +88,7 @@ export default function JobSheetsPage() {
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  // Debounced copy of searchQuery — API calls react to THIS, so typing doesn't
+  // Debounced copy of searchQuery   API calls react to THIS, so typing doesn't
   // fire a request (plus a stats request) on every keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [selectedStatus, setSelectedStatus] = useState<JobSheetStatus | ''>(searchParams.get('status') as JobSheetStatus || '');
@@ -115,7 +115,7 @@ export default function JobSheetsPage() {
         limit: actualLimit,
       };
 
-      // Add search filter if present (debounced — server-side search)
+      // Add search filter if present (debounced   server-side search)
       if (debouncedSearch) {
         queryParams.search = debouncedSearch;
       }
@@ -278,7 +278,7 @@ export default function JobSheetsPage() {
   }, [updateURLParams]);
 
   // Fetch initial data (list + stats are loaded by the effects below, which
-  // also run on mount — calling them here too would double-load everything)
+  // also run on mount   calling them here too would double-load everything)
   useEffect(() => {
     loadSummary();
   }, []);
@@ -290,7 +290,7 @@ export default function JobSheetsPage() {
   }, [searchQuery]);
 
   // Reload the LIST when filters change (search is debounced).
-  // Skipped on mount — the pagination effect below does the initial load and
+  // Skipped on mount   the pagination effect below does the initial load and
   // honours the page number restored from the URL.
   const filtersMountedRef = useRef(false);
   useEffect(() => {
@@ -307,7 +307,7 @@ export default function JobSheetsPage() {
     }
   }, [debouncedSearch, selectedStatus, selectedPriority, dateFilter, startDate, endDate, myJobsOnly]);
 
-  // Reload STATS only when the date scope changes — stats ignore text search,
+  // Reload STATS only when the date scope changes   stats ignore text search,
   // so reloading them per keystroke was pure waste (2 aggregate calls per key).
   useEffect(() => {
     loadStats();

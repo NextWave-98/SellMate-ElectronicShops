@@ -733,7 +733,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                   All Sales
                   {posData?.summary && (
                     <span className="ml-2 text-sm font-normal text-gray-500">
-                      — Total: {formatCurrency(posData.summary.totalRevenue)}
+                        Total: {formatCurrency(posData.summary.totalRevenue)}
                     </span>
                   )}
                 </CardTitle>
@@ -893,7 +893,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                                 size="sm"
                                 variant="outline"
                                 className="h-7 text-xs gap-1 border-blue-300 text-blue-700 hover:bg-blue-50"
-                                onClick={() => handleViewItems(sale.id, `${sale.saleNumber} — ${sale.customerName}`)}
+                                onClick={() => handleViewItems(sale.id, `${sale.saleNumber}   ${sale.customerName}`)}
                               >
                                 <Eye className="w-3 h-3" />
                                 Items
@@ -905,7 +905,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                                   className="h-7 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50"
                                   onClick={() => openPayModal({
                                     saleId: sale.id,
-                                    label: `${sale.saleNumber} — ${sale.customerName}`,
+                                    label: `${sale.saleNumber}   ${sale.customerName}`,
                                     totalAmount: sale.totalAmount,
                                     paidAmount: sale.paidAmount,
                                   })}
@@ -962,7 +962,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                   Courier Shipments
                   {unifiedData?.courier && (
                     <span className="ml-2 text-sm font-normal text-gray-500">
-                      — Revenue: {formatCurrency(unifiedData.courier.totalCharge)}
+                        Revenue: {formatCurrency(unifiedData.courier.totalCharge)}
                     </span>
                   )}
                 </CardTitle>
@@ -1018,7 +1018,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                             <TableCell className="text-sm font-medium text-gray-600">
                               {s.paymentReference}
                             </TableCell>
-                            <TableCell className="text-sm">{s.courier?.name ?? '—'}</TableCell>
+                            <TableCell className="text-sm">{s.courier?.name ?? ' '}</TableCell>
                             <TableCell className="text-sm">
                               <div className="font-medium">{s.recipientName}</div>
                               <div className="text-xs text-gray-400">{s.recipientPhone}</div>
@@ -1047,7 +1047,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                                   size="sm"
                                   variant="outline"
                                   className="h-7 text-xs gap-1 border-blue-300 text-blue-700 hover:bg-blue-50"
-                                  onClick={() => handleViewItems(s.saleId!, `${s.shipmentNumber} — ${s.recipientName}`)}
+                                  onClick={() => handleViewItems(s.saleId!, `${s.shipmentNumber}   ${s.recipientName}`)}
                                 >
                                   <Eye className="w-3 h-3" />
                                   Items
@@ -1063,7 +1063,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                                     className="h-7 text-xs gap-1 border-green-300 text-green-700 hover:bg-green-50"
                                     onClick={() => openPayModal({
                                       saleId: s.saleId!,
-                                      label: `${s.shipmentNumber} — ${s.recipientName}${s.codEnabled ? ' (COD)' : ''}`,
+                                      label: `${s.shipmentNumber}   ${s.recipientName}${s.codEnabled ? ' (COD)' : ''}`,
                                       totalAmount: s.saleTotal || s.codAmount,
                                       paidAmount: 0,
                                     })}
@@ -1100,7 +1100,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Package className="w-4 h-4 text-orange-500" />
-              Sale Items — {itemsModal?.label}
+              Sale Items   {itemsModal?.label}
             </DialogTitle>
           </DialogHeader>
           {itemsModal?.loading ? (
@@ -1125,7 +1125,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                     <TableRow key={i}>
                       <TableCell className="text-xs text-gray-400">{i + 1}</TableCell>
                       <TableCell className="text-sm">
-                        <div className="font-medium">{item.product?.name || item.productName || '—'}</div>
+                        <div className="font-medium">{item.product?.name || item.productName || ' '}</div>
                         {(item.product?.sku || item.sku) && (
                           <div className="text-xs text-gray-400">{item.product?.sku || item.sku}</div>
                         )}
@@ -1133,7 +1133,7 @@ export default function UnifiedSalesAnalyticsDashboard() {
                       <TableCell className="text-sm text-right">{item.quantity}</TableCell>
                       <TableCell className="text-sm text-right">{formatCurrency(item.unitPrice)}</TableCell>
                       <TableCell className="text-sm text-right">
-                        {item.discount > 0 ? formatCurrency(item.discount) : '—'}
+                        {item.discount > 0 ? formatCurrency(item.discount) : ' '}
                       </TableCell>
                       <TableCell className="text-sm text-right font-semibold">
                         {formatCurrency(item.totalPrice ?? (item.unitPrice * item.quantity))}

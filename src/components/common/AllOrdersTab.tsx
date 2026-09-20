@@ -239,7 +239,7 @@ const getOrderBalance = (order: UnifiedOrder) => {
   return Math.max(0, total - paid);
 };
 
-/** Paid in full but sale still shows pending/partial — needs reconcile */
+/** Paid in full but sale still shows pending/partial   needs reconcile */
 const isFullyPaidMismatch = (order: UnifiedOrder) => {
   const total = Number(order.totalAmount) || 0;
   const paid = Number(order.paidAmount) || 0;
@@ -304,7 +304,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
   // Active tab: 'all' or 'pending'
   const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
 
-  // Filters — "committed" values that actually trigger API calls
+  // Filters   "committed" values that actually trigger API calls
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [orderTypeFilter, setOrderTypeFilter] = useState('');
@@ -502,7 +502,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
     if (keys.length === 0) {
       toast('No fully-paid orders with wrong status on this page');
     } else {
-      toast.success(`Selected ${keys.length} order(s) — paid in full but status not updated`);
+      toast.success(`Selected ${keys.length} order(s)   paid in full but status not updated`);
     }
   };
 
@@ -692,7 +692,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
         notes: 'Payment marked complete from pending orders',
       });
       if (res?.success) {
-        toast.success('Payment recorded — sale marked complete');
+        toast.success('Payment recorded   sale marked complete');
         setSinglePayOrder(null);
         refreshOrders();
       } else {
@@ -772,7 +772,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
             : orderTotal - paid;
         const lineItems = o.items?.length
           ? o.items
-          : [{ name: '—', sku: '', quantity: o.itemCount ?? 0, unitPrice: 0, subtotal: 0 }];
+          : [{ name: ' ', sku: '', quantity: o.itemCount ?? 0, unitPrice: 0, subtotal: 0 }];
         for (const item of lineItems) {
           rows.push([
             o.orderNumber,
@@ -963,13 +963,13 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
 
       {mismatchOrders.length > 0 && !staffOrderActionsBlocked && (
         <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          {mismatchOrders.length} order(s) on this page are fully paid but still show pending/partial — use <strong>Auto: Fully Paid</strong> then <strong>Sync Status</strong>.
+          {mismatchOrders.length} order(s) on this page are fully paid but still show pending/partial   use <strong>Auto: Fully Paid</strong> then <strong>Sync Status</strong>.
         </div>
       )}
 
       {variant === 'admin' && codTotalMismatchOrders.length > 0 && (
         <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-          {codTotalMismatchOrders.length} COD order(s) have sale totals that do not match shipment COD — use <strong>Auto: COD Mismatch</strong> then <strong>Sync Totals</strong>.
+          {codTotalMismatchOrders.length} COD order(s) have sale totals that do not match shipment COD   use <strong>Auto: COD Mismatch</strong> then <strong>Sync Totals</strong>.
         </div>
       )}
 
@@ -1274,7 +1274,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
                               )}
                             </button>
                           ) : (
-                            <span className="text-xs text-slate-300">—</span>
+                            <span className="text-xs text-slate-300"> </span>
                           )}
                         </td>
 
@@ -1283,7 +1283,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
                           <div className="font-semibold text-slate-800 text-sm">{formatCurrency(order.totalAmount)}</div>
                           {order.totalMismatch && order.shipmentCodAmount && (
                             <div className="text-[10px] text-orange-600 font-semibold mt-0.5">
-                              COD: {formatCurrency(order.shipmentCodAmount)} — mismatch
+                              COD: {formatCurrency(order.shipmentCodAmount)}   mismatch
                             </div>
                           )}
                           {balance > 0.01 && (
@@ -1305,10 +1305,10 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
                         {/* Payment */}
                         <td className="px-3 py-3">
                           <span className={`text-xs font-medium ${paymentStyle}`}>
-                            {order.paymentStatus?.replace(/_/g, ' ') || '—'}
+                            {order.paymentStatus?.replace(/_/g, ' ') || ' '}
                           </span>
                           {paidMismatch && (
-                            <div className="text-[10px] text-amber-600 font-semibold mt-0.5">Paid {formatCurrency(order.paidAmount)} — needs sync</div>
+                            <div className="text-[10px] text-amber-600 font-semibold mt-0.5">Paid {formatCurrency(order.paidAmount)}   needs sync</div>
                           )}
                           {!paidMismatch && order.paidAmount > 0 && (
                             <div className="text-[10px] text-slate-400 mt-0.5">Received: {formatCurrency(order.paidAmount)}</div>
@@ -1322,7 +1322,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
 
                         {/* Location */}
                         <td className="px-3 py-3 text-xs text-slate-500">
-                          <div>{order.locationName || '—'}</div>
+                          <div>{order.locationName || ' '}</div>
                           {order.soldBy && <div className="text-[10px] text-slate-400">{order.soldBy}</div>}
                         </td>
 
@@ -1414,7 +1414,7 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
                                 {order.items!.map((item, idx) => (
                                   <tr key={idx} className="border-b border-slate-100">
                                     <td className="py-1 font-medium text-slate-700">{item.name}</td>
-                                    <td className="py-1 text-slate-400 font-mono">{item.sku || '—'}</td>
+                                    <td className="py-1 text-slate-400 font-mono">{item.sku || ' '}</td>
                                     <td className="py-1 text-right">{item.quantity}</td>
                                     <td className="py-1 text-right">{formatCurrency(item.unitPrice)}</td>
                                     <td className="py-1 text-right font-semibold">{formatCurrency(item.subtotal)}</td>
@@ -1503,10 +1503,10 @@ export default function AllOrdersTab({ fetchOrders, variant = 'branch', onDelete
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><p className="text-xs text-slate-400">Customer</p><p className="font-medium">{detailsOrder.customerName}</p>{detailsOrder.customerPhone && <p className="text-xs text-slate-500">{detailsOrder.customerPhone}</p>}</div>
-                <div><p className="text-xs text-slate-400">Location</p><p className="font-medium">{detailsOrder.locationName || '—'}</p>{detailsOrder.soldBy && <p className="text-xs text-slate-500">By: {detailsOrder.soldBy}</p>}</div>
+                <div><p className="text-xs text-slate-400">Location</p><p className="font-medium">{detailsOrder.locationName || ' '}</p>{detailsOrder.soldBy && <p className="text-xs text-slate-500">By: {detailsOrder.soldBy}</p>}</div>
                 <div><p className="text-xs text-slate-400">Status</p><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLES[detailsOrder.status?.toUpperCase()] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>{getStatusIcon(detailsOrder.status)}{detailsOrder.status?.replace(/_/g, ' ')}</span></div>
                 <div><p className="text-xs text-slate-400">Payment Status</p><span className={`text-sm font-medium ${PAYMENT_STATUS_STYLES[detailsOrder.paymentStatus?.toUpperCase()] || 'text-gray-500'}`}>{detailsOrder.paymentStatus?.replace(/_/g, ' ')}</span></div>
-                <div><p className="text-xs text-slate-400">Payment Method</p><p className="font-medium">{(detailsOrder.paymentMethods?.length ? detailsOrder.paymentMethods : detailsOrder.paymentMethod ? [detailsOrder.paymentMethod] : ['—']).join(' / ')}</p></div>
+                <div><p className="text-xs text-slate-400">Payment Method</p><p className="font-medium">{(detailsOrder.paymentMethods?.length ? detailsOrder.paymentMethods : detailsOrder.paymentMethod ? [detailsOrder.paymentMethod] : [' ']).join(' / ')}</p></div>
                 <div><p className="text-xs text-slate-400">Date</p><p className="font-medium text-xs">{formatDate(detailsOrder.createdAt)}</p></div>
               </div>
 

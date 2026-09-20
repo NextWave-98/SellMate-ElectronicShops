@@ -241,7 +241,7 @@ export default function CmsSettingsPage() {
         {shop && (
           <Card>
             <CardContent className="p-4 grid gap-3">
-              <h3 className="font-semibold text-sm">Home — Hero (shop)</h3>
+              <h3 className="font-semibold text-sm">Home   Hero (shop)</h3>
               <div><Label>Small label</Label><Input value={content.hero?.label || ''} onChange={(e) => setContentField('hero', 'label', e.target.value)} /></div>
               <div>
                 <Label>Headline (Enter = line break)</Label>
@@ -274,7 +274,7 @@ export default function CmsSettingsPage() {
         {rental && (
           <Card>
             <CardContent className="p-4 grid gap-3">
-              <h3 className="font-semibold text-sm">Home — Content (rental)</h3>
+              <h3 className="font-semibold text-sm">Home   Content (rental)</h3>
               <div className="grid sm:grid-cols-2 gap-3">
                 <div><Label>Hero CTA</Label><Input value={theme.heroCta || ''} onChange={(e) => setThemeField('heroCta', e.target.value)} /></div>
                 <div><Label>Secondary CTA</Label><Input value={content.hero?.ctaSecondary || ''} onChange={(e) => setContentField('hero', 'ctaSecondary', e.target.value)} /></div>
@@ -296,7 +296,7 @@ export default function CmsSettingsPage() {
         <Card>
           <CardContent className="p-4 grid gap-3">
             <h3 className="font-semibold text-sm">Theme colors</h3>
-            <p className="text-xs text-muted-foreground">Layout and fonts stay fixed — only colors / copy change.</p>
+            <p className="text-xs text-muted-foreground">Layout and fonts stay fixed   only colors / copy change.</p>
             <div className="grid sm:grid-cols-3 gap-3">
               {(['primary', 'secondary', 'accent'] as const).map((key) => (
                 <div key={key}>

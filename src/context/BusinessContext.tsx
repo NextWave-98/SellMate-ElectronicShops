@@ -81,7 +81,7 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
       const parsed = parseIndustryType((res?.data as { industryType?: IndustryType })?.industryType);
       if (parsed && parsed !== userIndustryType) {
-        // Profile refresh only — industryType comes from auth user on next login/profile fetch
+        // Profile refresh only   industryType comes from auth user on next login/profile fetch
         console.info('[BusinessContext] Industry type from API:', parsed);
       }
     } catch {

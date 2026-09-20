@@ -207,7 +207,7 @@ export default function ResolveClaimModal({ isOpen, onClose, claim, onSuccess }:
                   <option value="">No job sheet linked</option>
                   {jobSheets.map((sheet) => (
                     <option key={sheet.id} value={sheet.id}>
-                      {sheet.jobNumber} — {sheet.device?.brand} {sheet.device?.model} ({sheet.status})
+                      {sheet.jobNumber}   {sheet.device?.brand} {sheet.device?.model} ({sheet.status})
                     </option>
                   ))}
                 </select>

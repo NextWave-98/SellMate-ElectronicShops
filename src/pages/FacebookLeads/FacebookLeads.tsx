@@ -235,7 +235,7 @@ const FacebookLeadsPage: React.FC = () => {
     try {
       const res = await facebookLeadsService.syncLeads(businessId, branchFilter, formFilter || undefined);
       alert.success(
-        `Synced ${res.data.synced} new lead(s) — ${res.data.skipped} already imported.`,
+        `Synced ${res.data.synced} new lead(s)   ${res.data.skipped} already imported.`,
       );
       fetchLeads();
       fetchStats();
@@ -295,7 +295,7 @@ const FacebookLeadsPage: React.FC = () => {
       const updated = res.data.lead;
       alert.success(
         updated.trackingNumber
-          ? `Order created — tracking ${updated.trackingNumber}`
+          ? `Order created   tracking ${updated.trackingNumber}`
           : 'Order created and courier shipment generated.',
       );
       setLeads((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)));
@@ -466,10 +466,10 @@ const FacebookLeadsPage: React.FC = () => {
                       )}
                     </td>
                     <td className="p-3">
-                      <div>{lead.phone || '—'}</div>
+                      <div>{lead.phone || ' '}</div>
                       <div className="text-xs text-muted-foreground">{lead.email || ''}</div>
                     </td>
-                    <td className="p-3">{lead.formName || '—'}</td>
+                    <td className="p-3">{lead.formName || ' '}</td>
                     <td className="p-3">
                       <NativeSelect
                         size="sm"
@@ -600,13 +600,13 @@ const FacebookLeadsPage: React.FC = () => {
             )}
             <div className="text-sm space-y-1">
               <div>
-                <strong>Phone:</strong> {selected.phone || '—'}
+                <strong>Phone:</strong> {selected.phone || ' '}
               </div>
               <div>
-                <strong>Email:</strong> {selected.email || '—'}
+                <strong>Email:</strong> {selected.email || ' '}
               </div>
               <div>
-                <strong>Form:</strong> {selected.formName || '—'}
+                <strong>Form:</strong> {selected.formName || ' '}
               </div>
               <div>
                 <strong>Assigned:</strong> {staffName(selected.assignedStaffId) || 'Unassigned'}
@@ -649,7 +649,7 @@ const FacebookLeadsPage: React.FC = () => {
                   <Truck className="size-4" /> Order / Shipment
                 </div>
                 <div>
-                  <strong>Tracking:</strong> {selected.trackingNumber || '—'}
+                  <strong>Tracking:</strong> {selected.trackingNumber || ' '}
                 </div>
                 {selected.orderAmount != null && (
                   <div>
@@ -818,7 +818,7 @@ const FacebookLeadsPage: React.FC = () => {
                         e.target.value === '' ? undefined : Number(e.target.value),
                       )
                     }
-                    placeholder={orderForm.paymentMethod === 'cod' ? 'defaults to order amount' : '—'}
+                    placeholder={orderForm.paymentMethod === 'cod' ? 'defaults to order amount' : ' '}
                   />
                 </Field>
               </div>

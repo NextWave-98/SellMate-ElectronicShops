@@ -1,12 +1,14 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { Inventory } from '../../types/inventory.types';
 import { InventoryStatus } from '../../types/inventory.types';
 import { useAuth } from '../../context/AuthContext';
 import { useInventory, type InventoryItem } from '../../hooks/useInventory';
 import useProductCategory from '../../hooks/useProductCategory';
 import { useAddonRequest, type CreateAddonRequestData } from '../../hooks/useAddonRequest';
+import { usePermissions } from '../../hooks/usePermissions';
+import { PERMISSIONS } from '../../store/types';
 import ProductFilters from '../../components/branch/products/ProductFilters';
 import ProductsTable from '../../components/branch/products/ProductsTable';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -50,7 +52,11 @@ const transformInventoryItem = (item: InventoryItem): Inventory => {
 
 export default function ProductsPage() {
   const { branchCode } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
+  const canCreateProduct = hasPermission(PERMISSIONS.PRODUCTS_CREATE);
+  const canEditProduct = hasPermission(PERMISSIONS.PRODUCTS_UPDATE);
   const { getAllInventory, getLowStockItems } = useInventory();
   const { getAllCategories } = useProductCategory();
   const { createAddonRequest, loading: addonLoading } = useAddonRequest();
@@ -318,6 +324,15 @@ export default function ProductsPage() {
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          {canCreateProduct && (
+            <Button
+              onClick={() => navigate(`/${branchCode}/products/add`)}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Product
+            </Button>
+          )}
         </div>
       </div>
 
@@ -448,6 +463,11 @@ export default function ProductsPage() {
         pagination={pagination}
         onPageChange={handlePageChange}
         onLimitChange={handleLimitChange}
+        onEdit={
+          canEditProduct
+            ? (item) => navigate(`/${branchCode}/products/edit/${item.productId}`)
+            : undefined
+        }
       />
 
       {/* Results count */}

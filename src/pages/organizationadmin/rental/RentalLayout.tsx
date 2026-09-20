@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  Car, CalendarDays, Wrench, RefreshCw, AlertTriangle, Fuel, ShieldAlert, Tags, LayoutDashboard, IdCard,
+  Car, CalendarDays, Wrench, RefreshCw, AlertTriangle, Fuel, ShieldAlert, Tags, LayoutDashboard, IdCard, Package,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import type { RentalOutletContext } from './shared';
 const navItems = [
   { to: '.', end: true, label: 'Dashboard', icon: LayoutDashboard },
   { to: 'fleet', end: false, label: 'Fleet', icon: Car },
+  { to: 'equipment', end: false, label: 'Equipment', icon: Package },
   { to: 'bookings', end: false, label: 'Bookings', icon: CalendarDays },
   { to: 'maintenance', end: false, label: 'Maintenance', icon: Wrench },
   { to: 'fuel', end: false, label: 'Fuel Logs', icon: Fuel },
@@ -71,7 +72,7 @@ export default function RentalLayout() {
             <ul className="text-sm mt-1 text-amber-900">
               {stats.expiringDocuments.map((v: any) => (
                 <li key={v.id}>
-                  {v.registrationNo} ({v.make} {v.model}) — Insurance: {v.insuranceExpiry || '—'} | License: {v.licenseExpiry || '—'} | Emission: {v.emissionTestExpiry || '—'}
+                  {v.registrationNo} ({v.make} {v.model})   Insurance: {v.insuranceExpiry || ' '} | License: {v.licenseExpiry || ' '} | Emission: {v.emissionTestExpiry || ' '}
                 </li>
               ))}
             </ul>

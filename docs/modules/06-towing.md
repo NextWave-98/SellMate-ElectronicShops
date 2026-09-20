@@ -1,4 +1,4 @@
-# Towing / Roadside — Full Guide
+# Towing / Roadside   Full Guide
 
 **Industry:** `GARAGE` or `VEHICLE_RENTAL` (or `GENERAL`)  
 **Permission:** `towing.*`  
@@ -71,7 +71,7 @@ Body typically includes contact, location, vehicle, and message fields accepted 
 
 ---
 
-## Full example — A9 breakdown near Matale
+## Full example   A9 breakdown near Matale
 
 Tourist’s Toyota Axio stops on the A9.
 

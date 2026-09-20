@@ -78,9 +78,9 @@ export default function TradeInRulesPage() {
               <tr key={r.id} className="border-t">
                 <td className="p-3 font-medium">{r.brand}</td>
                 <td className="p-3">{r.model}</td>
-                <td className="p-3">{r.variant || '—'}</td>
+                <td className="p-3">{r.variant || ' '}</td>
                 {GRADES.map((g) => (
-                  <td key={g} className="p-3">{r.gradePrices?.[g] != null ? `Rs ${Number(r.gradePrices[g]).toLocaleString()}` : '—'}</td>
+                  <td key={g} className="p-3">{r.gradePrices?.[g] != null ? `Rs ${Number(r.gradePrices[g]).toLocaleString()}` : ' '}</td>
                 ))}
                 <td className="p-3">
                   <Button size="sm" variant="ghost" onClick={async () => { await tradein.deleteRule(r.id); load(); }}>

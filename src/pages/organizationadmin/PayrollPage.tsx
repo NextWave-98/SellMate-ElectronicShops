@@ -363,14 +363,14 @@ export default function PayrollPage() {
                     <TableRow key={row.staff.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{row.staff.user?.name ?? '—'}</p>
+                          <p className="font-medium">{row.staff.user?.name ?? ' '}</p>
                           <p className="text-xs text-gray-500">{row.staff.staffId}</p>
                         </div>
                       </TableCell>
                       <TableCell>{row.currentRate ? fmt(row.currentRate.basicSalary) : <span className="text-gray-400 text-xs">Not set</span>}</TableCell>
-                      <TableCell>{row.currentRate?.commissionMode ?? '—'}</TableCell>
-                      <TableCell>{row.currentRate?.rateValue != null ? fmt(row.currentRate.rateValue) : '—'}</TableCell>
-                      <TableCell>{row.currentRate?.effectiveFrom ?? '—'}</TableCell>
+                      <TableCell>{row.currentRate?.commissionMode ?? ' '}</TableCell>
+                      <TableCell>{row.currentRate?.rateValue != null ? fmt(row.currentRate.rateValue) : ' '}</TableCell>
+                      <TableCell>{row.currentRate?.effectiveFrom ?? ' '}</TableCell>
                       <TableCell>
                         <Button size="sm" variant="outline" onClick={() => openRateModal(row)}>Edit Rate</Button>
                       </TableCell>
@@ -477,7 +477,7 @@ export default function PayrollPage() {
       <Dialog open={payslipModalOpen} onOpenChange={setPayslipModalOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh]  ">
           <DialogHeader>
-            <DialogTitle>Payslips — {selectedRun?.runNumber} ({selectedRun?.periodStart} → {selectedRun?.periodEnd})</DialogTitle>
+            <DialogTitle>Payslips   {selectedRun?.runNumber} ({selectedRun?.periodStart} → {selectedRun?.periodEnd})</DialogTitle>
           </DialogHeader>
           <Table>
             <TableHeader>
@@ -497,7 +497,7 @@ export default function PayrollPage() {
                 <TableRow key={p.id}>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{p.staff?.user?.name ?? '—'}</p>
+                      <p className="font-medium">{p.staff?.user?.name ?? ' '}</p>
                       <p className="text-xs text-gray-500">{p.staff?.staffId}</p>
                     </div>
                   </TableCell>
@@ -522,7 +522,7 @@ export default function PayrollPage() {
       <Dialog open={rateModalOpen} onOpenChange={setRateModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Rate — {editingStaff?.user?.name ?? editingStaff?.staffId}</DialogTitle>
+            <DialogTitle>Edit Rate   {editingStaff?.user?.name ?? editingStaff?.staffId}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">

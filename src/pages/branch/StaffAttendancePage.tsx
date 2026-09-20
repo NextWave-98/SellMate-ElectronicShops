@@ -10,6 +10,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import toast from 'react-hot-toast';
 import useFetch from '../../hooks/useFetch';
+import { FaceCaptureModal } from '@/components/attendance/FaceCaptureModal';
+import { PinFallbackModal } from '@/components/attendance/PinFallbackModal';
+import {
+  createChallenge,
+  getBiometricPolicy,
+  submitPinFallback,
+  verifyCheckInMultipart,
+  verifyCheckOutMultipart,
+  type BiometricPolicy,
+} from '@/services/attendanceBiometricService';
+import { getOrCreateDeviceId } from '@/utils/deviceFingerprint';
 
 interface TodayStatus {
   id: string;
@@ -38,49 +49,6 @@ interface Device {
   deviceFingerprint: string;
   isActive: boolean;
   lastUsedAt: string | null;
-}
-
-function generateDeviceFingerprint(): string {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    ctx.textBaseline = 'top';
-    ctx.font = '14px Arial';
-    ctx.fillText('fp', 2, 2);
-  }
-  const canvasData = canvas.toDataURL();
-
-  const components = [
-    navigator.userAgent,
-    navigator.language,
-    `${screen.width}x${screen.height}x${screen.colorDepth}`,
-    new Date().getTimezoneOffset(),
-    canvasData,
-    navigator.hardwareConcurrency || '',
-    navigator.platform || '',
-  ];
-
-  let hash = 0;
-  const str = components.join('##');
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-
-  const h1 = Math.abs(hash).toString(16).padStart(16, '0');
-  const h2 = Math.abs(hash ^ 0xdeadbeef).toString(16).padStart(16, '0');
-  return (h1 + h2).slice(0, 32);
-}
-
-function getOrCreateDeviceId(): string {
-  const key = 'gcm_device_id_v2';
-  let id = localStorage.getItem(key);
-  if (!id) {
-    id = generateDeviceFingerprint();
-    localStorage.setItem(key, id);
-  }
-  return id;
 }
 
 function CopyDeviceId({ value }: { value: string }) {
@@ -136,6 +104,14 @@ export default function StaffAttendancePage() {
   const [correctionReason, setCorrectionReason] = useState('');
   const [submittingCorrection, setSubmittingCorrection] = useState(false);
 
+  const [biometricPolicy, setBiometricPolicy] = useState<BiometricPolicy | null>(null);
+  const [faceModalOpen, setFaceModalOpen] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'check_in' | 'check_out'>('check_in');
+  const [livenessPrompt, setLivenessPrompt] = useState('blink');
+  const [challengeId, setChallengeId] = useState('');
+  const [challengeToken, setChallengeToken] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
 
   const isDeviceRegistered = devices.some(d => d.deviceFingerprint === deviceFingerprint && d.isActive);
 
@@ -151,15 +127,17 @@ export default function StaffAttendancePage() {
     else setTodayStatus(null);
     if (historyRes?.data) setHistory(historyRes.data.data ?? historyRes.data ?? []);
     if (devicesRes?.data) setDevices(devicesRes.data);
+    try {
+      const policy = await getBiometricPolicy();
+      setBiometricPolicy(policy);
+    } catch {
+      setBiometricPolicy(null);
+    }
   }, []);
 
   useEffect(() => { fetchAll(); }, []);
 
-  const handleCheckIn = async () => {
-    if (!isDeviceRegistered) {
-      toast.error('This device is not registered. Please register it first.');
-      return;
-    }
+  const legacyCheckIn = async () => {
     setActionLoading(true);
     const res = await checkInApi.execute('/attendance/check-in', {
       method: 'POST',
@@ -172,7 +150,83 @@ export default function StaffAttendancePage() {
     }
   };
 
+  const startFaceFlow = async (action: 'check_in' | 'check_out') => {
+    setPendingAction(action);
+    setActionLoading(true);
+    try {
+      const challenge = await createChallenge(action, deviceFingerprint);
+      setChallengeId(challenge.challengeId);
+      setChallengeToken(challenge.challengeToken);
+      setLivenessPrompt(challenge.livenessPrompt);
+      setFaceModalOpen(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not start face verification');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    if (!isDeviceRegistered) {
+      toast.error('This device is not registered. Please register it first.');
+      return;
+    }
+    const useFace = biometricPolicy?.enabled && biometricPolicy.enforceCheckIn;
+    if (useFace) {
+      await startFaceFlow('check_in');
+      return;
+    }
+    await legacyCheckIn();
+  };
+
+  const handleFaceCapture = async (blobs: Blob[]) => {
+    setActionLoading(true);
+    try {
+      const fields = {
+        challengeId,
+        challengeToken,
+        deviceFingerprint,
+      };
+      if (pendingAction === 'check_in') {
+        await verifyCheckInMultipart(fields, blobs);
+        toast.success('Checked in with face verification!');
+      } else {
+        await verifyCheckOutMultipart(fields, blobs);
+        toast.success('Checked out with face verification!');
+      }
+      setRetryCount(0);
+      fetchAll();
+    } catch (e: unknown) {
+      const msg = e && typeof e === 'object' && 'response' in e
+        ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
+        : null;
+      toast.error(msg || 'Face verification failed');
+      const max = biometricPolicy?.maxRetries ?? 3;
+      const next = retryCount + 1;
+      setRetryCount(next);
+      if (next >= max) setPinModalOpen(true);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePinFallback = async (pin: string, reason: string) => {
+    await submitPinFallback({
+      action: pendingAction,
+      pin,
+      deviceFingerprint,
+      reason: reason || undefined,
+    });
+    toast.success('Request sent   waiting for manager approval');
+    fetchAll();
+  };
+
   const handleCheckOut = async () => {
+    const useFace = biometricPolicy?.enabled && biometricPolicy.enforceCheckOut;
+    if (useFace) {
+      await startFaceFlow('check_out');
+      return;
+    }
     setActionLoading(true);
     const res = await checkOutApi.execute('/attendance/check-out', {
       method: 'POST',
@@ -220,7 +274,7 @@ export default function StaffAttendancePage() {
 
 
   const formatTime = (dt: string | null) => {
-    if (!dt) return '—';
+    if (!dt) return ' ';
     return new Date(dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -241,7 +295,7 @@ export default function StaffAttendancePage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Today — {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            Today   {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -262,7 +316,7 @@ export default function StaffAttendancePage() {
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Hours</p>
-                <p className="text-xl font-bold">{todayStatus.hoursWorked != null ? `${Number(todayStatus.hoursWorked).toFixed(1)}h` : '—'}</p>
+                <p className="text-xl font-bold">{todayStatus.hoursWorked != null ? `${Number(todayStatus.hoursWorked).toFixed(1)}h` : ' '}</p>
               </div>
             </div>
           )}
@@ -360,7 +414,7 @@ export default function StaffAttendancePage() {
                   <TableCell>{log.attendanceDate}</TableCell>
                   <TableCell>{formatTime(log.dayInTime)}</TableCell>
                   <TableCell>{formatTime(log.dayOffTime)}</TableCell>
-                  <TableCell>{log.hoursWorked != null ? `${Number(log.hoursWorked).toFixed(1)}h` : '—'}</TableCell>
+                  <TableCell>{log.hoursWorked != null ? `${Number(log.hoursWorked).toFixed(1)}h` : ' '}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <Badge>{log.status.replace('_', ' ')}</Badge>
@@ -412,6 +466,20 @@ export default function StaffAttendancePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <FaceCaptureModal
+        open={faceModalOpen}
+        onClose={() => setFaceModalOpen(false)}
+        livenessPrompt={livenessPrompt}
+        onCapture={handleFaceCapture}
+        title={pendingAction === 'check_in' ? 'Check in   face verification' : 'Check out   face verification'}
+      />
+      <PinFallbackModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        action={pendingAction}
+        onSubmit={handlePinFallback}
+      />
     </div>
   );
 }

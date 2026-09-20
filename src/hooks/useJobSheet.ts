@@ -12,7 +12,7 @@ export interface JobSheet {
   issueDescription: string;
   diagnosisNotes?: string | null;
   repairNotes?: string | null;
-  status: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
+  status: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'WAITING_APPROVAL' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   assignedToId?: string | null;
   labourCost: number;
@@ -59,10 +59,13 @@ export interface JobSheet {
 
 export interface CreateJobSheetData {
   customerId: string;
-  deviceId: string;
+  /** Electronics jobs. Garage jobs send customerVehicleId instead. */
+  deviceId?: string;
+  customerVehicleId?: string;
+  serviceBayId?: string | null;
   locationId: string; // Changed from branchId
   issueDescription: string;
-  status?: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
+  status?: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'WAITING_APPROVAL' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   assignedToId?: string | null;
   labourCost?: number;
@@ -79,7 +82,7 @@ export interface UpdateJobSheetData {
   issueDescription?: string;
   diagnosisNotes?: string | null;
   repairNotes?: string | null;
-  status?: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
+  status?: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'WAITING_APPROVAL' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   assignedToId?: string | null;
   labourCost?: number;
@@ -93,7 +96,7 @@ export interface UpdateJobSheetData {
 }
 
 export interface UpdateJobStatLKRata {
-  status: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
+  status: 'PENDING' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'WAITING_APPROVAL' | 'QUALITY_CHECK' | 'COMPLETED' | 'READY_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'ON_HOLD';
   remarks?: string;
 }
 

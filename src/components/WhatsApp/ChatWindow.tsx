@@ -176,7 +176,7 @@ const ChatWindow: React.FC<Props> = ({
           <div className="rounded-lg border bg-background p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
             <p className="text-muted-foreground">
               {orgMode === 'AI' ? '🤖' : '⚡'}{' '}
-              {orgMode === 'AI' ? 'AI Mode active' : 'Auto reply active'} — replies are automatic.
+              {orgMode === 'AI' ? 'AI Mode active' : 'Auto reply active'}   replies are automatic.
               Switch to Manual mode to reply yourself.
             </p>
             <Button variant="link" size="sm" className="shrink-0 p-0 h-auto" asChild>

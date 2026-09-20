@@ -10,7 +10,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0 / 0.8);
   --popover-foreground: oklch(0.145 0 0);
-  /* SellMate Electronics — blue primary */
+  /* SellMate Electronics   blue primary */
   --primary: oklch(0.546 0.245 262.881);            /* blue-600 */
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.951 0.026 236.824);          /* light blue tint */
@@ -38,7 +38,7 @@
   --sidebar-accent-foreground: oklch(0.379 0.146 265.522);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.623 0.214 259.815);
-  /* Themed glass fields + modals (default: blue — SellMate Electronics) */
+  /* Themed glass fields + modals (default: blue   SellMate Electronics) */
   --field-accent-rgb: 37, 99, 235;
   --field-focus-ring: rgba(37, 99, 235, 0.4);
   --modal-accent: 37, 99, 235;
@@ -50,7 +50,7 @@
   --modal-scroll-border: 147, 197, 253;
 }
 
-/* Organization admin — blue (SellMate Electronics brand) */
+/* Organization admin   blue (SellMate Electronics brand) */
 html[data-theme="organization"] {
   --field-accent-rgb: 37, 99, 235;
   --field-focus-ring: rgba(37, 99, 235, 0.4);
@@ -63,7 +63,7 @@ html[data-theme="organization"] {
   --modal-scroll-border: 147, 197, 253;
 }
 
-/* Branch portal — blue */
+/* Branch portal   blue */
 html[data-theme="branch"] {
   --field-accent-rgb: 37, 99, 235;
   --field-focus-ring: rgba(37, 99, 235, 0.4);
@@ -154,7 +154,7 @@ html[data-theme="branch"] {
  * SellMate Electronics brand override:
  * The app was originally styled with orange accents in 100+ files.
  * Instead of editing every file, we remap the entire Tailwind `orange`
- * palette to the blue palette here — every bg-orange-*, text-orange-*,
+ * palette to the blue palette here   every bg-orange-*, text-orange-*,
  * border-orange-*, ring-orange-* etc. instantly renders as blue.
  * (True warnings mostly use amber/yellow/red, which stay untouched.)
  */
@@ -229,7 +229,7 @@ table {
   min-height:100px ;
 }
 
-/* Glassmorphism utilities — use across modals, cards, tables */
+/* Glassmorphism utilities   use across modals, cards, tables */
 @layer utilities {
   .glass-modal-overlay {
     @apply fixed w-full h-full inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-2xl backdrop-saturate-150;
@@ -397,7 +397,7 @@ table {
     @apply rounded-xl border border-white/30 bg-white/40 backdrop-blur-sm shadow-sm;
   }
 
-  /* Public marketing + auth — orange & white glass */
+  /* Public marketing + auth   orange & white glass */
   .landing-glass-nav {
     @apply border border-white/50 bg-white/60 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_rgba(15,23,42,0.06)] ring-1 ring-inset ring-white/60;
   }

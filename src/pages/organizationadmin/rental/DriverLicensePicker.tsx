@@ -133,7 +133,7 @@ export default function DriverLicensePicker({ customerId, value, onChange, minYe
               onChange(e.target.value, next);
             }}
           >
-            <option value="">— No license attached —</option>
+            <option value="">  No license attached  </option>
             {licenses.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.licenseNo}
@@ -145,7 +145,7 @@ export default function DriverLicensePicker({ customerId, value, onChange, minYe
 
           {licenses.length === 0 && (
             <p className="text-[11px] text-muted-foreground">
-              No license on file for this customer yet — capture one before handover.
+              No license on file for this customer yet   capture one before handover.
             </p>
           )}
 
@@ -161,7 +161,7 @@ export default function DriverLicensePicker({ customerId, value, onChange, minYe
               )}
               {yearsShort && (
                 <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-300">
-                  <AlertTriangle className="w-3 h-3 mr-1" /> Held {selected.yearsHeld ?? 0}y — {minYearsHeld}y required
+                  <AlertTriangle className="w-3 h-3 mr-1" /> Held {selected.yearsHeld ?? 0}y   {minYearsHeld}y required
                 </Badge>
               )}
             </div>
@@ -198,10 +198,10 @@ export default function DriverLicensePicker({ customerId, value, onChange, minYe
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {photoSlot('licenseFrontUrl', 'License — front')}
-            {photoSlot('licenseBackUrl', 'License — back')}
-            {photoSlot('nicFrontUrl', 'NIC — front')}
-            {photoSlot('nicBackUrl', 'NIC — back')}
+            {photoSlot('licenseFrontUrl', 'License   front')}
+            {photoSlot('licenseBackUrl', 'License   back')}
+            {photoSlot('nicFrontUrl', 'NIC   front')}
+            {photoSlot('nicBackUrl', 'NIC   back')}
           </div>
 
           <div><Label className="text-xs">Notes</Label>

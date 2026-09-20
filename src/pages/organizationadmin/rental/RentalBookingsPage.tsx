@@ -24,12 +24,19 @@ import { selectCls, statusColor, type RentalOutletContext } from './shared';
 const BOOKING_STATUSES = ['PENDING', 'CONFIRMED', 'CHECKED_OUT', 'RETURNED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
 const CHARGE_TYPES = ['DAMAGE', 'CLEANING', 'FINE', 'EXCESS_KM', 'FUEL_DIFFERENCE', 'LATE_RETURN', 'EXTRA', 'OTHER'];
 const textareaCls = 'w-full min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm';
+const PAY_METHODS = ['CASH', 'CARD', 'BANK_TRANSFER', 'MOBILE_PAYMENT', 'CHECK', 'OTHER'];
+const PAY_TYPES: Record<string, string> = {
+  RENT: 'Rent payment', DEPOSIT: 'Deposit taken', DEPOSIT_REFUND: 'Deposit refunded',
+  DEPOSIT_DEDUCTION: 'Deposit applied', REFUND: 'Refund',
+};
 
 const emptyBookingForm = {
   vehicleId: '', customerId: '', ratePlanId: '', startAt: '', endAt: '',
   baseAmount: 0, depositAmount: 0, withDriver: false, isLoanVehicle: false, notes: '',
   renterNic: '', renterLicenseNo: '', driverLicenseId: '', identityPhotos: [] as string[],
   extraFeeIds: [] as string[], couponCode: '',
+  // Equipment lines: { rentalItemId | assetId, quantity }
+  items: [] as any[],
 };
 
 /** Bookings: list, quote-driven creation, edit, detail, check-out / check-in, charges, agreements. */
@@ -47,7 +54,15 @@ export default function RentalBookingsPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [extraFees, setExtraFees] = useState<any[]>([]);
   const [ratePlans, setRatePlans] = useState<any[]>([]);
+  const [rentalItems, setRentalItems] = useState<any[]>([]);
+  const [equipmentUnits, setEquipmentUnits] = useState<any[]>([]);
+  const [itemsDirty, setItemsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Payments + settlement
+  const [payForm, setPayForm] = useState<any>({ paymentType: 'RENT', paymentMethod: 'CASH', amount: '', referenceNumber: '' });
+  const [paySaving, setPaySaving] = useState(false);
+  const [settleTarget, setSettleTarget] = useState<any>(null);
+  const [settleForm, setSettleForm] = useState<any>({ amount: '', paymentMethod: 'CASH', refundMethod: 'CASH', allowOutstanding: false });
 
   // List filters
   const [statusFilter, setStatusFilter] = useState('');
@@ -63,6 +78,7 @@ export default function RentalBookingsPage() {
   const [conditionTarget, setConditionTarget] = useState<{ booking: any; action: 'checkout' | 'checkin' } | null>(null);
   const [conditionForm, setConditionForm] = useState<any>({
     odometer: '', fuelLevel: '', notes: '', photos: [] as string[], damageMarkers: [] as any[], customerSignature: null as string | null, paidAmount: '',
+    paymentMethod: 'CASH', depositCollected: '', depositMethod: 'CASH', itemReturns: {} as Record<string, { lost: string; damaged: string }>,
   });
 
   // Agreement dialog
@@ -94,13 +110,17 @@ export default function RentalBookingsPage() {
   }, []);
 
   const loadLookups = async () => {
-    const [vehiclesRes, customersRes, feesRes, plansRes] = await Promise.all([
-      getVehicles({ limit: 100 }),
+    const [vehiclesRes, customersRes, feesRes, plansRes, itemsRes, unitsRes] = await Promise.all([
+      getVehicles({ limit: 200, assetType: 'VEHICLE' }),
       getCustomers({ limit: 200 } as any),
       getExtraFees(),
       getRatePlans(),
+      rental.getRentalItems(),
+      getVehicles({ limit: 200, assetType: 'EQUIPMENT' }),
     ]);
     setVehicles((vehiclesRes?.data as any)?.vehicles ?? []);
+    setRentalItems(Array.isArray(itemsRes?.data) ? (itemsRes?.data as any[]) : []);
+    setEquipmentUnits((unitsRes?.data as any)?.vehicles ?? []);
     const list = (customersRes?.data as any)?.customers ?? (Array.isArray(customersRes?.data) ? customersRes?.data : []);
     setCustomers(list);
     setExtraFees((feesRes?.data as any) ?? []);
@@ -109,7 +129,8 @@ export default function RentalBookingsPage() {
 
   const openBookingModal = async () => {
     setEditingId(null);
-    setBookingForm({ ...emptyBookingForm });
+    setBookingForm({ ...emptyBookingForm, items: [] });
+    setItemsDirty(false);
     setQuote(null);
     setShowBookingModal(true);
     await loadLookups();
@@ -125,10 +146,17 @@ export default function RentalBookingsPage() {
       baseAmount: b.baseAmount ?? 0, depositAmount: b.depositAmount ?? 0,
       withDriver: Boolean(b.withDriver), isLoanVehicle: Boolean(b.isLoanVehicle), notes: b.notes ?? '',
       renterNic: b.renterNic ?? '', renterLicenseNo: b.renterLicenseNo ?? '', driverLicenseId: b.driverLicenseId ?? '',
-      identityPhotos: b.identityPhotos ?? [], extraFeeIds: [], couponCode: '',
+      identityPhotos: b.identityPhotos ?? [], extraFeeIds: [], couponCode: '', items: [],
     });
+    setItemsDirty(false);
     setShowBookingModal(true);
     await loadLookups();
+    // Current equipment lines (the list row does not carry them)
+    const res = await rental.getBookingById(b.id);
+    const lines = ((res?.data as any)?.items ?? []).map((l: any) => ({
+      rentalItemId: l.rentalItemId, assetId: l.assetId, quantity: l.quantity, unitRate: Number(l.unitRate),
+    }));
+    setBookingForm((prev: any) => ({ ...prev, items: lines }));
   };
 
   /** Bookings that overlap [start,end] on the same vehicle (active statuses only). */
@@ -169,8 +197,18 @@ export default function RentalBookingsPage() {
   const submitBooking = async () => {
     setSaving(true);
     try {
+      const items = (bookingForm.items ?? [])
+        .filter((l: any) => l.rentalItemId || l.assetId)
+        .map((l: any) => ({
+          rentalItemId: l.rentalItemId || null,
+          assetId: l.assetId || null,
+          quantity: l.assetId ? 1 : Math.max(1, Number(l.quantity || 1)),
+          unitRate: l.unitRate !== '' && l.unitRate != null ? Number(l.unitRate) : null,
+        }));
+      const { items: _formItems, ...formRest } = bookingForm;
       const payload = {
-        ...bookingForm,
+        ...formRest,
+        vehicleId: bookingForm.vehicleId || null,
         ratePlanId: bookingForm.ratePlanId || null,
         renterNic: bookingForm.renterNic || null,
         renterLicenseNo: bookingForm.renterLicenseNo || null,
@@ -183,9 +221,12 @@ export default function RentalBookingsPage() {
         extraFeeIds: bookingForm.extraFeeIds ?? [],
         couponCode: bookingForm.couponCode || null,
       };
-      const res = editingId
+      let res: any = editingId
         ? await rental.updateBooking(editingId, payload)
-        : await rental.createBooking({ ...payload, useQuote: Boolean(quote) });
+        : await rental.createBooking({ ...payload, items, useQuote: Boolean(quote) && Boolean(payload.vehicleId) });
+      if (editingId && (res?.success || res?.status) && itemsDirty) {
+        res = await rental.setBookingItems(editingId, items);
+      }
       if (res?.success || res?.status) {
         setShowBookingModal(false);
         setEditingId(null);
@@ -212,12 +253,20 @@ export default function RentalBookingsPage() {
     refreshStats();
   };
 
-  const openConditionDialog = (booking: any, action: 'checkout' | 'checkin') => {
+  const openConditionDialog = async (booking: any, action: 'checkout' | 'checkin') => {
+    // Full booking: equipment lines + deposit figures are not on the list row
+    const res = await rental.getBookingById(booking.id);
+    const full = (res?.data as any) ?? booking;
+    const held = Number(full.depositHeld ?? 0);
     setConditionForm({
-      odometer: booking.vehicle?.currentOdometer != null ? String(booking.vehicle.currentOdometer) : '',
+      odometer: full.vehicle?.currentOdometer != null ? String(full.vehicle.currentOdometer) : '',
       fuelLevel: '', notes: '', photos: [], damageMarkers: [], customerSignature: null, paidAmount: '',
+      paymentMethod: 'CASH',
+      depositCollected: action === 'checkout' && held <= 0 && Number(full.depositAmount) > 0 ? String(full.depositAmount) : '',
+      depositMethod: 'CASH',
+      itemReturns: {},
     });
-    setConditionTarget({ booking, action });
+    setConditionTarget({ booking: full, action });
   };
 
   const submitCondition = async () => {
@@ -232,6 +281,17 @@ export default function RentalBookingsPage() {
         damageMarkers: conditionForm.damageMarkers,
         customerSignature: conditionForm.customerSignature,
         paidAmount: conditionForm.paidAmount !== '' ? Number(conditionForm.paidAmount) : null,
+        paymentMethod: conditionForm.paymentMethod,
+        depositCollected: conditionTarget.action === 'checkout' && conditionForm.depositCollected !== ''
+          ? Number(conditionForm.depositCollected) : null,
+        depositMethod: conditionForm.depositMethod,
+        items: conditionTarget.action === 'checkin'
+          ? (conditionTarget.booking.items ?? []).map((l: any) => ({
+              bookingItemId: l.id,
+              lostQuantity: Number(conditionForm.itemReturns[l.id]?.lost || 0),
+              damagedQuantity: Number(conditionForm.itemReturns[l.id]?.damaged || 0),
+            }))
+          : undefined,
       });
       if (res?.success || res?.status) {
         setConditionTarget(null);
@@ -279,6 +339,67 @@ export default function RentalBookingsPage() {
     } finally {
       setChargeSaving(false);
     }
+  };
+
+  const submitPayment = async () => {
+    if (!detail?.id || !payForm.amount) return;
+    setPaySaving(true);
+    try {
+      const res = await rental.addBookingPayment(detail.id, {
+        paymentType: payForm.paymentType,
+        paymentMethod: payForm.paymentMethod,
+        amount: Number(payForm.amount),
+        referenceNumber: payForm.referenceNumber || null,
+      });
+      if (res?.success || res?.status) {
+        setPayForm({ paymentType: 'RENT', paymentMethod: 'CASH', amount: '', referenceNumber: '' });
+        await reloadDetail();
+      }
+    } finally { setPaySaving(false); }
+  };
+
+  const voidPayment = async (paymentId: string) => {
+    if (!detail?.id) return;
+    await rental.voidBookingPayment(detail.id, paymentId, 'Entered by mistake');
+    await reloadDetail();
+  };
+
+  // ---- Settlement (complete) ----
+  const openSettle = async (b: any) => {
+    const res = await rental.getBookingById(b.id);
+    const full = (res?.data as any) ?? b;
+    setSettleForm({ amount: '', paymentMethod: 'CASH', refundMethod: 'CASH', allowOutstanding: false });
+    setSettleTarget(full);
+  };
+
+  const settlePreview = useMemo(() => {
+    if (!settleTarget) return null;
+    const total = Number(settleTarget.totalAmount || 0);
+    const paid = Number(settleTarget.paidAmount || 0) + Number(settleForm.amount || 0);
+    const held = Number(settleTarget.depositHeld || 0);
+    const owedBefore = Math.max(total - paid, 0);
+    const deduct = Math.min(held, owedBefore);
+    const refund = held - deduct;
+    const owed = Math.round((owedBefore - deduct) * 100) / 100;
+    return { total, paid, held, deduct, refund, owed };
+  }, [settleTarget, settleForm.amount]);
+
+  const submitSettle = async () => {
+    if (!settleTarget) return;
+    setSaving(true);
+    try {
+      const res = await rental.bookingAction(settleTarget.id, 'complete', {
+        paidAmount: settleForm.amount !== '' ? Number(settleForm.amount) : null,
+        paymentMethod: settleForm.paymentMethod,
+        refundMethod: settleForm.refundMethod,
+        allowOutstanding: Boolean(settleForm.allowOutstanding),
+      });
+      if (res?.success || res?.status) {
+        setSettleTarget(null);
+        load();
+        refreshStats();
+      }
+    } finally { setSaving(false); }
   };
 
   const removeCharge = async (chargeId: string) => {
@@ -423,7 +544,7 @@ export default function RentalBookingsPage() {
                       {day.items.slice(0, 3).map((b: any) => (
                         <div key={b.id}
                           onClick={() => openDetail(b.id)}
-                          title={`${b.bookingNumber} — ${b.customer?.name || ''} (${b.status})`}
+                          title={`${b.bookingNumber}   ${b.customer?.name || ''} (${b.status})`}
                           className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate cursor-pointer ${statusColor[b.status] || 'bg-gray-100 text-gray-700'}`}>
                           {b.vehicle?.registrationNo || b.bookingNumber}
                         </div>
@@ -465,8 +586,12 @@ export default function RentalBookingsPage() {
                   <button className="hover:underline text-primary" onClick={() => openDetail(b.id)}>{b.bookingNumber}</button>
                   {b.isLoanVehicle && <Badge variant="outline" className="ml-1.5 text-[10px]">LOAN</Badge>}
                 </td>
-                <td className="p-3">{b.vehicle ? `${b.vehicle.registrationNo}` : '—'}</td>
-                <td className="p-3">{b.customer?.name || '—'}</td>
+                <td className="p-3">
+                  {b.vehicle ? `${b.vehicle.registrationNo}` : ''}
+                  {b.itemSummary && <span className="block text-xs text-muted-foreground max-w-56 truncate" title={b.itemSummary}>{b.itemSummary}</span>}
+                  {!b.vehicle && !b.itemSummary && ' '}
+                </td>
+                <td className="p-3">{b.customer?.name || ' '}</td>
                 <td className="p-3">{new Date(b.startAt).toLocaleDateString()} → {new Date(b.endAt).toLocaleDateString()}</td>
                 <td className="p-3">{money(b.totalAmount)}</td>
                 <td className="p-3">
@@ -493,7 +618,7 @@ export default function RentalBookingsPage() {
                     <Button size="sm" onClick={() => openConditionDialog(b, 'checkin')}>Check-In</Button>
                   )}
                   {b.status === 'RETURNED' && (
-                    <Button size="sm" onClick={() => doBookingAction(b.id, 'complete')}>Complete</Button>
+                    <Button size="sm" onClick={() => openSettle(b)}>Settle & Complete</Button>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => viewAgreement(b.id)}>Agreement</Button>
                 </td>
@@ -516,11 +641,11 @@ export default function RentalBookingsPage() {
           <DialogHeader><DialogTitle>{editingId ? 'Edit Booking' : 'New Rental Booking'}</DialogTitle></DialogHeader>
           <DialogBody>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div><Label>Vehicle *</Label>
+            <div><Label>Vehicle {(bookingForm.items ?? []).length > 0 ? '(optional)' : '*'}</Label>
               <select className={selectCls} value={bookingForm.vehicleId} onChange={(e) => setBookingForm({ ...bookingForm, vehicleId: e.target.value })}>
-                <option value="">Select vehicle</option>
+                <option value="">{(bookingForm.items ?? []).length > 0 ? 'No vehicle   equipment only' : 'Select vehicle'}</option>
                 {vehicles.filter((v) => v.isActive && v.status !== 'RETIRED').map((v) => (
-                  <option key={v.id} value={v.id}>{v.registrationNo} — {v.make} {v.model}</option>
+                  <option key={v.id} value={v.id}>{v.registrationNo}   {v.make} {v.model}</option>
                 ))}
               </select>
             </div>
@@ -533,10 +658,10 @@ export default function RentalBookingsPage() {
             {ratePlans.length > 0 && (
               <div className="col-span-2"><Label>Rate Plan (enables auto excess-km & late fees)</Label>
                 <select className={selectCls} value={bookingForm.ratePlanId} onChange={(e) => setBookingForm({ ...bookingForm, ratePlanId: e.target.value })}>
-                  <option value="">— No rate plan —</option>
+                  <option value="">  No rate plan  </option>
                   {ratePlans.map((p: any) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} — Rs {Number(p.baseRate).toLocaleString()}/{String(p.rateType).toLowerCase()}
+                      {p.name}   Rs {Number(p.baseRate).toLocaleString()}/{String(p.rateType).toLowerCase()}
                       {p.includedKm != null ? ` · ${p.includedKm} km incl.` : ''}
                     </option>
                   ))}
@@ -558,6 +683,68 @@ export default function RentalBookingsPage() {
                     ))}
                   </ul>
                 </div>
+              </div>
+            )}
+
+            {/* Equipment lines: quantity items (chairs, tents) and serial-tracked units (generators) */}
+            {(rentalItems.length > 0 || equipmentUnits.length > 0) && (
+              <div className="col-span-2 rounded-md border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Equipment</Label>
+                  <div className="flex gap-1">
+                    {rentalItems.length > 0 && (
+                      <Button type="button" size="sm" variant="outline" onClick={() => { setItemsDirty(true); setBookingForm({ ...bookingForm, items: [...(bookingForm.items ?? []), { rentalItemId: '', quantity: 1, unitRate: '' }] }); }}>
+                        <Plus className="w-3 h-3 mr-1" /> Item (qty)
+                      </Button>
+                    )}
+                    {equipmentUnits.length > 0 && (
+                      <Button type="button" size="sm" variant="outline" onClick={() => { setItemsDirty(true); setBookingForm({ ...bookingForm, items: [...(bookingForm.items ?? []), { assetId: '', quantity: 1, unitRate: '' }] }); }}>
+                        <Plus className="w-3 h-3 mr-1" /> Unit (serial)
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {(bookingForm.items ?? []).length === 0 && <p className="text-xs text-muted-foreground">No equipment on this booking.</p>}
+                {(bookingForm.items ?? []).map((line: any, idx: number) => {
+                  const setLine = (patch: any) => {
+                    const items = [...bookingForm.items];
+                    items[idx] = { ...line, ...patch };
+                    setItemsDirty(true);
+                    setBookingForm({ ...bookingForm, items });
+                  };
+                  const isUnit = 'assetId' in line && !('rentalItemId' in line && line.rentalItemId);
+                  const item = rentalItems.find((i: any) => i.id === line.rentalItemId);
+                  return (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                      {isUnit ? (
+                        <select className={`${selectCls} col-span-7`} value={line.assetId || ''} onChange={(e) => setLine({ assetId: e.target.value })}>
+                          <option value="">Select unit</option>
+                          {equipmentUnits.filter((u: any) => u.isActive).map((u: any) => (
+                            <option key={u.id} value={u.id}>{u.registrationNo}   {u.make} {u.model}{u.unitRate != null ? ` · Rs ${Number(u.unitRate).toLocaleString()}/${String(u.rateType || 'DAILY').toLowerCase()}` : ''}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <select className={`${selectCls} col-span-5`} value={line.rentalItemId || ''} onChange={(e) => setLine({ rentalItemId: e.target.value })}>
+                            <option value="">Select item</option>
+                            {rentalItems.map((i: any) => (
+                              <option key={i.id} value={i.id}>{i.name} · Rs {Number(i.unitRate).toLocaleString()}/{String(i.rateType).toLowerCase()} ({i.totalQuantity} total)</option>
+                            ))}
+                          </select>
+                          <Input className="col-span-2" type="number" min={1} placeholder="Qty" value={line.quantity}
+                            onChange={(e) => setLine({ quantity: e.target.value })} />
+                        </>
+                      )}
+                      <Input className="col-span-3" type="number" placeholder={item ? `Rate ${Number(item.unitRate)}` : 'Rate (default)'} value={line.unitRate ?? ''}
+                        onChange={(e) => setLine({ unitRate: e.target.value })} />
+                      <Button type="button" size="sm" variant="ghost" className="col-span-2"
+                        onClick={() => { setItemsDirty(true); setBookingForm({ ...bookingForm, items: bookingForm.items.filter((_: any, i: number) => i !== idx) }); }}>
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                <p className="text-[11px] text-muted-foreground">Prices per period from the item; availability for the dates is checked when you save.</p>
               </div>
             )}
 
@@ -654,8 +841,8 @@ export default function RentalBookingsPage() {
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowBookingModal(false); setEditingId(null); }}>Cancel</Button>
-            <Button onClick={submitBooking} disabled={saving || !bookingForm.vehicleId || !bookingForm.customerId || !bookingForm.startAt || !bookingForm.endAt}>
-              {saving ? 'Saving...' : editingId ? 'Save Changes' : quote ? `Book — Rs ${Number(quote.totalAmount).toLocaleString()}` : 'Create Booking'}
+            <Button onClick={submitBooking} disabled={saving || (!bookingForm.vehicleId && !(bookingForm.items ?? []).some((l: any) => l.rentalItemId || l.assetId)) || !bookingForm.customerId || !bookingForm.startAt || !bookingForm.endAt}>
+              {saving ? 'Saving...' : editingId ? 'Save Changes' : quote ? `Book   Rs ${Number(quote.totalAmount).toLocaleString()}` : 'Create Booking'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -666,7 +853,7 @@ export default function RentalBookingsPage() {
         <DialogContent className="max-w-xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {conditionTarget?.action === 'checkout' ? 'Vehicle Check-Out (Handover)' : 'Vehicle Check-In (Return)'} — {conditionTarget?.booking?.bookingNumber}
+              {conditionTarget?.action === 'checkout' ? 'Vehicle Check-Out (Handover)' : 'Vehicle Check-In (Return)'}   {conditionTarget?.booking?.bookingNumber}
             </DialogTitle>
           </DialogHeader>
           <DialogBody>
@@ -676,6 +863,7 @@ export default function RentalBookingsPage() {
                 Auto-charges may apply from rate plan <b>{conditionTarget.booking.ratePlan.name}</b> if the vehicle is returned over the km allowance, with less fuel, or late. Review them in the booking details after check-in.
               </div>
             )}
+            {conditionTarget?.booking?.vehicleId && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5"><Label>Odometer (km)</Label><Input type="number" value={conditionForm.odometer} onChange={(e) => setConditionForm({ ...conditionForm, odometer: e.target.value })} /></div>
               <div className="space-y-1.5"><Label>Fuel Level</Label>
@@ -685,20 +873,64 @@ export default function RentalBookingsPage() {
                 </select>
               </div>
             </div>
+            )}
+            {/* Equipment on this booking */}
+            {(conditionTarget?.booking?.items?.length ?? 0) > 0 && (
+              <div className="rounded-md border p-3 space-y-2">
+                <Label>Equipment {conditionTarget?.action === 'checkin' ? '  mark anything lost or damaged' : ''}</Label>
+                {conditionTarget!.booking.items.map((l: any) => (
+                  <div key={l.id} className="grid grid-cols-12 gap-2 items-center text-sm">
+                    <span className="col-span-6">{l.quantity} x {l.description}</span>
+                    {conditionTarget?.action === 'checkin' && (
+                      <>
+                        <Input className="col-span-3" type="number" min={0} max={l.quantity} placeholder="Lost"
+                          value={conditionForm.itemReturns[l.id]?.lost ?? ''}
+                          onChange={(e) => setConditionForm({ ...conditionForm, itemReturns: { ...conditionForm.itemReturns, [l.id]: { ...(conditionForm.itemReturns[l.id] || {}), lost: e.target.value } } })} />
+                        <Input className="col-span-3" type="number" min={0} max={l.quantity} placeholder="Damaged"
+                          value={conditionForm.itemReturns[l.id]?.damaged ?? ''}
+                          onChange={(e) => setConditionForm({ ...conditionForm, itemReturns: { ...conditionForm.itemReturns, [l.id]: { ...(conditionForm.itemReturns[l.id] || {}), damaged: e.target.value } } })} />
+                      </>
+                    )}
+                  </div>
+                ))}
+                {conditionTarget?.action === 'checkin' && (
+                  <p className="text-[11px] text-muted-foreground">Lost units are removed from stock and charged at replacement cost. Add damage charges in the booking details.</p>
+                )}
+              </div>
+            )}
             <div className="space-y-1.5"><Label>Notes / Damage remarks</Label>
               <textarea className={textareaCls} value={conditionForm.notes} onChange={(e) => setConditionForm({ ...conditionForm, notes: e.target.value })} />
             </div>
-            <div className="space-y-1.5"><Label>Payment collected now (Rs)</Label><Input type="number" value={conditionForm.paidAmount} onChange={(e) => setConditionForm({ ...conditionForm, paidAmount: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Rent collected now (Rs)</Label><Input type="number" value={conditionForm.paidAmount} onChange={(e) => setConditionForm({ ...conditionForm, paidAmount: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Paid by</Label>
+                <select className={selectCls} value={conditionForm.paymentMethod} onChange={(e) => setConditionForm({ ...conditionForm, paymentMethod: e.target.value })}>
+                  {PAY_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
+                </select>
+              </div>
+              {conditionTarget?.action === 'checkout' && (
+                <>
+                  <div className="space-y-1.5"><Label>Security deposit taken (Rs)</Label><Input type="number" value={conditionForm.depositCollected} onChange={(e) => setConditionForm({ ...conditionForm, depositCollected: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>Deposit paid by</Label>
+                    <select className={selectCls} value={conditionForm.depositMethod} onChange={(e) => setConditionForm({ ...conditionForm, depositMethod: e.target.value })}>
+                      {PAY_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
             <PhotoUploadInput
               label="Condition Photos (before/after evidence)"
               folder="condition-reports"
               photos={conditionForm.photos}
               onChange={(photos) => setConditionForm({ ...conditionForm, photos })}
             />
+            {conditionTarget?.booking?.vehicleId && (
             <div className="space-y-2">
               <Label>Damage Diagram (tap the car to mark damage)</Label>
               <VehicleDamageDiagram value={conditionForm.damageMarkers} onChange={(damageMarkers) => setConditionForm({ ...conditionForm, damageMarkers })} />
             </div>
+            )}
             <SignaturePad
               value={conditionForm.customerSignature}
               onChange={(sig) => setConditionForm({ ...conditionForm, customerSignature: sig })}
@@ -732,7 +964,9 @@ export default function RentalBookingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-md border p-3 space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground">Vehicle & Customer</p>
-                    <p><b>{detail.vehicle?.registrationNo}</b> — {detail.vehicle?.make} {detail.vehicle?.model}</p>
+                    {detail.vehicle ? (
+                      <p><b>{detail.vehicle?.registrationNo}</b>   {detail.vehicle?.make} {detail.vehicle?.model}</p>
+                    ) : <p className="text-muted-foreground">Equipment rental</p>}
                     <p>{detail.customer?.name} {detail.customer?.phone ? `· ${detail.customer.phone}` : ''}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(detail.startAt).toLocaleString()} → {new Date(detail.endAt).toLocaleString()}
@@ -747,6 +981,7 @@ export default function RentalBookingsPage() {
                     <p className="text-xs font-semibold text-muted-foreground">Money</p>
                     <div className="flex justify-between"><span>Base</span><span>{money(detail.baseAmount)}</span></div>
                     <div className="flex justify-between"><span>Extras</span><span>{money(detail.extrasAmount)}</span></div>
+                    {Number(detail.itemsAmount) > 0 && <div className="flex justify-between"><span>Equipment</span><span>{money(detail.itemsAmount)}</span></div>}
                     <div className="flex justify-between"><span>Charges</span><span>{money(detail.chargesAmount)}</span></div>
                     {Number(detail.discountAmount) > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>−{money(detail.discountAmount)}</span></div>}
                     <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total</span><span>{money(detail.totalAmount)}</span></div>
@@ -756,9 +991,11 @@ export default function RentalBookingsPage() {
                         {money(Number(detail.totalAmount) - Number(detail.paidAmount))}
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs text-muted-foreground"><span>Deposit</span>
-                      <span>{money(detail.depositAmount)} {detail.depositReleased ? '· released' : '· held'}</span>
+                    <div className="flex justify-between text-xs text-muted-foreground border-t pt-1 mt-1"><span>Deposit agreed</span><span>{money(detail.depositAmount)}</span></div>
+                    <div className="flex justify-between text-xs text-muted-foreground"><span>Deposit taken / applied / refunded</span>
+                      <span>{money(detail.depositPaid)} / {money(detail.depositDeducted)} / {money(detail.depositRefunded)}</span>
                     </div>
+                    <div className="flex justify-between text-xs font-medium"><span>Deposit held now</span><span>{money(detail.depositHeld)}</span></div>
                   </div>
                 </div>
 
@@ -766,7 +1003,7 @@ export default function RentalBookingsPage() {
                 {(detail.renterNic || detail.renterLicenseNo || (detail.identityPhotos?.length ?? 0) > 0) && (
                   <div className="rounded-md border p-3">
                     <p className="text-xs font-semibold text-muted-foreground mb-1">Renter Identity</p>
-                    <p className="text-xs">NIC: {detail.renterNic || '—'} · License: {detail.renterLicenseNo || '—'}</p>
+                    <p className="text-xs">NIC: {detail.renterNic || ' '} · License: {detail.renterLicenseNo || ' '}</p>
                     {(detail.identityPhotos?.length ?? 0) > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         {detail.identityPhotos.map((p: string, i: number) => (
@@ -801,6 +1038,81 @@ export default function RentalBookingsPage() {
                     ))}
                   </div>
                 )}
+
+                {/* Equipment lines */}
+                {(detail.items?.length ?? 0) > 0 && (
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Equipment</p>
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {detail.items.map((l: any) => (
+                          <tr key={l.id} className="border-t first:border-t-0">
+                            <td className="py-1.5">{l.quantity} x {l.description}</td>
+                            <td className="py-1.5 text-muted-foreground">{money(l.unitRate)}/{String(l.rateType).toLowerCase()} x {l.periods}</td>
+                            <td className="py-1.5">
+                              {Number(l.lostQuantity) > 0 && <Badge variant="destructive" className="text-[10px] mr-1">{l.lostQuantity} lost</Badge>}
+                              {Number(l.damagedQuantity) > 0 && <Badge variant="outline" className="text-[10px]">{l.damagedQuantity} damaged</Badge>}
+                            </td>
+                            <td className="py-1.5 text-right font-medium">{money(l.lineTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Payments ledger */}
+                <div className="rounded-md border p-3">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Payments</p>
+                  {(detail.payments?.length ?? 0) > 0 ? (
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {detail.payments.map((p: any) => (
+                          <tr key={p.id} className={`border-t first:border-t-0 ${p.voidedAt ? 'line-through text-muted-foreground' : ''}`}>
+                            <td className="py-1.5">{p.paymentNumber}</td>
+                            <td className="py-1.5">{PAY_TYPES[p.paymentType] || p.paymentType}</td>
+                            <td className="py-1.5">{String(p.paymentMethod).replace(/_/g, ' ')}{p.referenceNumber ? ` · ${p.referenceNumber}` : ''}</td>
+                            <td className="py-1.5 text-muted-foreground">{new Date(p.paidAt).toLocaleString()}</td>
+                            <td className="py-1.5 text-right font-medium">{money(p.amount)}</td>
+                            <td className="py-1.5 text-right w-12">
+                              {!p.voidedAt && detail.status !== 'COMPLETED' && p.paymentType !== 'DEPOSIT_DEDUCTION' && (
+                                <button className="text-red-500 text-[11px]" onClick={() => voidPayment(p.id)}>Void</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : <p className="text-xs text-muted-foreground">No payments recorded.</p>}
+                  <div className="flex flex-wrap items-end gap-2 mt-3 border-t pt-3">
+                    <div>
+                      <Label className="text-xs">Type</Label>
+                      <select className={`${selectCls} h-8 w-36`} value={payForm.paymentType} onChange={(e) => setPayForm({ ...payForm, paymentType: e.target.value })}>
+                        {detail.status !== 'CANCELLED' && <option value="RENT">Rent payment</option>}
+                        {detail.status !== 'CANCELLED' && <option value="DEPOSIT">Deposit taken</option>}
+                        <option value="DEPOSIT_REFUND">Deposit refund</option>
+                        <option value="REFUND">Refund</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Method</Label>
+                      <select className={`${selectCls} h-8 w-36`} value={payForm.paymentMethod} onChange={(e) => setPayForm({ ...payForm, paymentMethod: e.target.value })}>
+                        {PAY_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
+                      </select>
+                    </div>
+                    <div className="w-28">
+                      <Label className="text-xs">Amount (Rs)</Label>
+                      <Input className="h-8" type="number" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} />
+                    </div>
+                    <div className="flex-1 min-w-28">
+                      <Label className="text-xs">Reference</Label>
+                      <Input className="h-8" value={payForm.referenceNumber} onChange={(e) => setPayForm({ ...payForm, referenceNumber: e.target.value })} placeholder="Slip / txn no" />
+                    </div>
+                    <Button size="sm" onClick={submitPayment} disabled={paySaving || !payForm.amount || Number(payForm.amount) <= 0}>
+                      {paySaving ? 'Saving…' : 'Record'}
+                    </Button>
+                  </div>
+                </div>
 
                 {/* Charges */}
                 <div className="rounded-md border p-3">
@@ -855,6 +1167,54 @@ export default function RentalBookingsPage() {
               <Button variant="outline" onClick={() => viewAgreement(detail.id)}>Agreement</Button>
             )}
             <Button variant="outline" onClick={() => setDetail(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settle & complete */}
+      <Dialog open={!!settleTarget} onOpenChange={(open) => !open && setSettleTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Settle {settleTarget?.bookingNumber}</DialogTitle></DialogHeader>
+          <DialogBody>
+            {settlePreview && (
+              <div className="space-y-3 text-sm">
+                <div className="rounded-md border p-3 space-y-0.5">
+                  <div className="flex justify-between"><span>Total (incl. charges)</span><span>{money(settlePreview.total)}</span></div>
+                  <div className="flex justify-between"><span>Paid (incl. now)</span><span>{money(settlePreview.paid)}</span></div>
+                  <div className="flex justify-between"><span>Deposit held</span><span>{money(settlePreview.held)}</span></div>
+                  <div className="flex justify-between text-amber-700"><span>Deposit applied to balance</span><span>{money(settlePreview.deduct)}</span></div>
+                  <div className="flex justify-between text-green-700"><span>Deposit to refund</span><span>{money(settlePreview.refund)}</span></div>
+                  <div className={`flex justify-between font-bold border-t pt-1 mt-1 ${settlePreview.owed > 0 ? 'text-red-600' : ''}`}><span>Still owed</span><span>{money(settlePreview.owed)}</span></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Collect now (Rs)</Label><Input type="number" value={settleForm.amount} onChange={(e) => setSettleForm({ ...settleForm, amount: e.target.value })} /></div>
+                  <div><Label>Paid by</Label>
+                    <select className={selectCls} value={settleForm.paymentMethod} onChange={(e) => setSettleForm({ ...settleForm, paymentMethod: e.target.value })}>
+                      {PAY_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
+                    </select>
+                  </div>
+                  {settlePreview.refund > 0 && (
+                    <div className="col-span-2"><Label>Refund deposit by</Label>
+                      <select className={selectCls} value={settleForm.refundMethod} onChange={(e) => setSettleForm({ ...settleForm, refundMethod: e.target.value })}>
+                        {PAY_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {settlePreview.owed > 0 && (
+                  <label className="flex items-start gap-2 text-xs">
+                    <input type="checkbox" className="mt-0.5" checked={settleForm.allowOutstanding} onChange={(e) => setSettleForm({ ...settleForm, allowOutstanding: e.target.checked })} />
+                    <span>Close the booking with {money(settlePreview.owed)} still owed by the customer</span>
+                  </label>
+                )}
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSettleTarget(null)}>Cancel</Button>
+            <Button onClick={submitSettle} disabled={saving || (!!settlePreview && settlePreview.owed > 0 && !settleForm.allowOutstanding)}>
+              {saving ? 'Saving...' : 'Settle & Complete'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

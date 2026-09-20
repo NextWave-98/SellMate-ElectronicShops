@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-import { Calendar, Users, CheckCircle, RefreshCw, Edit, Search, Plus, Upload, Monitor, Trash2, AlertCircle, CheckSquare, XSquare } from 'lucide-react';
+import { Calendar, Users, CheckCircle, RefreshCw, Edit, Search, Plus, Upload, Monitor, Trash2, AlertCircle, CheckSquare, XSquare, ScanFace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import toast from 'react-hot-toast';
 import useFetch from '../../hooks/useFetch';
 import { useAuthRedux } from '../../hooks/useAuthRedux';
+import { BiometricAttendanceAdmin } from '@/components/attendance/BiometricAttendanceAdmin';
 
 interface AttendanceLog {
   id: string;
@@ -431,7 +432,7 @@ export default function AttendancePage() {
   };
 
   const formatTime = (dt: string | null) => {
-    if (!dt) return '—';
+    if (!dt) return ' ';
     return new Date(dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -471,6 +472,7 @@ export default function AttendancePage() {
           <TabsTrigger value="logs"><Calendar className="h-4 w-4 mr-2" />Attendance Logs</TabsTrigger>
           <TabsTrigger value="corrections"><AlertCircle className="h-4 w-4 mr-2" />Pending Fixes {pendingTotal > 0 ? `(${pendingTotal})` : ''}</TabsTrigger>
           <TabsTrigger value="devices"><Monitor className="h-4 w-4 mr-2" />Registered Devices</TabsTrigger>
+          <TabsTrigger value="biometric"><ScanFace className="h-4 w-4 mr-2" />Face / PIN</TabsTrigger>
         </TabsList>
         </div>
 
@@ -540,14 +542,14 @@ export default function AttendancePage() {
                     <TableRow key={log.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{log.staff?.user?.name ?? '—'}</p>
+                          <p className="font-medium">{log.staff?.user?.name ?? ' '}</p>
                           <p className="text-xs text-gray-500">{log.staff?.staffId}</p>
                         </div>
                       </TableCell>
                       <TableCell>{log.attendanceDate}</TableCell>
                       <TableCell>{formatTime(log.dayInTime)}</TableCell>
                       <TableCell>{formatTime(log.dayOffTime)}</TableCell>
-                      <TableCell>{log.hoursWorked != null ? `${Number(log.hoursWorked).toFixed(1)}h` : '—'}</TableCell>
+                      <TableCell>{log.hoursWorked != null ? `${Number(log.hoursWorked).toFixed(1)}h` : ' '}</TableCell>
                       <TableCell>
                         <Badge className={statusColors[log.status] ?? 'bg-gray-100 text-gray-700'}>{log.status.replace(/_/g, ' ')}</Badge>
                         {log.correctionStatus && log.correctionStatus !== 'none' && (
@@ -617,7 +619,7 @@ export default function AttendancePage() {
                     <TableRow key={log.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{log.staff?.user?.name ?? '—'}</p>
+                          <p className="font-medium">{log.staff?.user?.name ?? ' '}</p>
                           <p className="text-xs text-gray-500">{log.staff?.staffId}</p>
                         </div>
                       </TableCell>
@@ -683,14 +685,14 @@ export default function AttendancePage() {
                     <TableRow key={d.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{d.staff?.user?.name ?? '—'}</p>
+                          <p className="font-medium">{d.staff?.user?.name ?? ' '}</p>
                           <p className="text-xs text-gray-500">{d.staff?.staffId}</p>
                         </div>
                       </TableCell>
                       <TableCell>{d.deviceName}</TableCell>
                       <TableCell className="font-mono text-xs">{d.deviceFingerprint.slice(0, 12)}…</TableCell>
-                      <TableCell>{d.ipAddress ?? '—'}</TableCell>
-                      <TableCell>{d.lastUsedAt ? new Date(d.lastUsedAt).toLocaleDateString() : '—'}</TableCell>
+                      <TableCell>{d.ipAddress ?? ' '}</TableCell>
+                      <TableCell>{d.lastUsedAt ? new Date(d.lastUsedAt).toLocaleDateString() : ' '}</TableCell>
                       <TableCell>
                         <Badge className={d.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}>
                           {d.isActive ? 'Active' : 'Inactive'}
@@ -708,12 +710,16 @@ export default function AttendancePage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="biometric">
+          <BiometricAttendanceAdmin staffList={staffList} />
+        </TabsContent>
       </Tabs>
 
       {/* ── Edit / Override Modal ── */}
       <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit Attendance — {overrideStaffName}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit Attendance   {overrideStaffName}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
               <Label>Attendance Date</Label>
@@ -822,7 +828,7 @@ export default function AttendancePage() {
                           <TableCell className="font-mono text-xs">{r.staffId.slice(0, 8)}…</TableCell>
                           <TableCell>{r.attendanceDate}</TableCell>
                           <TableCell>{r.dayInTime}</TableCell>
-                          <TableCell>{r.dayOffTime || '—'}</TableCell>
+                          <TableCell>{r.dayOffTime || ' '}</TableCell>
                         </TableRow>
                       ))}
                       {bulkPreview.length > 20 && (
@@ -850,7 +856,7 @@ export default function AttendancePage() {
           {reviewLog && (
             <div className="space-y-4 py-2">
               <div className="bg-white/40 backdrop-blur-sm rounded-xl p-3 text-sm border border-white/20">
-                <p><strong>Staff:</strong> {reviewLog.staff?.user?.name ?? '—'} ({reviewLog.staff?.staffId})</p>
+                <p><strong>Staff:</strong> {reviewLog.staff?.user?.name ?? ' '} ({reviewLog.staff?.staffId})</p>
                 <p><strong>Date:</strong> {reviewLog.attendanceDate}</p>
                 <p><strong>Current Check-In:</strong> {formatTime(reviewLog.dayInTime)}</p>
                 <p><strong>Current Check-Out:</strong> {formatTime(reviewLog.dayOffTime)}</p>

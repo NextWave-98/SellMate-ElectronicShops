@@ -351,7 +351,7 @@ export default function DiscountsPage() {
     return `৳${Number(item.discountValue).toFixed(2)}`;
   };
 
-  const formatDate = (d?: string | null) => (d ? d.slice(0, 10) : '—');
+  const formatDate = (d?: string | null) => (d ? d.slice(0, 10) : ' ');
 
   const isExpired = (item: DiscountItem) => {
     if (!item.endDate) return false;

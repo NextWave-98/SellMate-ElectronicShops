@@ -1,6 +1,6 @@
 import type { MouseEvent, MouseEventHandler } from "react"
 
-/** Close only when the backdrop itself is clicked — not when clicks bubble from the panel. */
+/** Close only when the backdrop itself is clicked   not when clicks bubble from the panel. */
 export function backdropClickToClose(onClose: () => void): MouseEventHandler<HTMLElement> {
   return (event: MouseEvent<HTMLElement>) => {
     if (event.target === event.currentTarget) onClose()

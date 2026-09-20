@@ -69,6 +69,6 @@ export function showWhatsAppBrowserNotification(phone: string, body: string): vo
       tag: `wa-${displayPhone}`,
     });
   } catch {
-    // ignore — some browsers block without user gesture
+    // ignore   some browsers block without user gesture
   }
 }

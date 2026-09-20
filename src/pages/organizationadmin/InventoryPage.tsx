@@ -168,7 +168,7 @@ export default function InventoryPage() {
   const loadInventory = useCallback(async () => {
     try {
       // Only show the full-page spinner on the very first load. Subsequent reloads
-      // (search, filters, pagination) keep the page — and the focused search input — mounted.
+      // (search, filters, pagination) keep the page   and the focused search input   mounted.
       if (!hasLoadedRef.current) setLoading(true);
       const filters: Record<string, unknown> = {
         page: currentPage,
@@ -352,7 +352,7 @@ export default function InventoryPage() {
     }
   }, [loadInventory, loadDashboardStats]);
 
-  // CSV export — fetches all inventory with current filters (no pagination)
+  // CSV export   fetches all inventory with current filters (no pagination)
   const handleExportCSV = useCallback(async () => {
     setExporting(true);
     try {

@@ -45,7 +45,7 @@ const getShipmentLastUpdatedDisplay = (shipment: CourierShipment): string => {
   if (shipment.updatedAt) {
     return formatDateTime(shipment.updatedAt);
   }
-  return '—';
+  return ' ';
 };
 
 const formatRecipientAddress = (shipment: CourierShipment) => {
@@ -55,7 +55,7 @@ const formatRecipientAddress = (shipment: CourierShipment) => {
     shipment.recipientDistrict,
     shipment.recipientPostalCode,
   ].filter((part) => Boolean(part && String(part).trim()));
-  return parts.join(', ') || '—';
+  return parts.join(', ') || ' ';
 };
 
 const extractSaleItems = (shipment: CourierShipment) => {
@@ -221,13 +221,13 @@ export const TrackingModal = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <span className="text-xs text-gray-600">Customer Name</span>
-                <p className="font-semibold text-gray-900">{shipment.recipientName || '—'}</p>
+                <p className="font-semibold text-gray-900">{shipment.recipientName || ' '}</p>
               </div>
               <div>
                 <span className="text-xs text-gray-600">Phone</span>
                 <p className="font-semibold text-gray-900 flex items-center gap-1">
                   <Phone className="w-3.5 h-3.5 text-gray-400" />
-                  {shipment.recipientPhone || '—'}
+                  {shipment.recipientPhone || ' '}
                 </p>
                 {shipment.recipientPhone2 && (
                   <p className="text-sm text-gray-600 mt-0.5">{shipment.recipientPhone2}</p>
@@ -270,13 +270,13 @@ export const TrackingModal = ({
                         <TableCell className="text-xs text-gray-400">{index + 1}</TableCell>
                         <TableCell className="text-sm">
                           <div className="font-medium text-gray-900">
-                            {item.product?.name || item.productName || '—'}
+                            {item.product?.name || item.productName || ' '}
                           </div>
                           {(item.product?.sku || item.sku) && (
                             <div className="text-xs text-gray-400">{item.product?.sku || item.sku}</div>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm text-right font-semibold">{item.quantity ?? '—'}</TableCell>
+                        <TableCell className="text-sm text-right font-semibold">{item.quantity ?? ' '}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

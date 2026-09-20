@@ -117,6 +117,13 @@ export const useGarage = () => {
     [fetchData]
   );
 
+  /** Approved estimate -> job sheet; linked products are issued from the branch's stock. */
+  const convertEstimate = useCallback(
+    async (id: string, data: { locationId: string; assignedToId?: string | null; serviceBayId?: string | null; expectedDate?: string | null }) =>
+      fetchData({ endpoint: `/garage/estimates/${id}/convert`, method: 'POST', data, successMessage: 'Job sheet created from estimate' }),
+    [fetchData]
+  );
+
   const sendEstimate = useCallback(
     async (id: string, channel: 'SMS' | 'WHATSAPP' = 'SMS') =>
       fetchData({ endpoint: `/garage/estimates/${id}/send`, method: 'POST', data: { channel }, successMessage: `Estimate sent via ${channel}` }),
@@ -177,7 +184,7 @@ export const useGarage = () => {
     () => ({
       getStats,
       getVehicles, getVehicleById, createVehicle, updateVehicle,
-      getEstimates, getEstimateById, createEstimate, updateEstimate, setEstimateStatus, sendEstimate,
+      getEstimates, getEstimateById, createEstimate, updateEstimate, setEstimateStatus, sendEstimate, convertEstimate,
       getLaborEntries, createLaborEntry,
       getBays, createBay, assignJobToBay,
       getReminders, createReminder, updateReminder,
@@ -185,7 +192,7 @@ export const useGarage = () => {
     [
       getStats,
       getVehicles, getVehicleById, createVehicle, updateVehicle,
-      getEstimates, getEstimateById, createEstimate, updateEstimate, setEstimateStatus, sendEstimate,
+      getEstimates, getEstimateById, createEstimate, updateEstimate, setEstimateStatus, sendEstimate, convertEstimate,
       getLaborEntries, createLaborEntry,
       getBays, createBay, assignJobToBay,
       getReminders, createReminder, updateReminder,

@@ -196,7 +196,7 @@ const WhatsAppSettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle>Connect WhatsApp Business</CardTitle>
             <CardDescription>
-              Use Meta Embedded Signup to connect in one click — no manual token copy-paste.
+              Use Meta Embedded Signup to connect in one click   no manual token copy-paste.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

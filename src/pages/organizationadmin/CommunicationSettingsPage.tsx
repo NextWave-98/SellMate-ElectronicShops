@@ -458,7 +458,7 @@ const CommunicationSettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* WhatsApp BYOC — each org uses their own Meta credentials */}
+      {/* WhatsApp BYOC   each org uses their own Meta credentials */}
       <Card className="border-emerald-200 bg-emerald-50/60 shadow-sm">
         <CardContent className="pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -468,7 +468,7 @@ const CommunicationSettingsPage: React.FC = () => {
             <div>
               <h2 className="font-semibold text-emerald-900">WhatsApp Business (your own Meta account)</h2>
               <p className="text-sm text-emerald-800/80 mt-1 max-w-xl">
-                Connect your organization&apos;s Meta Cloud API credentials — phone number, access token,
+                Connect your organization&apos;s Meta Cloud API credentials   phone number, access token,
                 and webhook. Outbound notifications and auto-replies use <strong>your</strong> WhatsApp
                 number, not the platform&apos;s.
               </p>
@@ -526,7 +526,7 @@ const CommunicationSettingsPage: React.FC = () => {
                 <div>
                   <Label className="text-base font-semibold text-gray-800">Enable Notifications</Label>
                   <p className="text-sm text-muted-foreground mt-0.5">
-                    Master switch — disabling this stops all outbound messages.
+                    Master switch   disabling this stops all outbound messages.
                   </p>
                 </div>
                 <button
@@ -608,8 +608,8 @@ const CommunicationSettingsPage: React.FC = () => {
                 <div>
                   <Label className="font-semibold text-violet-800">Credential Mode</Label>
                   <p className="text-sm text-violet-600 mt-0.5">
-                    <strong>Platform Managed</strong> — use shared platform credentials.&nbsp;
-                    <strong>BYOC</strong> — bring your own credentials.
+                    <strong>Platform Managed</strong>   use shared platform credentials.&nbsp;
+                    <strong>BYOC</strong>   bring your own credentials.
                   </p>
                 </div>
                 <Select
@@ -816,7 +816,7 @@ const CommunicationSettingsPage: React.FC = () => {
                 <CardTitle className="text-lg">Credentials</CardTitle>
                 <CardDescription className="text-sm">
                   {notifDraft.notificationMode === 'BYOC'
-                    ? 'Your own credentials are active — add at least one per channel you have enabled above.'
+                    ? 'Your own credentials are active   add at least one per channel you have enabled above.'
                     : 'Platform credentials are in use. Switch to BYOC to add your own.'}
                 </CardDescription>
               </div>

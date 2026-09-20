@@ -29,7 +29,7 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   },
   {
     id: 'system-usage',
-    // Help guide — all authenticated admin users
+    // Help guide   all authenticated admin users
   },
   {
     id: 'shops',
@@ -365,7 +365,7 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   },
   {
     id: 'system-usage',
-    // Help guide — all authenticated branch users
+    // Help guide   all authenticated branch users
   },
   {
     id: 'pos',
@@ -512,7 +512,7 @@ export interface RoutePermissionConfig {
  */
 export const SUPERADMIN_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   { path: '/superadmin/dashboard' }, // All admins can access
-  { path: '/superadmin/system-usage' }, // Help guide — all admins
+  { path: '/superadmin/system-usage' }, // Help guide   all admins
   { path: '/superadmin/shops/management', requiredModule: 'locations' },
   { path: '/superadmin/staff/management', requiredModule: 'users' },
   { path: '/superadmin/roles/management', requiredModule: 'roles' },
@@ -601,7 +601,7 @@ export const SUPERADMIN_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
  */
 export const BRANCH_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   { path: '/:branchCode/dashboard' }, // All branch users can access
-  { path: '/:branchCode/system-usage' }, // Help guide — all branch users
+  { path: '/:branchCode/system-usage' }, // Help guide   all branch users
   { path: '/:branchCode/pos', requiredPermission: PERMISSIONS.SALES_CREATE },
   { path: '/:branchCode/quick-pos', requiredPermission: PERMISSIONS.SALES_CREATE },
   { path: '/:branchCode/cash-drawer', requiredPermission: PERMISSIONS.SALES_CREATE },

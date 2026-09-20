@@ -343,7 +343,7 @@ const CourierShipmentModal = ({
       })(),
       notes: `Payment Method: ${paymentMethod.toUpperCase()}${formData.notes ? ' | ' + formData.notes : ''}`,
       paymentMethod: paymentMethod,
-      // Sale items — required for auto-sale creation on backend
+      // Sale items   required for auto-sale creation on backend
       saleItems: selectedProducts.map(p => ({
         productId: p.id,
         name: p.name,
@@ -609,7 +609,7 @@ const CourierShipmentModal = ({
                             }}
                           >
                             {c.name}
-                            {c.stateName ? <span className="text-gray-400 ml-1">— {c.stateName}</span> : null}
+                            {c.stateName ? <span className="text-gray-400 ml-1">  {c.stateName}</span> : null}
                           </li>
                         ))}
                     </ul>
@@ -648,7 +648,7 @@ const CourierShipmentModal = ({
                             }}
                           >
                             {c.name}
-                            <span className="text-gray-400 ml-1">— {c.district}</span>
+                            <span className="text-gray-400 ml-1">  {c.district}</span>
                           </li>
                         ))}
                     </ul>

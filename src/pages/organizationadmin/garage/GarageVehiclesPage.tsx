@@ -84,9 +84,9 @@ export default function GarageVehiclesPage() {
               <tr key={v.id} className="border-t">
                 <td className="p-3 font-medium">{v.registrationNo}</td>
                 <td className="p-3">{v.make} {v.model} {v.year ? `(${v.year})` : ''}</td>
-                <td className="p-3">{v.customer?.name || '—'}</td>
-                <td className="p-3">{v.currentMileage != null ? `${Number(v.currentMileage).toLocaleString()} km` : '—'}</td>
-                <td className="p-3">{v.nextServiceDate || (v.nextServiceMileage ? `${v.nextServiceMileage} km` : '—')}</td>
+                <td className="p-3">{v.customer?.name || ' '}</td>
+                <td className="p-3">{v.currentMileage != null ? `${Number(v.currentMileage).toLocaleString()} km` : ' '}</td>
+                <td className="p-3">{v.nextServiceDate || (v.nextServiceMileage ? `${v.nextServiceMileage} km` : ' ')}</td>
               </tr>
             ))}
             {vehicles.length === 0 && (

@@ -15,7 +15,7 @@ function slugify(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-/** Blog posts / promotions — create, edit (with cover), delete. */
+/** Blog posts / promotions   create, edit (with cover), delete. */
 export default function CmsBlogPage() {
   const { listPosts, createPost, updatePost, deletePost } = useCms();
   const [posts, setPosts] = useState<any[]>([]);

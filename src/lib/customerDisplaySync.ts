@@ -23,7 +23,7 @@ export interface CustomerDisplayState {
   sessionId: string;
   businessName?: string;
   items: CustomerDisplayItem[];
-  /** Most recently scanned / selected line — shown large on the pole display. */
+  /** Most recently scanned / selected line   shown large on the pole display. */
   lastItem?: CustomerDisplayItem | null;
   itemCount: number;
   subtotal: number;
@@ -71,7 +71,7 @@ export function publishCustomerDisplay(state: CustomerDisplayState): void {
     channel.postMessage(state);
     channel.close();
   } catch {
-    // BroadcastChannel unsupported — localStorage still helps on reload
+    // BroadcastChannel unsupported   localStorage still helps on reload
   }
 }
 

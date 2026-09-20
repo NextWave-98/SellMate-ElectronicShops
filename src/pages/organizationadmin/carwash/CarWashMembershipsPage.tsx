@@ -111,11 +111,11 @@ export default function CarWashMembershipsPage() {
           <tbody>
             {memberships.map((m: any) => (
               <tr key={m.id} className="border-t">
-                <td className="p-3">{m.customer?.name || '—'}</td>
-                <td className="p-3">{m.plan?.name || '—'}</td>
-                <td className="p-3">{m.vehiclePlate || '—'}</td>
+                <td className="p-3">{m.customer?.name || ' '}</td>
+                <td className="p-3">{m.plan?.name || ' '}</td>
+                <td className="p-3">{m.vehiclePlate || ' '}</td>
                 <td className="p-3">{m.remainingWashes ?? '∞'} <span className="text-xs text-muted-foreground">(used {m.usedWashes})</span></td>
-                <td className="p-3">{m.expiryDate || '—'}</td>
+                <td className="p-3">{m.expiryDate || ' '}</td>
                 <td className="p-3"><Badge className={statusColor[m.status] || ''}>{m.status}</Badge></td>
               </tr>
             ))}
@@ -168,7 +168,7 @@ export default function CarWashMembershipsPage() {
                 setSellForm({ ...sellForm, planId: e.target.value, paidAmount: plan ? String(plan.price) : sellForm.paidAmount });
               }}>
                 <option value="">Select plan</option>
-                {plans.filter((p: any) => p.isActive).map((p: any) => <option key={p.id} value={p.id}>{p.name} — Rs {Number(p.price).toLocaleString()}</option>)}
+                {plans.filter((p: any) => p.isActive).map((p: any) => <option key={p.id} value={p.id}>{p.name}   Rs {Number(p.price).toLocaleString()}</option>)}
               </select>
             </div>
             <div><Label>Vehicle Plate</Label><Input value={sellForm.vehiclePlate} onChange={(e) => setSellForm({ ...sellForm, vehiclePlate: e.target.value })} /></div>

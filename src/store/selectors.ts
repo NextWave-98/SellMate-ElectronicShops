@@ -17,6 +17,11 @@ export const selectAuthError = (state: RootState) => state.auth.error;
 export const selectAuthInitialized = (state: RootState) => state.auth.initialized;
 export const selectRequiresBranchSelection = (state: RootState) => state.auth.requiresBranchSelection;
 export const selectAssignedBranches = (state: RootState) => state.auth.assignedBranches;
+/**
+ * Why a login was refused for non-payment, or null. Null is by far the normal
+ * case: it is only ever set by a 403 carrying code BILLING_BLOCKED.
+ */
+export const selectBillingBlock = (state: RootState) => state.auth.billingBlock;
 
 // User role selectors
 export const selectUserRole = createSelector(

@@ -1,4 +1,4 @@
-/** Default editable content slots — shop + rental. Layout/fonts stay fixed on public sites. */
+/** Default editable content slots   shop + rental. Layout/fonts stay fixed on public sites. */
 
 export const DEFAULT_SHOP_CONTENT = {
   hero: {
@@ -72,7 +72,7 @@ export const DEFAULT_RENTAL_CONTENT = {
   contactCta: {
     badge: 'Ready when you are',
     title: 'Book the next mile',
-    body: "Search live availability, send a request, and we'll confirm by phone — usually within the hour.",
+    body: "Search live availability, send a request, and we'll confirm by phone   usually within the hour.",
     formCta: 'Contact form',
     hoursLabel: 'Desk hours',
     hours: '8:00 – 20:00 daily',
@@ -85,7 +85,7 @@ export const DEFAULT_RENTAL_CONTENT = {
   contact: {
     label: 'Contact',
     title: "We're on the desk",
-    subtitle: 'Call, email, or send a message — we confirm bookings by phone.',
+    subtitle: 'Call, email, or send a message   we confirm bookings by phone.',
   },
   header: {
     searchPlaceholder: 'Type to search fleet, pages…',

@@ -1,4 +1,4 @@
-# SellMate Electronic Shops — Vite build → nginx static
+# SellMate Electronic Shops   Vite build → nginx static
 FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app

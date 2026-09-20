@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import * as Yup from 'yup';
-import { formatSriLankaPhone, isValidSriLankaPhone } from '../../../utils/phone';
+import { formatSriLankaPhone, isValidSriLankaPhone, toLocalSriLankaPhone } from '../../../utils/phone';
 import useFetch from '../../../hooks/useFetch';
 import type { Customer } from '../../../types/customer.types';
 
@@ -45,7 +45,8 @@ interface CustomerDetails {
   customerType: 'WALK_IN' | 'REGULAR' | 'VIP';
   notes: string | null;
   isActive: boolean;
-  branchId: string | null;
+  branchId?: string | null;
+  locationId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -62,15 +63,18 @@ const validationSchema = Yup.object({
     .min(2, 'Name must be at least 2 characters')
     .optional(),
   email: Yup.string()
+    .transform((value) => (value?.trim() ? value.trim() : undefined))
     .email('Invalid email format')
     .optional(),
   phone: Yup.string()
     .test('phone', 'Format: +94 XX XXX XXXX or 0XXXXXXXXX', (value) => !value || isValidSriLankaPhone(value))
     .optional(),
   alternatePhone: Yup.string()
+    .transform((value) => (value?.trim() ? value.trim() : undefined))
     .test('phone', 'Format: +94 XX XXX XXXX or 0XXXXXXXXX', (value) => !value || isValidSriLankaPhone(value))
     .optional(),
   nicNumber: Yup.string()
+    .transform((value) => (value?.trim() ? value.trim() : undefined))
     .matches(/^(?:\d{9}[VvXx]|\d{12})$/, 'Invalid NIC format (e.g., 123456789V or 199012345678)')
     .optional(),
   customerType: Yup.string()
@@ -107,28 +111,59 @@ export default function EditCustomerModal({ isOpen, onClose, onSubmit, customer 
 
       setIsSubmitting(true);
       try {
+        const normalizeEmpty = (value: string | null | undefined) => {
+          const trimmed = (value ?? '').trim();
+          return trimmed ? trimmed : null;
+        };
+
         // Only include changed fields
         const payload: UpdateCustomerPayload = {};
 
-        if (values.name !== customerDetails.name) payload.name = values.name.trim();
-        if (values.email !== customerDetails.email) payload.email = values.email.trim() || null;
-        if (values.phone !== customerDetails.phone) {
-          payload.phone = values.phone ? formatSriLankaPhone(values.phone).replace(/\s+/g, '') : values.phone.trim();
+        if (values.name.trim() !== (customerDetails.name || '').trim()) {
+          payload.name = values.name.trim();
         }
-        if (values.alternatePhone !== customerDetails.alternatePhone) {
-          payload.alternatePhone = values.alternatePhone ? formatSriLankaPhone(values.alternatePhone).replace(/\s+/g, '') : null;
+        if (normalizeEmpty(values.email) !== normalizeEmpty(customerDetails.email)) {
+          payload.email = normalizeEmpty(values.email);
         }
-        if (values.address !== customerDetails.address) payload.address = values.address.trim() || null;
-        if (values.city !== customerDetails.city) payload.city = values.city.trim() || null;
-        if (values.nicNumber !== customerDetails.nicNumber) payload.nicNumber = values.nicNumber.trim() || null;
-        if (values.branchId !== (customerDetails.branchId || '')) {
+        if (toLocalSriLankaPhone(values.phone) !== toLocalSriLankaPhone(customerDetails.phone)) {
+          payload.phone = values.phone
+            ? toLocalSriLankaPhone(formatSriLankaPhone(values.phone))
+            : values.phone.trim();
+        }
+        if (
+          toLocalSriLankaPhone(values.alternatePhone) !==
+          toLocalSriLankaPhone(customerDetails.alternatePhone)
+        ) {
+          payload.alternatePhone = values.alternatePhone?.trim()
+            ? toLocalSriLankaPhone(formatSriLankaPhone(values.alternatePhone))
+            : null;
+        }
+        if (normalizeEmpty(values.address) !== normalizeEmpty(customerDetails.address)) {
+          payload.address = normalizeEmpty(values.address);
+        }
+        if (normalizeEmpty(values.city) !== normalizeEmpty(customerDetails.city)) {
+          payload.city = normalizeEmpty(values.city);
+        }
+        if (normalizeEmpty(values.nicNumber) !== normalizeEmpty(customerDetails.nicNumber)) {
+          payload.nicNumber = normalizeEmpty(values.nicNumber);
+        }
+        if (values.branchId !== (customerDetails.branchId || customerDetails.locationId || '')) {
           payload.branchId = values.branchId || null;
         }
-        if (values.customerType !== customerDetails.customerType) payload.customerType = values.customerType;
-        if (values.notes !== customerDetails.notes) payload.notes = values.notes.trim() || null;
-        if (values.isActive !== customerDetails.isActive) payload.isActive = values.isActive;
+        if (values.customerType !== customerDetails.customerType) {
+          payload.customerType = values.customerType;
+        }
+        if (normalizeEmpty(values.notes) !== normalizeEmpty(customerDetails.notes)) {
+          payload.notes = normalizeEmpty(values.notes);
+        }
+        if (values.isActive !== customerDetails.isActive) {
+          payload.isActive = values.isActive;
+        }
 
         await onSubmit(customer.id, payload);
+        formik.resetForm();
+        setCustomerDetails(null);
+        onClose();
       } catch (error) {
         console.error('Error in modal:', error);
       } finally {
@@ -170,7 +205,7 @@ export default function EditCustomerModal({ isOpen, onClose, onSubmit, customer 
             address: details.address || '',
             city: details.city || '',
             nicNumber: details.nicNumber || '',
-            branchId: details.branchId || '',
+            branchId: details.branchId || details.locationId || '',
             customerType: details.customerType || 'WALK_IN',
             notes: details.notes || '',
             isActive: details.isActive ?? true,
@@ -272,7 +307,7 @@ export default function EditCustomerModal({ isOpen, onClose, onSubmit, customer 
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 ${
                       formik.errors.alternatePhone && formik.touched.alternatePhone ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    placeholder="0777654321"
+                    placeholder="Optional alternate number"
                   />
                   {formik.errors.alternatePhone && formik.touched.alternatePhone && (
                     <p className="mt-1 text-sm text-red-500">{formik.errors.alternatePhone}</p>

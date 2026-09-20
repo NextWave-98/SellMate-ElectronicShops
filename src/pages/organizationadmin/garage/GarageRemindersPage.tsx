@@ -87,10 +87,10 @@ export default function GarageRemindersPage() {
           <tbody>
             {reminders.map((r) => (
               <tr key={r.id} className="border-t">
-                <td className="p-3">{r.customer?.name || '—'}</td>
-                <td className="p-3">{r.vehicle?.registrationNo || '—'}</td>
+                <td className="p-3">{r.customer?.name || ' '}</td>
+                <td className="p-3">{r.vehicle?.registrationNo || ' '}</td>
                 <td className="p-3">{r.reminderType}</td>
-                <td className="p-3">{r.dueDate || (r.dueMileage ? `${r.dueMileage} km` : '—')}</td>
+                <td className="p-3">{r.dueDate || (r.dueMileage ? `${r.dueMileage} km` : ' ')}</td>
                 <td className="p-3"><Badge className={statusColor[r.status] || ''}>{r.status}</Badge></td>
                 <td className="p-3 space-x-1">
                   {r.status === 'PENDING' && (

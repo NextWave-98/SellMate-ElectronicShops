@@ -43,7 +43,7 @@ const LeadInteractionPanel: React.FC<Props> = ({ leadId, phone }) => {
       const res = await leadFormsService.listInteractions(leadId);
       setItems(res.data || []);
     } catch (err: any) {
-      // Older backends / missing perms — keep panel quiet
+      // Older backends / missing perms   keep panel quiet
       console.warn(err);
     } finally {
       setLoading(false);
@@ -102,7 +102,7 @@ const LeadInteractionPanel: React.FC<Props> = ({ leadId, phone }) => {
       const res = await leadFormsService.getCallPayload(leadId);
       const uri = res.data.telUri;
       if (uri) window.open(uri, '_self');
-      alert.info('Dialer opened — log the call outcome below');
+      alert.info('Dialer opened   log the call outcome below');
     } catch (err: any) {
       alert.error(err?.message || 'Failed to start call');
     } finally {

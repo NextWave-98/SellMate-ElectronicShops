@@ -119,7 +119,7 @@ export default function CmsPaymentsPage() {
         successMessage: `${row.provider} settings saved`,
       });
       if (!res) {
-        setLoadError('Save failed — is the migration applied and backend restarted?');
+        setLoadError('Save failed   is the migration applied and backend restarted?');
         return;
       }
       await load();

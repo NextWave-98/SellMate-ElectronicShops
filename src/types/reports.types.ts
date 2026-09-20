@@ -6,6 +6,7 @@ export const ReportType = {
   CUSTOMER_ANALYSIS : 'customer_analysis',
   SHOP_PERFORMANCE : 'shop_performance',
   JOBSHEET : 'jobsheet',
+  STOCK_LOSS : 'stock_loss',
 } as const;
 
 export type ReportType = (typeof ReportType)[keyof typeof ReportType];

@@ -21,7 +21,7 @@ const META_APP_ID = import.meta.env.VITE_META_APP_ID as string | undefined;
 
 // Permissions required to read a Page's lead-gen forms and retrieve leads.
 // Overridable via VITE_FB_LEADS_SCOPE so scopes can be tuned (e.g. to test
-// incrementally) without a code change — must match what the Meta app has enabled.
+// incrementally) without a code change   must match what the Meta app has enabled.
 const FB_LEADS_SCOPE =
   (import.meta.env.VITE_FB_LEADS_SCOPE as string | undefined) ||
   'pages_show_list,pages_read_engagement,pages_manage_metadata,pages_manage_ads,leads_retrieval,business_management';
@@ -105,7 +105,7 @@ const FacebookConnectButton: React.FC<FacebookConnectButtonProps> = ({
       alert.error('Facebook SDK is still loading. Please wait a moment.');
       return;
     }
-    // Facebook blocks FB.login on http pages — fail with a clear message instead
+    // Facebook blocks FB.login on http pages   fail with a clear message instead
     // of the SDK's cryptic console error.
     if (window.location.protocol !== 'https:') {
       alert.error(
@@ -121,7 +121,7 @@ const FacebookConnectButton: React.FC<FacebookConnectButtonProps> = ({
 
     setConnecting(true);
 
-    // NOTE: FB.login requires a *plain* (non-async) callback — passing an async
+    // NOTE: FB.login requires a *plain* (non-async) callback   passing an async
     // function throws "Expression is of type asyncfunction, not function".
     // Do the async work inside an IIFE instead.
     window.FB.login(

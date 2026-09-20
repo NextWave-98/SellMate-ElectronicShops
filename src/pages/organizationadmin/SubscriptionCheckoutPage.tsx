@@ -192,7 +192,7 @@ export default function SubscriptionCheckoutPage() {
     document.head.appendChild(script);
 
     return () => {
-      // Don't remove script on cleanup — it's global
+      // Don't remove script on cleanup   it's global
     };
   }, [paypalClientId, paypalScriptLoaded]);
 

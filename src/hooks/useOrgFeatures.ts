@@ -14,6 +14,12 @@ export function useOrgFeatures() {
     updateOrgFeatures: updatePOSSettings,
     staffManagementEnabled: businessData?.staffManagementEnabled ?? true,
     supplierOrdersEnabled: businessData?.supplierOrdersEnabled ?? true,
+    // Warranty defaults to FALSE, unlike the flags above. It is hidden for every
+    // organization until one deliberately turns it on, so an undefined value  
+    // an old API response, a profile that has not loaded yet   must mean hidden
+    // rather than briefly flashing a menu the organization never asked for.
+    warrantyEnabled: businessData?.warrantyEnabled ?? false,
+    warrantyAutoGenerate: businessData?.warrantyAutoGenerate ?? true,
   };
 }
 

@@ -203,7 +203,7 @@ export default function TopNavbar({
             </button>
           )}
 
-          {/* Search — desktop */}
+          {/* Search   desktop */}
           <div className="relative hidden md:block">
             {isSearchOpen ? (
               <div className="flex items-center gap-2 bg-white/50 border border-white/50 backdrop-blur-sm rounded-xl px-3 py-1.5">
@@ -230,7 +230,7 @@ export default function TopNavbar({
             )}
           </div>
 
-          {/* Search — mobile toggle */}
+          {/* Search   mobile toggle */}
           <button
             onClick={() => setIsSearchOpen(!isSearchOpen)}
             className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white/60 transition-colors"
@@ -407,7 +407,7 @@ export default function TopNavbar({
 
     </div>
 
-    {/* Quick Courier Modal — rendered outside the fixed navbar div to avoid stacking-context clipping */}
+    {/* Quick Courier Modal   rendered outside the fixed navbar div to avoid stacking-context clipping */}
     {showCourierModal && (
       <CourierShipmentModal
         courierServices={courierServices}

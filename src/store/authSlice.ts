@@ -4,7 +4,7 @@
  */
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import axios, { AxiosError } from 'axios';
-import type { AuthState, User } from './types';
+import type { AuthState, BillingBlock, User } from './types';
 import {
   getAccessToken,
   setAccessToken,
@@ -44,7 +44,40 @@ const initialState: AuthState = {
   initialized: false,
   requiresBranchSelection: false,
   assignedBranches: [],
+  billingBlock: null,
 };
+
+/**
+ * Pull the message   and, when the refusal is a subscription block, the detail
+ * the customer needs to fix it   out of a failed request.
+ *
+ * The rejected payload stays readable as a plain string by every existing
+ * caller (`String(payload)` and `payload?.message` both give the message), so
+ * adding the billing detail changes nothing for any other error.
+ */
+const describeAuthFailure = (
+  error: unknown,
+  fallback: string,
+): { message: string; billing: BillingBlock | null } => {
+  const axiosError = error as AxiosError<{ message?: string; details?: BillingBlock }>;
+  const details = axiosError?.response?.data?.details;
+  return {
+    message: axiosError?.response?.data?.message || axiosError?.message || fallback,
+    billing: details?.code === 'BILLING_BLOCKED' ? details : null,
+  };
+};
+
+/** The message out of whatever a rejected thunk carried. */
+const failureMessage = (payload: unknown, fallback: string): string =>
+  typeof payload === 'string'
+    ? payload
+    : (payload as { message?: string } | null)?.message || fallback;
+
+/** The billing block out of whatever a rejected thunk carried, if any. */
+const failureBilling = (payload: unknown): BillingBlock | null =>
+  typeof payload === 'string'
+    ? null
+    : (payload as { billing?: BillingBlock } | null)?.billing || null;
 
 // Async thunk for login
 export const loginAsync = createAsyncThunk(
@@ -76,9 +109,7 @@ export const loginAsync = createAsyncThunk(
       }
       return rejectWithValue(response.data.message || 'Login failed');
     } catch (error) {
-      const axiosError = error as AxiosError<{ message?: string }>;
-      const message = axiosError.response?.data?.message || axiosError.message || 'Login failed';
-      return rejectWithValue(message);
+      return rejectWithValue(describeAuthFailure(error, 'Login failed'));
     }
   }
 );
@@ -136,9 +167,7 @@ export const qrLoginAsync = createAsyncThunk(
 
       return rejectWithValue(response.data.message || 'QR login failed');
     } catch (error) {
-      const axiosError = error as AxiosError<{ message?: string }>;
-      const message = axiosError.response?.data?.message || axiosError.message || 'QR login failed';
-      return rejectWithValue(message);
+      return rejectWithValue(describeAuthFailure(error, 'QR login failed'));
     }
   }
 );
@@ -327,6 +356,7 @@ const authSlice = createSlice({
     // Clear error
     clearError: (state) => {
       state.error = null;
+      state.billingBlock = null;
     },
     // Set loading state
     setLoading: (state, action: PayloadAction<boolean>) => {
@@ -348,6 +378,7 @@ const authSlice = createSlice({
       state.error = null;
       state.requiresBranchSelection = false;
       state.assignedBranches = [];
+      state.billingBlock = null;
       clearAllTokens();
       localStorage.removeItem('user');
     },
@@ -362,6 +393,7 @@ const authSlice = createSlice({
       .addCase(loginAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.billingBlock = null;
       })
       .addCase(loginAsync.fulfilled, (state, action) => {
         state.loading = false;
@@ -376,7 +408,8 @@ const authSlice = createSlice({
       })
       .addCase(loginAsync.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = failureMessage(action.payload, 'Login failed');
+        state.billingBlock = failureBilling(action.payload);
         state.initialized = true;
       });
 
@@ -384,6 +417,7 @@ const authSlice = createSlice({
       .addCase(qrLoginAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
+        state.billingBlock = null;
       })
       .addCase(qrLoginAsync.fulfilled, (state, action) => {
         state.loading = false;
@@ -398,7 +432,8 @@ const authSlice = createSlice({
       })
       .addCase(qrLoginAsync.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = failureMessage(action.payload, 'QR login failed');
+        state.billingBlock = failureBilling(action.payload);
         state.initialized = true;
       });
 

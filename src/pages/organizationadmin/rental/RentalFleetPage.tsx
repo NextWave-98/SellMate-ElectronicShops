@@ -21,7 +21,7 @@ const serviceState = (v: any): 'due' | 'soon' | null => {
   return null;
 };
 
-/** Fleet management: vehicle list — create / edit now open as full pages. */
+/** Fleet management: vehicle list   create / edit now open as full pages. */
 export default function RentalFleetPage() {
   const { getVehicles } = useRental();
 
@@ -33,7 +33,8 @@ export default function RentalFleetPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getVehicles({ search, limit: 100 });
+      // Equipment units live on the Equipment page
+      const res = await getVehicles({ search, limit: 100, assetType: 'VEHICLE' });
       setVehicles((res?.data as any)?.vehicles ?? []);
     } finally {
       setLoading(false);
@@ -94,13 +95,13 @@ export default function RentalFleetPage() {
                 </td>
                 <td className="p-3 font-medium">{v.registrationNo}</td>
                 <td className="p-3">{v.vehicleClass}</td>
-                <td className="p-3 text-xs">{v.fuelType || '—'}{v.transmission ? ` / ${v.transmission}` : ''}</td>
+                <td className="p-3 text-xs">{v.fuelType || ' '}{v.transmission ? ` / ${v.transmission}` : ''}</td>
                 <td className="p-3">
                   {Number(v.currentOdometer).toLocaleString()} km
                   {serviceState(v) === 'due' && <Badge className="ml-1.5 bg-red-100 text-red-800">Service due</Badge>}
                   {serviceState(v) === 'soon' && <Badge className="ml-1.5 bg-amber-100 text-amber-800">Service soon</Badge>}
                 </td>
-                <td className="p-3">{v.insuranceExpiry || '—'}</td>
+                <td className="p-3">{v.insuranceExpiry || ' '}</td>
                 <td className="p-3"><Badge className={statusColor[v.status] || ''}>{v.status}</Badge></td>
                 <td className="p-3">
                   <Link to={`${v.id}/edit`}>
@@ -112,7 +113,7 @@ export default function RentalFleetPage() {
             {filteredVehicles.length === 0 && (
               <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">
                 {vehicles.length === 0
-                  ? <>No vehicles in the fleet yet — <Link to="new" className="underline">add the first one</Link></>
+                  ? <>No vehicles in the fleet yet   <Link to="new" className="underline">add the first one</Link></>
                   : 'No vehicles match this status'}
               </td></tr>
             )}

@@ -13,6 +13,19 @@ import {
   clearAllTokens,
 } from '../utils/tokenStorage';
 
+/**
+ * The message out of a rejected auth thunk.
+ *
+ * `loginAsync` and `qrLoginAsync` reject with an object when the refusal
+ * carries detail worth showing (an unpaid subscription sends the amount, the
+ * due date and the bank account). Everything else still rejects with a plain
+ * string, so both shapes have to read cleanly.
+ */
+const rejectionMessage = (payload: unknown, fallback: string): string =>
+  (typeof payload === 'string'
+    ? payload
+    : (payload as { message?: string } | null)?.message) || fallback;
+
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
@@ -266,7 +279,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return userData;
       } else {
         // Login failed, extract error message
-        const errorMessage = resultAction.payload as string || 'Login failed';
+        const errorMessage = rejectionMessage(resultAction.payload, 'Login failed');
         console.error('[AuthContext] Login failed:', errorMessage);
         throw new Error(errorMessage);
       }
@@ -295,7 +308,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return userData;
       }
 
-      const errorMessage = resultAction.payload as string || 'QR login failed';
+      const errorMessage = rejectionMessage(resultAction.payload, 'QR login failed');
       throw new Error(errorMessage);
     } catch (error) {
       console.error('[AuthContext] QR login error:', error);
@@ -323,7 +336,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         alert.success('Super admin login successful');
       } else {
         // Handle Redux action rejection
-        const errorMessage = resultAction.payload as string || 'Super admin login failed';
+        const errorMessage = rejectionMessage(resultAction.payload, 'Super admin login failed');
         alert.error(errorMessage);
         throw new Error(errorMessage);
       }

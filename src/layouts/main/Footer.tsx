@@ -154,7 +154,7 @@ const Footer = () => {
                 Cookie Policy
               </a>
               <a 
-                href="https://divenzainc.com" 
+                href="https://www.nextwavessoftware.com" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="hover:text-purple-400 transition duration-200"

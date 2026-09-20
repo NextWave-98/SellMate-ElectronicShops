@@ -96,11 +96,11 @@ export default function RentalFuelPage() {
             {(fuelData?.logs ?? []).map((l: any) => (
               <tr key={l.id} className="border-t">
                 <td className="p-3">{l.filledAt}</td>
-                <td className="p-3">{l.vehicle?.registrationNo || '—'}</td>
+                <td className="p-3">{l.vehicle?.registrationNo || ' '}</td>
                 <td className="p-3">{Number(l.odometer).toLocaleString()} km</td>
                 <td className="p-3">{l.liters} L</td>
                 <td className="p-3">Rs {Number(l.cost).toLocaleString()}</td>
-                <td className="p-3">{l.kmPerLiter != null ? <Badge className="bg-green-100 text-green-800">{l.kmPerLiter} km/L</Badge> : '—'}</td>
+                <td className="p-3">{l.kmPerLiter != null ? <Badge className="bg-green-100 text-green-800">{l.kmPerLiter} km/L</Badge> : ' '}</td>
                 <td className="p-3">
                   <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(l)}>
                     <Trash2 className="w-4 h-4 text-red-500" />
@@ -123,7 +123,7 @@ export default function RentalFuelPage() {
             <div className="col-span-2"><Label>Vehicle *</Label>
               <select className={selectCls} value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
                 <option value="">Select vehicle</option>
-                {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNo} — {v.make} {v.model}</option>)}
+                {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNo}   {v.make} {v.model}</option>)}
               </select>
             </div>
             <div><Label>Date *</Label><Input type="date" value={form.filledAt} onChange={(e) => setForm({ ...form, filledAt: e.target.value })} /></div>
@@ -153,7 +153,7 @@ export default function RentalFuelPage() {
           <DialogHeader><DialogTitle>Delete this fuel log?</DialogTitle></DialogHeader>
           <DialogBody>
             <p className="text-sm text-muted-foreground">
-              {deleteTarget?.vehicle?.registrationNo || 'Vehicle'} · {deleteTarget?.filledAt} · {deleteTarget?.liters} L — this cannot be undone.
+              {deleteTarget?.vehicle?.registrationNo || 'Vehicle'} · {deleteTarget?.filledAt} · {deleteTarget?.liters} L   this cannot be undone.
             </p>
           </DialogBody>
           <DialogFooter>

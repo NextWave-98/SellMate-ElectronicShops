@@ -416,7 +416,7 @@ const BranchDashboardPage = () => {
         })}
       </div>
 
-       {/* Courier summary (collapsed by default — electronics shop focus) */}
+       {/* Courier summary (collapsed by default   electronics shop focus) */}
       {canViewCourier && courierStats && (
         <Card className="p-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -445,7 +445,7 @@ const BranchDashboardPage = () => {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Courier Shipments</h2>
-                <p className="text-xs text-gray-500">{periodLabel} — success rate & parcel metrics</p>
+                <p className="text-xs text-gray-500">{periodLabel}   success rate & parcel metrics</p>
               </div>
             </div>
             <div className="flex items-center gap-2">

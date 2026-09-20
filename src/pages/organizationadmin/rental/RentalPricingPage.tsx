@@ -64,7 +64,7 @@ export default function RentalPricingPage() {
   const removeTier = (idx: number) =>
     setPlanForm((prev: any) => ({ ...prev, durationTiers: prev.durationTiers.filter((_: any, i: number) => i !== idx) }));
 
-  /** SL default ladder — 1–3d full rate, 4–6d ~8% off, 7d+ ~15% off. */
+  /** SL default ladder   1–3d full rate, 4–6d ~8% off, 7d+ ~15% off. */
   const applyTierPreset = () => {
     const base = Number(planForm.baseRate || 0);
     if (!base) return;
@@ -290,9 +290,9 @@ export default function RentalPricingPage() {
                     </span>
                   )}
                 </td>
-                <td className="p-2">{p.withDriverRate != null ? `Rs ${Number(p.withDriverRate).toLocaleString()}` : '—'}</td>
-                <td className="p-2">{p.includedKm != null ? `${p.includedKm} km` : '—'}</td>
-                <td className="p-2">{p.depositAmount != null ? `Rs ${Number(p.depositAmount).toLocaleString()}` : '—'}</td>
+                <td className="p-2">{p.withDriverRate != null ? `Rs ${Number(p.withDriverRate).toLocaleString()}` : ' '}</td>
+                <td className="p-2">{p.includedKm != null ? `${p.includedKm} km` : ' '}</td>
+                <td className="p-2">{p.depositAmount != null ? `Rs ${Number(p.depositAmount).toLocaleString()}` : ' '}</td>
                 <td className="p-2">
                   <input type="checkbox" checked={p.isActive} onChange={async () => { await rental.updateRatePlan(p.id, { isActive: !p.isActive }); load(); }} />
                 </td>
@@ -323,7 +323,7 @@ export default function RentalPricingPage() {
                 <td className="p-2"><Badge variant="outline">{r.ruleType}</Badge></td>
                 <td className="p-2">{r.vehicleClass || 'All'}</td>
                 <td className="p-2">{r.multiplier ? `× ${r.multiplier}` : ''} {r.flatAddition ? `+Rs ${Number(r.flatAddition).toLocaleString()}/day` : ''}</td>
-                <td className="p-2">{r.ruleType === 'WEEKEND' ? 'Sat & Sun' : `${r.startDate || '—'} → ${r.endDate || '—'}`}</td>
+                <td className="p-2">{r.ruleType === 'WEEKEND' ? 'Sat & Sun' : `${r.startDate || ' '} → ${r.endDate || ' '}`}</td>
                 <td className="p-2">
                   <input type="checkbox" checked={r.isActive} onChange={async () => { await rental.updatePricingRule(r.id, { isActive: !r.isActive }); load(); }} />
                 </td>
@@ -373,7 +373,7 @@ export default function RentalPricingPage() {
               <tr key={c.id} className="border-t">
                 <td className="p-2 font-mono font-bold">{c.code}</td>
                 <td className="p-2">{c.discountType === 'PERCENT' ? `${c.value}%` : `Rs ${Number(c.value).toLocaleString()}`}</td>
-                <td className="p-2">{c.validFrom || '—'} → {c.validTo || '—'}</td>
+                <td className="p-2">{c.validFrom || ' '} → {c.validTo || ' '}</td>
                 <td className="p-2">{c.usedCount}{c.maxUses ? ` / ${c.maxUses}` : ''}</td>
                 <td className="p-2">
                   <input type="checkbox" checked={c.isActive} onChange={async () => { await rental.updateCoupon(c.id, { isActive: !c.isActive }); load(); }} />
@@ -407,13 +407,13 @@ export default function RentalPricingPage() {
         <div className="flex flex-wrap gap-2">
           {blockedDays.map((d) => (
             <Badge key={d.id} variant="outline" className="text-xs py-1.5 px-3 gap-1.5">
-              {d.date}{d.reason ? ` — ${d.reason}` : ''}
+              {d.date}{d.reason ? `   ${d.reason}` : ''}
               <button onClick={async () => { await rental.deleteBlockedDay(d.id); load(); }}>
                 <Trash2 className="w-3 h-3 text-red-500" />
               </button>
             </Badge>
           ))}
-          {blockedDays.length === 0 && <p className="text-sm text-muted-foreground">No blocked days — bookings allowed on all dates.</p>}
+          {blockedDays.length === 0 && <p className="text-sm text-muted-foreground">No blocked days   bookings allowed on all dates.</p>}
         </div>
       </CardContent></Card>
 
@@ -442,7 +442,7 @@ export default function RentalPricingPage() {
             <div><Label>Late Fee / Hour (Rs)</Label><Input type="number" value={planForm.lateFeePerHour} onChange={(e) => setPlanForm({ ...planForm, lateFeePerHour: e.target.value })} /></div>
             <div><Label>Fuel Charge / Gauge Step (Rs)</Label><Input type="number" placeholder="e.g. 3000 per ¼ tank" value={planForm.fuelStepCharge} onChange={(e) => setPlanForm({ ...planForm, fuelStepCharge: e.target.value })} /></div>
 
-            {/* Duration tiers — cheaper day rate for longer rentals */}
+            {/* Duration tiers   cheaper day rate for longer rentals */}
             <div className="col-span-2 border rounded-md p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div>

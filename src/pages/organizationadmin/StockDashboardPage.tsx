@@ -129,7 +129,7 @@ export default function StockDashboardPage() {
     [categories],
   );
 
-  // Load dashboard data — all active filters are read from state inside the callback
+  // Load dashboard data   all active filters are read from state inside the callback
   const loadDashboardData = useCallback(async (
     opts: { locationId?: string; page?: number; limit?: number; search?: string; status?: string; category?: string } = {}
   ) => {
@@ -346,7 +346,7 @@ export default function StockDashboardPage() {
     }
   }, [branchLocationId, isBranchScoped]);
 
-  // Debounced search — skip the first run (initial load already fetched data)
+  // Debounced search   skip the first run (initial load already fetched data)
   useEffect(() => {
     if (!filtersReadyRef.current) return;
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);

@@ -227,7 +227,7 @@ export default function PaymentsPage() {
   const applyFilters = useCallback(() => {
     let filtered = [...payments];
 
-    // Search filter (client-side — backend /admin/payments/all does not support search param)
+    // Search filter (client-side   backend /admin/payments/all does not support search param)
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -616,7 +616,7 @@ export default function PaymentsPage() {
                           )}
                         </div>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-gray-400"> </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
