@@ -78,6 +78,8 @@ interface BusinessProfile {
   city?: string;
   staffManagementEnabled?: boolean;
   supplierOrdersEnabled?: boolean;
+  /** Off unless the organization has switched warranty on. */
+  warrantyEnabled?: boolean;
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -272,8 +274,11 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
         if (item.id === 'goods-receipts' && orgFeatures?.supplierOrdersEnabled === false) return null;
         if (item.id === 'jobsheets' && !industryAllowsFeature(industryType, 'jobsheets')) return null;
         if (item.id === 'parts' && !industryAllowsFeature(industryType, 'parts')) return null;
-        if (item.id === 'warranty' && !industryAllowsFeature(industryType, 'warranty')) return null;
-        // New verticals — only for their own industry (GENERAL sees all)
+        // Warranty is an organization setting now, not an industry trait.
+        // `=== false` is not enough: the flag defaults to OFF, so an undefined
+        // value (profile still loading, or an older API) must hide it.
+        if (item.id === 'warranty' && orgFeatures?.warrantyEnabled !== true) return null;
+        // New verticals   only for their own industry (GENERAL sees all)
         if (item.id === 'rental' && !industryAllowsFeature(industryType, 'rental')) return null;
         if (item.id === 'carwash' && !industryAllowsFeature(industryType, 'carwash')) return null;
         if (item.id === 'garage' && !industryAllowsFeature(industryType, 'garage')) return null;
@@ -283,9 +288,12 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
         // Retail-only modules hidden for rental / car wash / garage orgs
         const retailOnlyIds = [
           'quick-pos', 'advance-payments', 'sales', 'orders', 'sale-jobs', 'installments', 'returns',
-          'stock', 'goods-receipts', 'product-usage', 'addon-requests', 'woocommerce',
+          'addon-requests', 'woocommerce',
         ];
         if (retailOnlyIds.includes(item.id) && !industryAllowsFeature(industryType, 'retail')) return null;
+        // Stock screens: retail shops AND garages (spare parts issued to job sheets)
+        const inventoryIds = ['stock', 'goods-receipts', 'product-usage'];
+        if (inventoryIds.includes(item.id) && !industryAllowsFeature(industryType, 'inventory')) return null;
 
         // Courier + WooCommerce are tied: no courier access → hide both
         if (

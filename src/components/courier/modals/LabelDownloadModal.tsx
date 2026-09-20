@@ -162,7 +162,7 @@ export const LabelDownloadModal = ({
                   }}
                   className={theme.radioInput}
                 />
-                <span>Normal Post label (A4 — 8 per page)</span>
+                <span>Normal Post label (A4   8 per page)</span>
               </label>
             </div>
           </div>

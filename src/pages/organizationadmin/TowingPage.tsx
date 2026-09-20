@@ -162,12 +162,12 @@ export default function TowingPage() {
                 <tr key={r.id} className="border-t hover:bg-gray-50">
                   <td className="p-3 font-mono text-xs">{r.requestNo}</td>
                   <td className="p-3">
-                    <span>{r.customer?.name || r.customerName || '—'}</span>
+                    <span>{r.customer?.name || r.customerName || ' '}</span>
                     {(r.customer?.phone || r.customerPhone) && <span className="block text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{r.customer?.phone || r.customerPhone}</span>}
                     {r.vehicleReg && <span className="text-xs text-muted-foreground">{r.vehicleReg}</span>}
                   </td>
                   <td className="p-3 max-w-[220px]">
-                    <span className="flex items-center gap-1 text-xs"><MapPin className="w-3 h-3 text-red-500" />{r.pickupLocation || '—'}</span>
+                    <span className="flex items-center gap-1 text-xs"><MapPin className="w-3 h-3 text-red-500" />{r.pickupLocation || ' '}</span>
                     {r.dropLocation && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Navigation className="w-3 h-3" />{r.dropLocation}</span>}
                     {mapLink(r) && <a href={mapLink(r)!} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">Open in Maps</a>}
                   </td>
@@ -205,14 +205,14 @@ export default function TowingPage() {
                   const c = customers.find((x) => x.id === e.target.value);
                   setForm({ ...form, customerId: e.target.value, customerName: c?.name || form.customerName, customerPhone: c?.phone || form.customerPhone });
                 }}>
-                <option value="">— New / walk-in (type below) —</option>
+                <option value="">  New / walk-in (type below)  </option>
                 {customers.map((c) => <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ''}</option>)}
               </select>
             </div>
             <div>
               <Label>Assign Driver (optional)</Label>
               <select className="block w-full h-10 rounded-md border border-input bg-background px-3 text-sm" value={form.driverStaffId} onChange={(e) => setForm({ ...form, driverStaffId: e.target.value })}>
-                <option value="">— Unassigned —</option>
+                <option value="">  Unassigned  </option>
                 {staffList.map((s) => <option key={s.id} value={s.id}>{staffLabel(s)}</option>)}
               </select>
             </div>

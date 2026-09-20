@@ -1,20 +1,20 @@
 /** Shared glassmorphism class tokens for modals, cards, tables, and overlays */
 
-/** Frosted backdrop — soft gradient, not flat gray */
+/** Frosted backdrop   soft gradient, not flat gray */
 export const glassOverlay =
   "glass-modal-overlay"
 
 export const glassPanel =
   "rounded-2xl border border-white/40 bg-white/55 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_20px_60px_0_rgba(15,23,42,0.2)] ring-1 ring-inset ring-white/50"
 
-/** Layout helper — use with GlassModalScroll component for custom scrollbar */
+/** Layout helper   use with GlassModalScroll component for custom scrollbar */
 export const glassModalScroll = "glass-modal-scroll min-h-0 flex-1"
 
-/** Layout-only header — no separate background (glass lives on panel parent) */
+/** Layout-only header   no separate background (glass lives on panel parent) */
 export const glassPanelHeader =
   "sticky top-0 z-10 shrink-0 bg-transparent px-6 pt-6 pb-4"
 
-/** Layout-only footer — no separate background (glass lives on panel parent) */
+/** Layout-only footer   no separate background (glass lives on panel parent) */
 export const glassPanelFooter =
   "sticky bottom-0 z-10 shrink-0 bg-transparent px-6 pt-4 pb-6"
 

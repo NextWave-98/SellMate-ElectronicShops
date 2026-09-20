@@ -55,7 +55,7 @@ import { format, isValid } from 'date-fns';
 // Helpers
 // ─────────────────────────────────────────────────────
 const fmt = (n: number | null | undefined) =>
-  n == null ? '—' : `Rs. ${Number(n).toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
+  n == null ? ' ' : `Rs. ${Number(n).toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 
 const varianceBadge = (variance: number | null) => {
   if (variance == null) return null;
@@ -342,8 +342,8 @@ export default function CashDrawerPage() {
               {activeDrawer && (
                 <p className="text-sm text-gray-500 mt-0.5">
                   {isDrawerOpen
-                    ? `Opened by ${activeDrawer.openedBy?.name} at ${openedDate && isValid(openedDate) ? format(openedDate, 'HH:mm, dd MMM yyyy') : '—'}`
-                    : `Closed by ${activeDrawer.closedBy?.name ?? '—'} at ${closedDate && isValid(closedDate) ? format(closedDate, 'HH:mm, dd MMM yyyy') : '—'}`}
+                    ? `Opened by ${activeDrawer.openedBy?.name} at ${openedDate && isValid(openedDate) ? format(openedDate, 'HH:mm, dd MMM yyyy') : ' '}`
+                    : `Closed by ${activeDrawer.closedBy?.name ?? ' '} at ${closedDate && isValid(closedDate) ? format(closedDate, 'HH:mm, dd MMM yyyy') : ' '}`}
                 </p>
               )}
             </div>
@@ -653,14 +653,14 @@ export default function CashDrawerPage() {
                                 {format(new Date(row.openedAt), 'dd MMM yyyy HH:mm')}
                               </TableCell>
                               <TableCell className="text-sm">
-                                {row.openedBy ? row.openedBy.name : '—'}
+                                {row.openedBy ? row.openedBy.name : ' '}
                               </TableCell>
                               <TableCell className="text-right font-medium">{fmt(row.openingBalance)}</TableCell>
                               <TableCell className="text-right">{fmt(row.expectedClosingBalance)}</TableCell>
                               <TableCell className="text-right">{fmt(row.closingBalance)}</TableCell>
                               <TableCell className="text-right">{varianceBadge(variance)}</TableCell>
                               <TableCell className="whitespace-nowrap text-sm">
-                                {row.closedAt ? format(new Date(row.closedAt), 'dd MMM yyyy HH:mm') : '—'}
+                                {row.closedAt ? format(new Date(row.closedAt), 'dd MMM yyyy HH:mm') : ' '}
                               </TableCell>
                             </TableRow>
                           );

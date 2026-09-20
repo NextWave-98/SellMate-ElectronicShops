@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import * as Yup from 'yup';
-import { formatSriLankaPhone, isValidSriLankaPhone } from '../../../utils/phone';
+import { formatSriLankaPhone, isValidSriLankaPhone, toLocalSriLankaPhone } from '../../../utils/phone';
 import useFetch from '../../../hooks/useFetch';
 import { useAuth } from '../../../context/AuthContext';
 
@@ -44,15 +44,18 @@ const validationSchema = Yup.object({
     .min(2, 'Name must be at least 2 characters')
     .required('Name is required'),
   email: Yup.string()
+    .transform((value) => (value?.trim() ? value.trim() : undefined))
     .email('Invalid email format')
     .optional(),
   phone: Yup.string()
     .required('Phone number is required')
     .test('phone', 'Format: +94 XX XXX XXXX or 0XXXXXXXXX', (value) => !value || isValidSriLankaPhone(value)),
   alternatePhone: Yup.string()
+    .transform((value) => (value?.trim() ? value.trim() : undefined))
     .test('phone', 'Format: +94 XX XXX XXXX or 0XXXXXXXXX', (value) => !value || isValidSriLankaPhone(value))
     .optional(),
   nicNumber: Yup.string()
+    .transform((value) => (value?.trim() ? value.trim() : undefined))
     .matches(/^(?:\d{9}[VvXx]|\d{12})$/, 'Invalid NIC format (e.g., 123456789V or 199012345678)')
     .optional(),
   customerType: Yup.string()
@@ -87,9 +90,11 @@ export default function AddCustomerModal({ isOpen, onClose, onSubmit, initialPho
       try {
         const payload: CreateCustomerPayload = {
           name: values.name.trim(),
-          phone: values.phone ? formatSriLankaPhone(values.phone).replace(/\s+/g, '') : values.phone.trim(),
+          phone: values.phone ? toLocalSriLankaPhone(formatSriLankaPhone(values.phone)) : values.phone.trim(),
           email: values.email.trim() || null,
-          alternatePhone: values.alternatePhone ? formatSriLankaPhone(values.alternatePhone).replace(/\s+/g, '') : null,
+          alternatePhone: values.alternatePhone
+            ? toLocalSriLankaPhone(formatSriLankaPhone(values.alternatePhone))
+            : null,
           address: values.address.trim() || null,
           city: values.city.trim() || null,
           nicNumber: values.nicNumber.trim() || null,

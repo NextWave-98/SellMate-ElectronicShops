@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ShieldPlus } from 'lucide-react';
 import type { Warranty, WarrantyClaim, WarrantyStats } from '../../../types/warranty.types';
 import LoadingSpinner from '../../common/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -21,6 +21,7 @@ import { getExpiringWarrantyCount } from '../../../utils/warrantyClaimStatus';
 
 // Import Warranty Modals
 import ViewWarrantyModal from './ViewWarrantyModal';
+import AddWarrantyModal from './AddWarrantyModal';
 import EditWarrantyModal from './EditWarrantyModal';
 import TransferWarrantyModal from './TransferWarrantyModal';
 import CreateClaimModal from './CreateClaimModal';
@@ -31,6 +32,7 @@ import ViewClaimModal from './ViewClaimModal';
 import UpdateClaimStatusModal from './UpdateClaimStatusModal';
 import AssignTechnicianModal from './AssignTechnicianModal';
 import ResolveClaimModal from './ResolveClaimModal';
+import CoverageSettingsPanel from './CoverageSettingsPanel';
 
 export default function WarrantyPage() {
   const {
@@ -59,6 +61,7 @@ export default function WarrantyPage() {
   // Modal states
   const [selectedWarranty, setSelectedWarranty] = useState<WarrantyCard | null>(null);
   const [selectedClaim, setSelectedClaim] = useState<APIWarrantyClaim | null>(null);
+  const [showAddWarrantyModal, setShowAddWarrantyModal] = useState(false);
   const [showViewWarrantyModal, setShowViewWarrantyModal] = useState(false);
   const [showEditWarrantyModal, setShowEditWarrantyModal] = useState(false);
   const [showTransferWarrantyModal, setShowTransferWarrantyModal] = useState(false);
@@ -87,7 +90,7 @@ export default function WarrantyPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'warranties' | 'claims'>('warranties');
+  const [activeTab, setActiveTab] = useState<'warranties' | 'claims' | 'settings'>('warranties');
 
   // Pagination states
   const [warrantyPagination, setWarrantyPagination] = useState({
@@ -107,7 +110,7 @@ export default function WarrantyPage() {
   const [selectedWarrantyIds, setSelectedWarrantyIds] = useState<string[]>([]);
   const [selectedClaimIds, setSelectedClaimIds] = useState<string[]>([]);
 
-  const handleTabChange = useCallback((tab: 'warranties' | 'claims') => {
+  const handleTabChange = useCallback((tab: 'warranties' | 'claims' | 'settings') => {
     setActiveTab(tab);
     setSelectedWarrantyIds([]);
     setSelectedClaimIds([]);
@@ -483,6 +486,13 @@ export default function WarrantyPage() {
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+          <button
+            onClick={() => setShowAddWarrantyModal(true)}
+            className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-white bg-teal-600 hover:bg-teal-700"
+          >
+            <ShieldPlus className="w-4 h-4 mr-2" />
+            Add Warranty
+          </button>
         </div>
       </div>
 
@@ -516,6 +526,16 @@ export default function WarrantyPage() {
             >
               Claims ({claimPagination.total})
             </button>
+            <button
+              onClick={() => handleTabChange('settings')}
+              className={`px-6 py-3 text-sm font-medium ${
+                activeTab === 'settings'
+                  ? 'border-b-2 border-orange-400 text-orange-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Coverage Settings
+            </button>
           </nav>
         </div>
 
@@ -545,6 +565,9 @@ export default function WarrantyPage() {
           />
         )}
 
+        {activeTab === 'settings' && <CoverageSettingsPanel />}
+
+        {activeTab !== 'settings' && (
         <div className="p-6">
           {activeTab === 'warranties' ? (
             <div>
@@ -582,9 +605,17 @@ export default function WarrantyPage() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Warranty Modals */}
+      {showAddWarrantyModal && (
+        <AddWarrantyModal
+          isOpen={showAddWarrantyModal}
+          onClose={() => setShowAddWarrantyModal(false)}
+          onCreated={handleRefresh}
+        />
+      )}
       {showViewWarrantyModal && selectedWarranty && (
         <ViewWarrantyModal
           isOpen={showViewWarrantyModal}

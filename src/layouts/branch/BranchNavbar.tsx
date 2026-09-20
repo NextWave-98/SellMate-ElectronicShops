@@ -182,7 +182,7 @@ const BranchNavbar = ({
             <span className="hidden md:inline">Quick Courier</span>
           </button>
 
-          {/* POS Fullscreen — only on POS routes; labeled so exit is obvious */}
+          {/* POS Fullscreen   only on POS routes; labeled so exit is obvious */}
           {isPosRoute ? (
             <button
               onClick={toggleFullscreen}

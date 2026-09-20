@@ -110,6 +110,7 @@ export default function AddStaffModal({ isOpen, onClose, onSubmit }: AddStaffMod
         };
 
         await onSubmit(payload);
+        formik.resetForm();
       } catch (error) {
         console.error('Error in modal:', error);
       } finally {

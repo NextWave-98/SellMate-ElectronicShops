@@ -104,7 +104,7 @@ export default function AdvancePaymentsPage() {
         return;
       }
       await completeJob(job.id, { notifyCustomer: notify });
-      toast.success(notify ? 'Job completed — customer notified' : 'Job completed');
+      toast.success(notify ? 'Job completed   customer notified' : 'Job completed');
       setPayDialog(null);
       load(page);
     } catch {

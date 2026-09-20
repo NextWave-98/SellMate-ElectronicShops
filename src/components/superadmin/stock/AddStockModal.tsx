@@ -472,6 +472,7 @@ export default function AddStockModal({ isOpen, onClose, onSuccess }: AddStockMo
                         <option value="EXTENDED">Extended</option>
                         <option value="LIMITED">Limited</option>
                         <option value="LIFETIME">Lifetime</option>
+                        <option value="SERVICE">Service Warranty</option>
                         <option value="NO_WARRANTY">No Warranty</option>
                       </select>
                     </div>

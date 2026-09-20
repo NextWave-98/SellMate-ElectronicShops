@@ -217,7 +217,7 @@ export default function StaffAttendancePage() {
       deviceFingerprint,
       reason: reason || undefined,
     });
-    toast.success('Request sent — waiting for manager approval');
+    toast.success('Request sent   waiting for manager approval');
     fetchAll();
   };
 
@@ -274,7 +274,7 @@ export default function StaffAttendancePage() {
 
 
   const formatTime = (dt: string | null) => {
-    if (!dt) return '—';
+    if (!dt) return ' ';
     return new Date(dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -295,7 +295,7 @@ export default function StaffAttendancePage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Today — {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            Today   {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -316,7 +316,7 @@ export default function StaffAttendancePage() {
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Hours</p>
-                <p className="text-xl font-bold">{todayStatus.hoursWorked != null ? `${Number(todayStatus.hoursWorked).toFixed(1)}h` : '—'}</p>
+                <p className="text-xl font-bold">{todayStatus.hoursWorked != null ? `${Number(todayStatus.hoursWorked).toFixed(1)}h` : ' '}</p>
               </div>
             </div>
           )}
@@ -414,7 +414,7 @@ export default function StaffAttendancePage() {
                   <TableCell>{log.attendanceDate}</TableCell>
                   <TableCell>{formatTime(log.dayInTime)}</TableCell>
                   <TableCell>{formatTime(log.dayOffTime)}</TableCell>
-                  <TableCell>{log.hoursWorked != null ? `${Number(log.hoursWorked).toFixed(1)}h` : '—'}</TableCell>
+                  <TableCell>{log.hoursWorked != null ? `${Number(log.hoursWorked).toFixed(1)}h` : ' '}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <Badge>{log.status.replace('_', ' ')}</Badge>
@@ -472,7 +472,7 @@ export default function StaffAttendancePage() {
         onClose={() => setFaceModalOpen(false)}
         livenessPrompt={livenessPrompt}
         onCapture={handleFaceCapture}
-        title={pendingAction === 'check_in' ? 'Check in — face verification' : 'Check out — face verification'}
+        title={pendingAction === 'check_in' ? 'Check in   face verification' : 'Check out   face verification'}
       />
       <PinFallbackModal
         open={pinModalOpen}

@@ -36,7 +36,7 @@ type DatePeriod = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 const getColomboDateString = () => todayColombo();
 
-/** Stable identity — must not be recreated each render (used in effect deps). */
+/** Stable identity   must not be recreated each render (used in effect deps). */
 const BRANCH_SHIPMENT_SCOPE = { scope: 'branch' as const };
 
 const BranchCourierPage = () => {
@@ -951,7 +951,7 @@ const BranchCourierPage = () => {
               </Button>
               <p className="text-xs text-gray-500">Click here to get actual result</p>
               {hasUnappliedSearch && (
-                <p className="text-xs text-blue-600 font-medium">Filters changed — click Search to apply</p>
+                <p className="text-xs text-blue-600 font-medium">Filters changed   click Search to apply</p>
               )}
             </div>
           </div>
@@ -1102,7 +1102,7 @@ const BranchCourierPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Truck className="w-4 h-4 text-purple-600" />
-              Update Status — {selectedIds.size} Shipment{selectedIds.size !== 1 ? 's' : ''}
+              Update Status   {selectedIds.size} Shipment{selectedIds.size !== 1 ? 's' : ''}
             </DialogTitle>
             <DialogDescription>
               Select a new status to apply to all selected shipments.
@@ -1141,7 +1141,7 @@ const BranchCourierPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <FileText className="w-4 h-4 text-blue-600" />
-              Update Shipment Numbers — {selectedIds.size} Shipment{selectedIds.size !== 1 ? 's' : ''}
+              Update Shipment Numbers   {selectedIds.size} Shipment{selectedIds.size !== 1 ? 's' : ''}
             </DialogTitle>
             <DialogDescription>
               New shipment numbers will be auto-generated for all selected shipments.
@@ -1195,7 +1195,7 @@ const BranchCourierPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Package className="w-4 h-4 text-blue-500" />
-              Sale Items — {itemsModal?.label}
+              Sale Items   {itemsModal?.label}
             </DialogTitle>
           </DialogHeader>
           {itemsModal?.loading ? (
@@ -1222,7 +1222,7 @@ const BranchCourierPage = () => {
                     <TableRow key={i}>
                       <TableCell className="text-xs text-gray-400">{i + 1}</TableCell>
                       <TableCell className="text-sm">
-                        <div className="font-medium">{item.product?.name || item.productName || '—'}</div>
+                        <div className="font-medium">{item.product?.name || item.productName || ' '}</div>
                         {(item.product?.sku || item.sku) && (
                           <div className="text-xs text-gray-400">{item.product?.sku || item.sku}</div>
                         )}
@@ -1230,7 +1230,7 @@ const BranchCourierPage = () => {
                       <TableCell className="text-sm text-right">{item.quantity}</TableCell>
                       <TableCell className="text-sm text-right">{formatCurrency(item.unitPrice)}</TableCell>
                       <TableCell className="text-sm text-right">
-                        {item.discount > 0 ? formatCurrency(item.discount) : '—'}
+                        {item.discount > 0 ? formatCurrency(item.discount) : ' '}
                       </TableCell>
                       <TableCell className="text-sm text-right font-semibold">
                         {formatCurrency(item.totalPrice ?? (item.unitPrice * item.quantity))}
@@ -1738,7 +1738,7 @@ const CourierShipmentsTable = ({
                 {(() => {
                   const tracking = shipment.trackingNumber?.trim();
                   const awb = shipment.awb_number?.trim();
-                  if (!tracking && !awb) return <span className="text-sm text-gray-400">—</span>;
+                  if (!tracking && !awb) return <span className="text-sm text-gray-400"> </span>;
                   const showBoth = !!(tracking && awb && tracking !== awb);
                   return (
                     <div className="space-y-0.5">

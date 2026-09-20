@@ -159,7 +159,7 @@ export default function CarWashQueuePage() {
                 {services.filter((s: any) => s.isActive).map((s: any) => (
                   <label key={s.id} className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={jobForm.serviceIds.includes(s.id)} onChange={() => toggleService(s.id)} />
-                    {s.name} {s.priceMatrix?.[jobForm.vehicleSizeClass] != null && `— Rs ${Number(s.priceMatrix[jobForm.vehicleSizeClass]).toLocaleString()}`}
+                    {s.name} {s.priceMatrix?.[jobForm.vehicleSizeClass] != null && `  Rs ${Number(s.priceMatrix[jobForm.vehicleSizeClass]).toLocaleString()}`}
                   </label>
                 ))}
               </div>

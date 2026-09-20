@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { DragEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import useOrgFeatures from '../../hooks/useOrgFeatures';
 import toast from 'react-hot-toast';
 import { compressImageToWebP } from '../../utils/compressImage';
 import {
@@ -21,8 +22,11 @@ import {
   Link,
   Wrench,
   Smartphone,
+  Shield,
 } from 'lucide-react';
 import { useProduct } from '../../hooks/useProduct';
+import useWarranty, { type WarrantyCoverageItem } from '../../hooks/useWarranty';
+import WarrantyCoverageFields from '../../components/organizationadmin/products/WarrantyCoverageFields';
 import { useProductCategory } from '../../hooks/useProductCategory';
 import { useProductVariantType } from '../../hooks/useProductVariantType';
 import { useLocation } from '../../hooks/useLocation';
@@ -30,6 +34,13 @@ import type { ProductVariantType } from '../../hooks/useProductVariantType';
 import AsyncSearchSelect from '../../components/common/AsyncSearchSelect';
 import { toCategoryOptions } from '../../utils/productListFilters';
 import { formatCurrency } from '../../utils/currency';
+import {
+  SELL_BY_DEFAULTS,
+  SELL_BY_LABELS,
+  UNITS_FOR_SELL_BY,
+  type SellBy,
+  type UnitOfMeasure,
+} from '../../utils/qty';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,11 +81,12 @@ interface Category {
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-type SectionId = 'basic' | 'pricing' | 'images' | 'inventory' | 'variants';
+type SectionId = 'basic' | 'pricing' | 'warranty' | 'images' | 'inventory' | 'variants';
 
 const SECTION_LABELS: Record<SectionId, { label: string; icon: React.ReactNode }> = {
   basic:     { label: 'Basic Info',   icon: <Package className="w-4 h-4" /> },
   pricing:   { label: 'Pricing',      icon: <DollarSign className="w-4 h-4" /> },
+  warranty:  { label: 'Warranty',     icon: <Shield className="w-4 h-4" /> },
   images:    { label: 'Images',       icon: <Image className="w-4 h-4" /> },
   inventory: { label: 'Inventory',    icon: <BarChart2 className="w-4 h-4" /> },
   variants:  { label: 'Variants',     icon: <Layers className="w-4 h-4" /> },
@@ -144,6 +156,7 @@ const Section = ({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function EditProductPage() {
+  const { warrantyEnabled } = useOrgFeatures();
   const navigate = useNavigate();
   const { productId } = useParams<{ productId: string }>();
   const productHook = useProduct();
@@ -152,6 +165,51 @@ export default function EditProductPage() {
   const variantTypeHook = useProductVariantType();
   const locationHook = useLocation();
 
+  // ── Warranty coverage vocabulary ─────────────────────────────────────────────
+  const warrantyHook = useWarranty();
+  const warrantyHookRef = useRef(warrantyHook);
+  warrantyHookRef.current = warrantyHook;
+
+  useEffect(() => {
+    if (!warrantyEnabled) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingCoverageItems(true);
+      const res = await warrantyHookRef.current.getCoverageItems();
+      if (!cancelled && Array.isArray(res?.data)) {
+        setCoverageItems(res!.data as WarrantyCoverageItem[]);
+      }
+      setLoadingCoverageItems(false);
+    })();
+    return () => { cancelled = true; };
+  }, [warrantyEnabled]);
+
+  // The template this product already carries   a snapshot of what's on file
+  // right now, not what any already-issued card says (cards keep their own copy).
+  useEffect(() => {
+    if (!warrantyEnabled || !productId) return;
+    let cancelled = false;
+    (async () => {
+      const res = await warrantyHookRef.current.getProductCoverage(productId);
+      if (cancelled || !Array.isArray(res?.data)) return;
+      const map: Record<string, 'INCLUDED' | 'EXCLUDED'> = {};
+      (res!.data as Array<{ id: string; stance: 'INCLUDED' | 'EXCLUDED' }>).forEach(row => {
+        map[row.id] = row.stance;
+      });
+      setCoverageSelections(map);
+    })();
+    return () => { cancelled = true; };
+  }, [warrantyEnabled, productId]);
+
+  const handleCoverageToggle = useCallback((itemId: string, stance: 'INCLUDED' | 'EXCLUDED') => {
+    setCoverageSelections(prev => {
+      const next = { ...prev };
+      if (next[itemId] === stance) delete next[itemId];
+      else next[itemId] = stance;
+      return next;
+    });
+  }, []);
+
   // ── Reference data ──────────────────────────────────────────────────────────
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [variantTypes, setVariantTypes] = useState<ProductVariantType[]>([]);
@@ -159,7 +217,7 @@ export default function EditProductPage() {
 
   // ── Section collapse state ───────────────────────────────────────────────────
   const [collapsed, setCollapsed] = useState<Record<SectionId, boolean>>({
-    basic: false, pricing: false, images: false, inventory: true, variants: false,
+    basic: false, pricing: false, warranty: false, images: false, inventory: true, variants: false,
   });
 
   // ── Basic Info ───────────────────────────────────────────────────────────────
@@ -174,6 +232,22 @@ export default function EditProductPage() {
   // ── Pricing ──────────────────────────────────────────────────────────────────
   const [unitPrice, setUnitPrice] = useState('');
   const [costPrice, setCostPrice] = useState('');
+  // Warranty. Shown only when the organization has the warranty feature on  
+  // these fields are what the warranty card is later built from, so offering
+  // them to an organization that cannot issue cards is just clutter.
+  const [warrantyMonths, setWarrantyMonths] = useState('');
+  const [warrantyType, setWarrantyType] = useState('STANDARD');
+  const [warrantyTerms, setWarrantyTerms] = useState('');
+  const [warrantyCoverage, setWarrantyCoverage] = useState('');
+  const [warrantyExclusions, setWarrantyExclusions] = useState('');
+  // Provider / DOA / claim-limit / structured coverage   see WarrantyCoverageFields.
+  const [warrantyProviderField, setWarrantyProviderField] = useState('');
+  const [doaDays, setDoaDays] = useState('');
+  const [doaAction, setDoaAction] = useState('');
+  const [claimLimit, setClaimLimit] = useState('');
+  const [coverageItems, setCoverageItems] = useState<WarrantyCoverageItem[]>([]);
+  const [loadingCoverageItems, setLoadingCoverageItems] = useState(false);
+  const [coverageSelections, setCoverageSelections] = useState<Record<string, 'INCLUDED' | 'EXCLUDED'>>({});
   const [wholesalePrice, setWholesalePrice] = useState('');
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -200,6 +274,27 @@ export default function EditProductPage() {
   // ── Product type ──────────────────────────────────────────────────────────────
   const [isService, setIsService] = useState(false);
   const [isReload, setIsReload] = useState(false);
+  // Unit of measure
+  const [sellBy, setSellBy] = useState<SellBy>('UNIT');
+  const [unitOfMeasure, setUnitOfMeasure] = useState<UnitOfMeasure>('PCS');
+  const [qtyStep, setQtyStep] = useState('1');
+  const [minSaleQty, setMinSaleQty] = useState('1');
+  const [qtyDecimals, setQtyDecimals] = useState('0');
+  /**
+   * A product that has already been sold cannot change unit: 5 "PCS" on last
+   * month's sale lines would silently become 5 kg in every report. The backend
+   * refuses it too   this just stops the user filling in a form that will bounce.
+   */
+  const [unitLocked, setUnitLocked] = useState(false);
+
+  const applySellBy = (next: SellBy) => {
+    setSellBy(next);
+    const d = SELL_BY_DEFAULTS[next];
+    setUnitOfMeasure(d.unitOfMeasure);
+    setQtyStep(String(d.qtyStep));
+    setMinSaleQty(String(d.minSaleQty));
+    setQtyDecimals(String(d.qtyDecimals));
+  };
 
   // ── Variants ─────────────────────────────────────────────────────────────────
   const [hasVariants, setHasVariants] = useState(false);
@@ -257,6 +352,17 @@ export default function EditProductPage() {
         setTags(Array.isArray(p.tags) ? p.tags : []);
         setUnitPrice(p.unitPrice != null ? String(p.unitPrice) : '');
         setCostPrice(p.costPrice != null ? String(p.costPrice) : '');
+        // Warranty, so editing a product shows what it currently carries rather
+        // than silently resetting it on save.
+        setWarrantyMonths((p as any).warrantyMonths != null ? String((p as any).warrantyMonths) : '');
+        setWarrantyType((p as any).warrantyType ?? 'STANDARD');
+        setWarrantyTerms((p as any).terms ?? '');
+        setWarrantyCoverage((p as any).coverage ?? '');
+        setWarrantyExclusions((p as any).exclusions ?? '');
+        setWarrantyProviderField((p as any).warrantyProvider ?? '');
+        setDoaDays((p as any).doaDays != null ? String((p as any).doaDays) : '');
+        setDoaAction((p as any).doaAction ?? '');
+        setClaimLimit((p as any).claimLimit != null ? String((p as any).claimLimit) : '');
         setWholesalePrice(p.wholesalePrice != null ? String(p.wholesalePrice) : '');
         setSku(p.sku ?? '');
         setBarcode(p.barcode ?? '');
@@ -267,8 +373,15 @@ export default function EditProductPage() {
         setHasVariants(p.hasVariants ?? false);
         setIsService(p.isService ?? false);
         setIsReload(p.isReload ?? false);
+        setSellBy(((p as any).sellBy ?? 'UNIT') as SellBy);
+        setUnitOfMeasure(((p as any).unitOfMeasure ?? 'PCS') as UnitOfMeasure);
+        setQtyStep(String((p as any).qtyStep ?? 1));
+        setMinSaleQty(String((p as any).minSaleQty ?? 1));
+        setQtyDecimals(String((p as any).qtyDecimals ?? 0));
+        // Any recorded sale freezes the unit.
+        setUnitLocked(Number((p as any).totalSold ?? (p as any).salesCount ?? 0) > 0);
 
-        // Pre-fill images — merge images array + primaryImage (API may return images:null with primaryImage set)
+        // Pre-fill images   merge images array + primaryImage (API may return images:null with primaryImage set)
         const rawImages: string[] = Array.isArray(p.images) ? p.images : [];
         const primaryUrl: string | null = p.primaryImage ?? null;
         const allImageUrls = primaryUrl && !rawImages.includes(primaryUrl)
@@ -601,6 +714,20 @@ export default function EditProductPage() {
         ...(sku && { sku }),
         ...(barcode && { barcode }),
         ...(costPrice && { costPrice: Number(costPrice) }),
+        // Warranty travels with the product: when one sells, the card is built
+        // from exactly these values. Only sent while the feature is on, so an
+        // organization with warranty off never writes warranty data by accident.
+        ...(warrantyEnabled && warrantyMonths !== '' && {
+          warrantyMonths: Number(warrantyMonths) || 0,
+        }),
+        ...(warrantyEnabled && warrantyType && { warrantyType }),
+        ...(warrantyEnabled && warrantyTerms && { terms: warrantyTerms }),
+        ...(warrantyEnabled && warrantyCoverage && { coverage: warrantyCoverage }),
+        ...(warrantyEnabled && warrantyExclusions && { exclusions: warrantyExclusions }),
+        ...(warrantyEnabled && warrantyProviderField && { warrantyProvider: warrantyProviderField }),
+        ...(warrantyEnabled && doaDays !== '' && { doaDays: Number(doaDays) || 0 }),
+        ...(warrantyEnabled && doaAction && { doaAction }),
+        ...(warrantyEnabled && claimLimit !== '' && { claimLimit: Number(claimLimit) || 0 }),
         ...(wholesalePrice && { wholesalePrice: Number(wholesalePrice) }),
         ...(minStockLevel && { minStockLevel: Number(minStockLevel) }),
         ...(maxStockLevel && { maxStockLevel: Number(maxStockLevel) }),
@@ -610,12 +737,27 @@ export default function EditProductPage() {
         ...(imageUrls.length > 0 && { images: imageUrls }),
         ...(primaryUrl && { primaryImage: primaryUrl }),
         hasVariants: hasVariants && variantRows.length > 0 && !isReload,
+        sellBy,
+        unitOfMeasure,
+        qtyStep: Number(qtyStep) || 1,
+        minSaleQty: Number(minSaleQty) || 1,
+        qtyDecimals: Number(qtyDecimals) || 0,
         isService,
         isReload,
         ...(hasVariants && selectedTypeIds.length > 0 && {
           customAttributes: { variantTypeIds: selectedTypeIds },
         }),
       });
+
+      // Coverage template sync. Always sent while the feature is on   an
+      // empty selection is a real choice (clears the template back to "just
+      // the free text"), not something to skip out of caution.
+      if (warrantyEnabled && productId) {
+        const items = Object.entries(coverageSelections).map(([coverageItemId, stance]) => ({
+          coverageItemId, stance,
+        }));
+        await warrantyHookRef.current.setProductCoverage(productId, items);
+      }
 
       // 2. Update existing variants / create new ones
       if (hasVariants && variantRows.length > 0) {
@@ -930,16 +1072,112 @@ export default function EditProductPage() {
                   </button>
                   {isService && (
                     <span className="text-xs text-indigo-600 font-medium">
-                      No inventory tracking — always available in POS
+                      No inventory tracking   always available in POS
                     </span>
                   )}
                   {isReload && (
                     <span className="text-xs text-emerald-700 font-medium">
-                      Credit balance pool — inventory amount is LKR balance
+                      Credit balance pool   inventory amount is LKR balance
                     </span>
                   )}
                 </div>
               </div>
+
+              {/* How this product is measured. Locked once it has been sold. */}
+              {!isService && !isReload && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sold by
+                  </label>
+                  <div className="rounded-xl border border-gray-200 bg-white p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {(Object.keys(SELL_BY_LABELS) as SellBy[]).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          disabled={unitLocked}
+                          onClick={() => applySellBy(mode)}
+                          className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                            sellBy === mode
+                              ? 'border-orange-500 bg-orange-500 text-white'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300'
+                          }`}
+                        >
+                          {SELL_BY_LABELS[mode]}
+                        </button>
+                      ))}
+                    </div>
+
+                    {unitLocked && (
+                      <p className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                        This product has already been sold, so its unit is fixed  
+                        changing it would reinterpret every past sale and report.
+                        Create a new product if you need a different unit.
+                      </p>
+                    )}
+
+                    {sellBy !== 'UNIT' && (
+                      <>
+                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-600">Unit</label>
+                            <select
+                              value={unitOfMeasure}
+                              disabled={unitLocked}
+                              onChange={(e) => setUnitOfMeasure(e.target.value as UnitOfMeasure)}
+                              className={inputCls}
+                            >
+                              {UNITS_FOR_SELL_BY[sellBy].map((u) => (
+                                <option key={u} value={u}>{u.toLowerCase()}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-600">Step</label>
+                            <input
+                              type="number"
+                              min="0.001"
+                              step="0.001"
+                              value={qtyStep}
+                              onChange={(e) => setQtyStep(e.target.value)}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-600">Minimum</label>
+                            <input
+                              type="number"
+                              min="0.001"
+                              step="0.001"
+                              value={minSaleQty}
+                              onChange={(e) => setMinSaleQty(e.target.value)}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-600">Decimals</label>
+                            <select
+                              value={qtyDecimals}
+                              onChange={(e) => setQtyDecimals(e.target.value)}
+                              className={inputCls}
+                            >
+                              {[0, 1, 2, 3].map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-orange-700">
+                          Stock and sales are recorded in{' '}
+                          <strong>{unitOfMeasure.toLowerCase()}</strong>, and the unit
+                          price is the price of one{' '}
+                          <strong>{unitOfMeasure.toLowerCase()}</strong>.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <Field label="Tags">
                 <div className="flex flex-wrap gap-1.5 items-center min-h-9.5 px-3 py-1.5 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-orange-400 bg-white">
@@ -976,7 +1214,17 @@ export default function EditProductPage() {
                   Unit price is set on each variant below. The parent product will use the lowest variant price.
                 </div>
               ) : (
-                <Field label={isReload ? 'Price per LKR (usually 1)' : 'Unit Price (Selling)'} required error={errors.unitPrice}>
+                <Field
+                  label={
+                    isReload
+                      ? 'Price per LKR (usually 1)'
+                      : sellBy === 'UNIT'
+                        ? 'Unit Price (Selling)'
+                        : `Price per ${unitOfMeasure.toLowerCase()} (Selling)`
+                  }
+                  required
+                  error={errors.unitPrice}
+                >
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
                     <input
@@ -1040,6 +1288,88 @@ export default function EditProductPage() {
             </div>
           </Section>
 
+
+          {/* ── Warranty ── */}
+          {warrantyEnabled && (
+            <Section id="warranty" collapsed={collapsed.warranty} onToggle={() => toggle('warranty')}>
+              <div className="mt-4 space-y-4">
+                <p className="text-xs text-gray-500">
+                  When this product is sold, a warranty card is issued from exactly
+                  these values and linked to that sale. Leave the months at 0 for a
+                  product that carries no warranty   no card is ever created for it.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Warranty Months">
+                    <input
+                      type="number"
+                      min="0"
+                      value={warrantyMonths}
+                      onChange={e => setWarrantyMonths(e.target.value)}
+                      placeholder="0"
+                      className={inputCls}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">0 = no warranty</p>
+                  </Field>
+                  <Field label="Warranty Type">
+                    <select
+                      value={warrantyType}
+                      onChange={e => setWarrantyType(e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="STANDARD">Standard</option>
+                      <option value="EXTENDED">Extended</option>
+                      <option value="LIMITED">Limited</option>
+                      <option value="LIFETIME">Lifetime</option>
+                      <option value="SERVICE">Service Warranty</option>
+                      <option value="NO_WARRANTY">No Warranty</option>
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Terms">
+                  <textarea
+                    rows={3}
+                    value={warrantyTerms}
+                    onChange={e => setWarrantyTerms(e.target.value)}
+                    placeholder="Leave empty to use the standard wording on the warranty card"
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="Coverage">
+                  <textarea
+                    rows={3}
+                    value={warrantyCoverage}
+                    onChange={e => setWarrantyCoverage(e.target.value)}
+                    placeholder="What the warranty covers"
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="Exclusions">
+                  <textarea
+                    rows={3}
+                    value={warrantyExclusions}
+                    onChange={e => setWarrantyExclusions(e.target.value)}
+                    placeholder="What the warranty does not cover"
+                    className={inputCls}
+                  />
+                </Field>
+                <WarrantyCoverageFields
+                  items={coverageItems}
+                  loadingItems={loadingCoverageItems}
+                  selections={coverageSelections}
+                  onToggle={handleCoverageToggle}
+                  provider={warrantyProviderField}
+                  onProviderChange={setWarrantyProviderField}
+                  doaDays={doaDays}
+                  onDoaDaysChange={setDoaDays}
+                  doaAction={doaAction}
+                  onDoaActionChange={setDoaAction}
+                  claimLimit={claimLimit}
+                  onClaimLimitChange={setClaimLimit}
+                />
+              </div>
+            </Section>
+          )}
+
           {/* ── Images ── */}
           <Section id="images" collapsed={collapsed.images} onToggle={() => toggle('images')}>
             <div className="mt-4 space-y-4">
@@ -1065,7 +1395,7 @@ export default function EditProductPage() {
                 </p>
                 <p className="text-xs text-gray-400">
                   {images.length < 5
-                    ? `${images.length}/5 images · JPEG, PNG, WebP — compressed to WebP before upload`
+                    ? `${images.length}/5 images · JPEG, PNG, WebP   compressed to WebP before upload`
                     : `Remove an image to add more`}
                 </p>
               </div>
@@ -1169,7 +1499,7 @@ export default function EditProductPage() {
               <div className="mt-4 flex items-start gap-3 p-4 rounded-xl bg-indigo-50 border border-indigo-100">
                 <Wrench className="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-indigo-800">Service Product — No Inventory Required</p>
+                  <p className="text-sm font-semibold text-indigo-800">Service Product   No Inventory Required</p>
                   <p className="text-xs text-indigo-600 mt-0.5">Service products are always considered available and do not consume physical stock.</p>
                 </div>
               </div>
@@ -1178,7 +1508,7 @@ export default function EditProductPage() {
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                   <Smartphone className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-sm font-semibold text-emerald-900">Reload Product — Credit Balance Pool</p>
+                    <p className="text-sm font-semibold text-emerald-900">Reload Product   Credit Balance Pool</p>
                     <p className="text-xs text-emerald-700 mt-0.5">
                       Inventory stores whole-LKR credit. POS reload sales deduct the sold amount from this balance.
                     </p>
@@ -1276,7 +1606,7 @@ export default function EditProductPage() {
                         const label = t === 'WAREHOUSE' ? 'Warehouse' : t === 'BRANCH' ? 'Branch' : ((l as any).locationType || (l as any).type || 'Location');
                         return (
                           <option key={l.id} value={l.id}>
-                            {l.name}{l.code ? ` (${l.code})` : ''} — {label}
+                            {l.name}{l.code ? ` (${l.code})` : ''}   {label}
                           </option>
                         );
                       })}
@@ -1647,7 +1977,7 @@ export default function EditProductPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Name</span>
                 <span className="font-medium text-gray-800 text-right max-w-40 truncate">
-                  {name || '—'}
+                  {name || ' '}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -1658,10 +1988,10 @@ export default function EditProductPage() {
                       ? derivedUnitPriceMax != null && derivedUnitPriceMax !== derivedUnitPrice
                         ? `${formatCurrency(derivedUnitPrice)} – ${formatCurrency(derivedUnitPriceMax)}`
                         : formatCurrency(derivedUnitPrice)
-                      : '—'
+                      : ' '
                     : unitPrice
                       ? formatCurrency(Number(unitPrice))
-                      : '—'}
+                      : ' '}
                 </span>
               </div>
               {costPrice && (
@@ -1674,7 +2004,7 @@ export default function EditProductPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-500">Category</span>
                   <span className="font-medium text-gray-800 text-right max-w-35 truncate">
-                    {selectedCategory?.name || '—'}
+                    {selectedCategory?.name || ' '}
                   </span>
                 </div>
               )}

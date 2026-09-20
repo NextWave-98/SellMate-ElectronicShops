@@ -20,7 +20,7 @@ export default defineConfig(({ command }) => ({
     // the charting, PDF, QR-scanning and printing code on first paint even if
     // they never opened those pages.
     //
-    // This splits out heavy LEAF libraries only — packages nothing else in the
+    // This splits out heavy LEAF libraries only   packages nothing else in the
     // bundle imports back into. Interdependent packages (React, Radix, the form
     // stacks) are deliberately left in the main chunk, because splitting those
     // is what causes "Cannot access X before initialization" at runtime.
@@ -33,15 +33,15 @@ export default defineConfig(({ command }) => ({
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return
 
-          // Charts — only used on dashboards and report pages
+          // Charts   only used on dashboards and report pages
           if (/[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/.test(id)) {
             return 'vendor-charts'
           }
-          // PDF export — only used when a user actually exports
+          // PDF export   only used when a user actually exports
           if (/[\\/]node_modules[\\/](html2pdf\.js|jspdf|html2canvas)[\\/]/.test(id)) {
             return 'vendor-pdf'
           }
-          // Barcode / QR scanning + thermal printing — POS and barcode pages only
+          // Barcode / QR scanning + thermal printing   POS and barcode pages only
           if (/[\\/]node_modules[\\/](html5-qrcode|qz-tray)[\\/]/.test(id)) {
             return 'vendor-scan'
           }

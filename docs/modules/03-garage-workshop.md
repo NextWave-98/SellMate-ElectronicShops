@@ -1,4 +1,4 @@
-# Garage / Workshop — Full Guide
+# Garage / Workshop   Full Guide
 
 **Industry:** `GARAGE` (or `GENERAL`)  
 **Permission:** `garage.*` (often also `jobsheets.*`, `parts.*`)  
@@ -28,7 +28,7 @@ Workshop operations for customer vehicles: estimates (with customer approval lin
 | `/superadmin/garage/reminders` | Service reminders |
 | `/superadmin/job-sheets/monitor` | Job sheets (feature `jobsheets`) |
 
-**Public:** estimate approval via token URL (no login) — `GET/POST /api/public/estimates/:id`
+**Public:** estimate approval via token URL (no login)   `GET/POST /api/public/estimates/:id`
 
 Related: `/superadmin/appointments`, `/superadmin/towing`, rental loan vehicles.
 
@@ -37,7 +37,7 @@ Related: `/superadmin/appointments`, `/superadmin/towing`, rental loan vehicles.
 ## Setup
 
 1. Register **customers**.
-2. **Vehicles** — plate, make/model, VIN/odometer, owner customer.
+2. **Vehicles**   plate, make/model, VIN/odometer, owner customer.
 3. Ensure **parts** catalogue / stock if you bill parts from inventory.
 4. Optional: **Appointments** for booking slots into the workshop.
 
@@ -82,7 +82,7 @@ Related: `/superadmin/appointments`, `/superadmin/towing`, rental loan vehicles.
 
 ---
 
-## Full example — Lanka Motors Workshop (Kandy)
+## Full example   Lanka Motors Workshop (Kandy)
 
 **Vehicle:** Honda Vezel `WP CAB-8890`, owner Nimal Perera.
 
@@ -91,7 +91,7 @@ Related: `/superadmin/appointments`, `/superadmin/towing`, rental loan vehicles.
 | Line | Amount (LKR) |
 |------|----------------|
 | Brake pads (parts) | 12,000 |
-| Labor — pad replacement | 4,500 |
+| Labor   pad replacement | 4,500 |
 | **Total** | **16,500** |
 
 1. Advisor sends WhatsApp approval link.

@@ -77,6 +77,16 @@ export const DEFAULT_PRINTER_CONFIG: PrinterConfig = {
   starWebPrntSecure: false,
 };
 
+/** Defaults when no per-location config is saved yet. */
+export function createDefaultPrinterConfig(options?: {
+  preferWidePaper?: boolean;
+}): PrinterConfig {
+  return {
+    ...DEFAULT_PRINTER_CONFIG,
+    paperWidth: options?.preferWidePaper ? "80mm" : DEFAULT_PRINTER_CONFIG.paperWidth,
+  };
+}
+
 /** Resolve thermal width from device settings (mPOP is usually 58mm). */
 export function resolveThermalPaperFormat(
   printerConf?: PrinterConfig | null,

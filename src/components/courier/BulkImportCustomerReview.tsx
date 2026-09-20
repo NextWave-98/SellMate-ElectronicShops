@@ -337,7 +337,7 @@ export default function BulkImportCustomerReview({
 
         {preview.parseErrors.length > 0 && (
           <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-800">
-            <p className="font-medium">{preview.parseErrors.length} row(s) missing phone — will be skipped on import</p>
+            <p className="font-medium">{preview.parseErrors.length} row(s) missing phone   will be skipped on import</p>
           </div>
         )}
       </div>

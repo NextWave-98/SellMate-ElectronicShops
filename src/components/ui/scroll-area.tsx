@@ -4,7 +4,7 @@ import { ScrollArea as ScrollAreaPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
-  /** Frosted glass thumb — use in modals and glass panels */
+  /** Frosted glass thumb   use in modals and glass panels */
   glass?: boolean
 }
 

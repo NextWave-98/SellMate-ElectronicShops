@@ -103,7 +103,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
       const res = await facebookLeadsService.getForms(businessId, id);
       setForms(res.data.forms ?? []);
     } catch {
-      // non-fatal — user can click Reload
+      // non-fatal   user can click Reload
     }
   };
 
@@ -134,7 +134,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
     if (branchId) loadSettings(branchId);
   }, [branchId, businessId]);
 
-  // After OAuth — store page list and show selector
+  // After OAuth   store page list and show selector
   const handleConnected = (pgs: FacebookPage[]) => {
     setPages(pgs);
     setChangingPage(false);
@@ -231,7 +231,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
     setSyncing(true);
     try {
       const res = await facebookLeadsService.syncLeads(businessId, branchId, formId);
-      alert.success(`Synced ${res.data.synced} new lead(s) — ${res.data.skipped} already imported.`);
+      alert.success(`Synced ${res.data.synced} new lead(s)   ${res.data.skipped} already imported.`);
     } catch (err) {
       alert.error(err instanceof Error ? err.message : 'Failed to sync leads');
     } finally {
@@ -414,7 +414,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             <>
-              {/* Step 1 — Connect with Facebook (when not connected or changing page) */}
+              {/* Step 1   Connect with Facebook (when not connected or changing page) */}
               {(!connected || changingPage) && branchId && (
                 <div className="space-y-3">
                   {!connected && (
@@ -435,7 +435,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Step 2 — Page selection (after OAuth or change-page) */}
+              {/* Step 2   Page selection (after OAuth or change-page) */}
               {showPageSelector && pages.length > 0 && (
                 <div>
                   <Label>Select a Facebook page to connect</Label>
@@ -445,7 +445,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
                     onChange={(e) => e.target.value && handleSelectPage(e.target.value)}
                     disabled={busy}
                   >
-                    <NativeSelectOption value="">— Choose a page —</NativeSelectOption>
+                    <NativeSelectOption value="">  Choose a page  </NativeSelectOption>
                     {pages.map((p) => (
                       <NativeSelectOption key={p.id} value={p.id}>
                         {p.name}
@@ -455,7 +455,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Step 3 — Form management (when connected) */}
+              {/* Step 3   Form management (when connected) */}
               {connected && !changingPage && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
@@ -570,7 +570,7 @@ const FacebookLeadsSettingsPage: React.FC = () => {
       {/* Webhook info card */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Meta App — Webhook URL</CardTitle>
+          <CardTitle className="text-base">Meta App   Webhook URL</CardTitle>
           <CardDescription>
             Configure this callback URL once in your Meta App dashboard (Webhooks → Page →{' '}
             <code>leadgen</code>), using the verify token from your server's{' '}

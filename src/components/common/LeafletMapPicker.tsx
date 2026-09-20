@@ -23,7 +23,7 @@ function loadLeaflet(): Promise<any> {
 }
 
 /**
- * Interactive OpenStreetMap pin-drop picker (Leaflet via CDN — no npm install).
+ * Interactive OpenStreetMap pin-drop picker (Leaflet via CDN   no npm install).
  * Click the map to drop/move a pin; reports lat/lng via onChange.
  */
 export default function LeafletMapPicker({

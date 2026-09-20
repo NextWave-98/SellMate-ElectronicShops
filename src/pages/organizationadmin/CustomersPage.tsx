@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, UserPlus, Search, Eye, Edit, Trash2, MessageSquare } from 'lucide-react';
+import { RefreshCw, UserPlus, Search, Eye, Edit, Trash2, MessageSquare, Upload } from 'lucide-react';
 import type { Customer, CustomerStats } from '../../types/customer.types';
 import CustomerStatsCards from '../../components/superadmin/customers/CustomerStatsCards';
 import CustomerTable from '../../components/superadmin/customers/CustomerTable';
 import AddCustomerModal from '../../components/superadmin/customers/AddCustomerModal';
 import EditCustomerModal from '../../components/superadmin/customers/EditCustomerModal';
+import BulkUploadModal from '../../components/superadmin/customers/BulkUploadModal';
 import BulkSMSSameModal from '../../components/superadmin/customers/BulkSMSSameModal';
 import BulkSMSDifferentModal from '../../components/superadmin/customers/BulkSMSDifferentModal';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -54,6 +55,7 @@ export default function CustomersPage() {
   const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([]);
   const [isBulkSMSSameModalOpen, setIsBulkSMSSameModalOpen] = useState(false);
   const [isBulkSMSDifferentModalOpen, setIsBulkSMSDifferentModalOpen] = useState(false);
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
 
  
 
@@ -107,7 +109,7 @@ export default function CustomersPage() {
    * Load customers with server-side pagination AND server-side search.
    * The /customers/all endpoint searches ID/name/email/phone/NIC (with smart
    * phone-number variants), so search results paginate exactly like the
-   * normal list — no 100-result cap, no stale pagination bar.
+   * normal list   no 100-result cap, no stale pagination bar.
    *
    * `background` = true keeps the page (and the focused search input) mounted
    * and shows the small spinner inside the search box instead.
@@ -168,7 +170,7 @@ export default function CustomersPage() {
     }
   };
 
-  // Load stats ONCE on mount — they don't change when flipping pages,
+  // Load stats ONCE on mount   they don't change when flipping pages,
   // so reloading them on every page change was wasted aggregate queries.
   useEffect(() => {
     loadStats();
@@ -183,7 +185,7 @@ export default function CustomersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, itemsPerPage]);
 
-  // Debounced server-side search — resets to page 1 and reloads.
+  // Debounced server-side search   resets to page 1 and reloads.
   const searchMountedRef = useRef(false);
   useEffect(() => {
     if (!searchMountedRef.current) {
@@ -290,17 +292,14 @@ export default function CustomersPage() {
 
   const handleEditCustomerSubmit = async (customerId: string, data: Parameters<typeof updateCustomer>[1]) => {
     const result = await updateCustomer(customerId, data);
-    if(result?.success===false){
-      setIsEditModalOpen(true);
-     
-    }else{
-      
+    if (result?.success === false) {
+      throw new Error(result?.message || 'Failed to update customer');
+    }
+
     setIsEditModalOpen(false);
     setSelectedCustomer(null);
     await loadCustomers();
     await loadStats();
-    }
-   
   };
 
   const handleBulkSMSSame = () => {
@@ -349,6 +348,14 @@ export default function CustomersPage() {
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button
+            onClick={() => setIsBulkUploadModalOpen(true)}
+            variant="outline"
+            className="border-orange-300 text-orange-700 hover:bg-orange-50"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Bulk Upload
           </Button>
           <Button
             onClick={handleAddCustomer}
@@ -473,6 +480,14 @@ export default function CustomersPage() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleAddCustomerSubmit}
+      />
+
+      <BulkUploadModal
+        isOpen={isBulkUploadModalOpen}
+        onClose={() => setIsBulkUploadModalOpen(false)}
+        onSuccess={() => {
+          void handleRefresh();
+        }}
       />
 
       <EditCustomerModal

@@ -513,7 +513,7 @@ export default function CreateInstallmentPlanPage() {
                                                 <CreditCard className="h-4 w-4 text-blue-600" />
                                                 <span className="text-sm font-semibold text-blue-900">National ID</span>
                                             </div>
-                                            <p className="text-blue-800 font-medium">{financialDetails.nationalId || "—"}</p>
+                                            <p className="text-blue-800 font-medium">{financialDetails.nationalId || " "}</p>
                                         </div>
 
                                         {/* Bank */}

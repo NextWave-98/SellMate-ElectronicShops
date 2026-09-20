@@ -2,6 +2,8 @@ import type { Inventory } from '../../../types/inventory.types';
 import Pagination from '../../common/Pagination';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Edit } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -24,6 +26,7 @@ interface ProductsTableProps {
   };
   onPageChange?: (page: number) => void;
   onLimitChange?: (limit: number) => void;
+  onEdit?: (item: Inventory) => void;
 }
 
 export default function ProductsTable({ 
@@ -32,7 +35,8 @@ export default function ProductsTable({
   onSelectionChange,
   pagination,
   onPageChange,
-  onLimitChange
+  onLimitChange,
+  onEdit,
 }: ProductsTableProps) {
   const formatCurrency = (amount: number) => {
     return `LKR ${amount.toLocaleString('en-US')}`;
@@ -115,6 +119,7 @@ export default function ProductsTable({
             <TableHead className="text-center">Quantity</TableHead>
             <TableHead className="text-right">Unit Price</TableHead>
             <TableHead className="text-center">Status</TableHead>
+            {onEdit && <TableHead className="text-center w-20">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -142,6 +147,23 @@ export default function ProductsTable({
               <TableCell className="text-center">
                 <Badge className={getStatusColor(item.status)}>{getStatusText(item.status)}</Badge>
               </TableCell>
+              {onEdit && (
+                <TableCell className="text-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(item);
+                    }}
+                    title="Edit product"
+                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

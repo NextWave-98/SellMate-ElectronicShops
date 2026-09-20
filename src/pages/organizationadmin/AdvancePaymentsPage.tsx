@@ -141,7 +141,7 @@ export default function OrgAdvancePaymentsPage() {
         return;
       }
       await completeJob(job.id, { notifyCustomer: notify });
-      toast.success(notify ? 'Job completed — customer notified' : 'Job completed');
+      toast.success(notify ? 'Job completed   customer notified' : 'Job completed');
       setPayDialog(null);
       load(page);
     } catch {
@@ -218,7 +218,7 @@ export default function OrgAdvancePaymentsPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Advance Payments</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              All sales with partial / advance payment pending — across all branches
+              All sales with partial / advance payment pending   across all branches
             </p>
           </div>
           <button
@@ -376,7 +376,7 @@ export default function OrgAdvancePaymentsPage() {
                             : <span className="text-gray-400">–</span>}
                         </td>
                         <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                          {sale.location?.name ?? <span className="text-gray-400 text-xs">—</span>}
+                          {sale.location?.name ?? <span className="text-gray-400 text-xs"> </span>}
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-gray-900">{custName}</p>
@@ -386,7 +386,7 @@ export default function OrgAdvancePaymentsPage() {
                         <td className="px-4 py-3 text-green-700 font-medium whitespace-nowrap">{fmt(sale.paidAmount)}</td>
                         <td className="px-4 py-3 text-red-600 font-bold whitespace-nowrap">{fmt(balance)}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">
-                          {sale.soldBy?.name ?? <span className="text-gray-400">—</span>}
+                          {sale.soldBy?.name ?? <span className="text-gray-400"> </span>}
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
@@ -395,7 +395,7 @@ export default function OrgAdvancePaymentsPage() {
                         </td>
                         <td className="px-4 py-3 min-w-[400px]">
                           <div className="flex items-center gap-1 flex-wrap">
-                            {/* Pay Balance — hidden once fully paid */}
+                            {/* Pay Balance   hidden once fully paid */}
                             {balance > 0.01 && (
                               <button
                                 onClick={() => { setPayDialog({ sale }); setPayAmount(balance.toFixed(2)); setPayHistory([]); loadPayHistory(sale.id); }}

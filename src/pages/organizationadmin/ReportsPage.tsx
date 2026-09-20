@@ -11,6 +11,7 @@ import {
   ChartColumnStacked,
   ChartNoAxesCombined,
   ClipboardList,
+  PackageX,
   Settings2,
   Truck,
   Store,
@@ -68,9 +69,15 @@ export default function ReportsPage() {
   const includeJobsheet = businessData?.reportIncludeJobsheet ?? true;
   const includeSupplierPayment =
     businessData?.reportIncludeSupplierPayment ?? true;
+  // Off by default: switching it on moves historical profit figures, so it is a
+  // deliberate choice rather than something that changes under the owner.
+  const includeStockLoss = businessData?.reportIncludeStockLoss ?? false;
 
   const handleToggleSetting = async (
-    key: "reportIncludeJobsheet" | "reportIncludeSupplierPayment",
+    key:
+      | "reportIncludeJobsheet"
+      | "reportIncludeSupplierPayment"
+      | "reportIncludeStockLoss",
     value: boolean,
   ) => {
     setSavingSettings(true);
@@ -114,6 +121,11 @@ export default function ReportsPage() {
       type: ReportType.JOBSHEET,
       label: "Jobsheet Report",
       icon: ClipboardList,
+    },
+    {
+      type: ReportType.STOCK_LOSS,
+      label: "Stock Loss",
+      icon: PackageX,
     },
   ];
 
@@ -232,7 +244,7 @@ export default function ReportsPage() {
     if (!dateRange?.start || !dateRange?.end) return null;
     const start = new Date(dateRange.start).toLocaleDateString();
     const end = new Date(dateRange.end).toLocaleDateString();
-    return `${start} — ${end}`;
+    return `${start}   ${end}`;
   };
 
   const renderStaffProductTable = (
@@ -397,7 +409,125 @@ export default function ReportsPage() {
                       {formatCurrency(data.summary?.averageOrderValue)}
                     </p>
                   </div>
+                  {/* Stock loss always gets a tile. A missing tile reads as
+                      "the feature is broken"; a zero tile reads as "nothing was
+                      lost", which is the answer we actually want to give. */}
+                  <div className="bg-rose-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Stock Loss</p>
+                    <p className="text-2xl font-bold text-rose-600">
+                      -{formatCurrency(data.summary?.stockLoss ?? 0)}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {data.summary?.stockLossIncluded === false &&
+                      Number(data.summary?.stockLossGross ?? 0) > 0
+                        ? `${formatCurrency(data.summary?.stockLossGross)} lost - not deducted`
+                        : `${data.summary?.stockLossCount ?? 0} ${
+                            (data.summary?.stockLossCount ?? 0) === 1
+                              ? "entry"
+                              : "entries"
+                          } in this period`}
+                    </p>
+                  </div>
+                  <div className="bg-emerald-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Profit After Loss</p>
+                    <p className="text-2xl font-bold text-emerald-700">
+                      {formatCurrency(data.summary?.netProfitAfterLoss)}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      matches the Profit &amp; Loss report
+                    </p>
+                  </div>
                 </div>
+              </div>
+            )}
+
+            {/* Stock loss for the selected period */}
+            {data.summary && (
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 mb-3">
+                  Stock Loss in this Period
+                </h4>
+
+                {!data?.stockLossDetail && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    The API is serving an older build - restart the backend to see
+                    stock loss on this report.
+                  </div>
+                )}
+
+                {data?.stockLossDetail && data.stockLossDetail.count === 0 && (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                    No damaged, expired, lost or internally used stock was recorded
+                    in this period, so there is nothing to deduct from profit.
+                  </div>
+                )}
+
+                {data?.stockLossDetail && data.stockLossDetail.count > 0 && (
+                  <div
+                    className={`rounded-lg border px-4 py-3 ${
+                      data.stockLossDetail.included
+                        ? "border-rose-200 bg-rose-50/60"
+                        : "border-amber-200 bg-amber-50"
+                    }`}
+                  >
+                    {!data.stockLossDetail.included && (
+                      <p className="text-xs text-amber-900 mb-2">
+                        Deduction is switched off in Settings, so these losses are
+                        shown but not taken off profit.
+                      </p>
+                    )}
+                    {Number(data.stockLossDetail.zeroCostCount ?? 0) > 0 && (
+                      <p className="text-xs text-amber-900 mb-2">
+                        {data.stockLossDetail.zeroCostCount} of these entries are
+                        worth {formatCurrency(0)} because the product had no cost
+                        price
+                        {data.stockLossDetail.zeroCostProducts?.length > 0 &&
+                          ` (${data.stockLossDetail.zeroCostProducts.join(", ")})`}
+                        . They cannot reduce profit until a cost price is set.
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-500">
+                          Damaged / expired / lost
+                        </p>
+                        <p className="text-lg font-semibold text-rose-700">
+                          {formatCurrency(data.stockLossDetail.cogsLoss)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Internal use / demo</p>
+                        <p className="text-lg font-semibold text-rose-700">
+                          {formatCurrency(data.stockLossDetail.opexConsumption)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Recovered</p>
+                        <p className="text-lg font-semibold text-gray-800">
+                          {formatCurrency(data.stockLossDetail.totalRecovered)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Entries</p>
+                        <p className="text-lg font-semibold text-gray-800">
+                          {data.stockLossDetail.count}
+                        </p>
+                      </div>
+                    </div>
+                    {data.stockLossDetail.byProduct?.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {data.stockLossDetail.byProduct.map((pr: any) => (
+                          <span
+                            key={pr.productId}
+                            className="text-xs bg-white border border-rose-100 rounded px-2 py-1 text-gray-700"
+                          >
+                            {pr.name} - {pr.quantity} - {formatCurrency(pr.cost)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -746,7 +876,7 @@ export default function ReportsPage() {
                       {data.saleTransactions.map((txn: any, index: number) => (
                         <tr key={index}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-orange-600">
-                            {txn.invoiceNumber || "—"}
+                            {txn.invoiceNumber || " "}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {txn.customerName}
@@ -762,7 +892,7 @@ export default function ReportsPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {txn.date || txn.paymentDate
                               ? formatDateTime(txn.date || txn.paymentDate)
-                              : "—"}
+                              : " "}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {txn.itemCount}
@@ -785,7 +915,7 @@ export default function ReportsPage() {
                                       : "bg-gray-100 text-gray-700"
                               }`}
                             >
-                              {txn.status || "—"}
+                              {txn.status || " "}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -800,7 +930,7 @@ export default function ReportsPage() {
                                       : "bg-gray-100 text-gray-700"
                               }`}
                             >
-                              {txn.paymentStatus || "—"}
+                              {txn.paymentStatus || " "}
                             </span>
                           </td>
                         </tr>
@@ -811,7 +941,7 @@ export default function ReportsPage() {
               </div>
             )}
 
-            {/* Orders (unified POS + courier — same shape as All Orders) */}
+            {/* Orders (unified POS + courier   same shape as All Orders) */}
             {data.orders && data.orders.length > 0 && (
               <div>
                 <h4 className="text-md font-semibold text-gray-900 mb-3">
@@ -893,7 +1023,7 @@ export default function ReportsPage() {
                                 )}
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-orange-600">
-                                {order.orderNumber || "—"}
+                                {order.orderNumber || " "}
                                 {order.shipmentNumber &&
                                   order.shipmentNumber !== order.orderNumber && (
                                     <div className="text-[10px] text-gray-400 font-mono mt-0.5">
@@ -902,13 +1032,13 @@ export default function ReportsPage() {
                                   )}
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
-                                {order.saleNumber || "—"}
+                                {order.saleNumber || " "}
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
-                                {order.trackingNumber || "—"}
+                                {order.trackingNumber || " "}
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
-                                {order.awbNumber || "—"}
+                                {order.awbNumber || " "}
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-600">
                                 <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
@@ -940,7 +1070,7 @@ export default function ReportsPage() {
                                     )}
                                   </button>
                                 ) : (
-                                  "—"
+                                  " "
                                 )}
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
@@ -957,7 +1087,7 @@ export default function ReportsPage() {
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm">
                                 <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  {(order.status || "—").replace(/_/g, " ")}
+                                  {(order.status || " ").replace(/_/g, " ")}
                                 </span>
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm">
@@ -970,7 +1100,7 @@ export default function ReportsPage() {
                                         : "bg-gray-100 text-gray-700"
                                   }`}
                                 >
-                                  {order.paymentStatus || "—"}
+                                  {order.paymentStatus || " "}
                                 </span>
                                 {order.paymentMethod && (
                                   <div className="text-[10px] text-gray-400 mt-0.5">
@@ -979,7 +1109,7 @@ export default function ReportsPage() {
                                 )}
                               </td>
                               <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {order.locationName || "—"}
+                                {order.locationName || " "}
                                 {order.soldBy && (
                                   <div className="text-[10px] text-gray-400">
                                     {order.soldBy}
@@ -989,7 +1119,7 @@ export default function ReportsPage() {
                               <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {order.paymentDate
                                   ? formatDateTime(order.paymentDate)
-                                  : "—"}
+                                  : " "}
                               </td>
                             </tr>
                             {isExpanded && hasItems && (
@@ -1026,7 +1156,7 @@ export default function ReportsPage() {
                                               {item.name}
                                             </td>
                                             <td className="py-1 pr-4 text-gray-500">
-                                              {item.sku || "—"}
+                                              {item.sku || " "}
                                             </td>
                                             <td className="py-1 pr-4 text-right text-gray-700">
                                               {item.quantity}
@@ -1193,6 +1323,74 @@ export default function ReportsPage() {
                       {formatNumber(data.summary?.inventoryTurnover)}
                     </p>
                   </div>
+                  <div className="bg-rose-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Stock Lost (period)</p>
+                    <p className="text-2xl font-bold text-rose-600">
+                      {formatCurrency(data.summary?.stockLossValue ?? 0)}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {formatNumber(data.summary?.stockLossUnits ?? 0)} units over{" "}
+                      {data.summary?.stockLossEntries ?? 0} entries
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Where the stock went */}
+            {data.stockLoss && data.stockLoss.count > 0 && (
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 mb-3">
+                  Stock Lost in this Period
+                </h4>
+                <div className="rounded-lg border border-rose-200 bg-rose-50/60 px-4 py-3">
+                  {Number(data.stockLoss.zeroCostCount ?? 0) > 0 && (
+                    <p className="text-xs text-amber-900 mb-2">
+                      {data.stockLoss.zeroCostCount} of these entries have no cost
+                      price, so they carry no value into the Profit &amp; Loss
+                      report.
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        Damaged / expired / lost
+                      </p>
+                      <p className="text-lg font-semibold text-rose-700">
+                        {formatCurrency(data.stockLoss.cogsLoss)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Internal use / demo</p>
+                      <p className="text-lg font-semibold text-rose-700">
+                        {formatCurrency(data.stockLoss.opexConsumption)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Units</p>
+                      <p className="text-lg font-semibold text-gray-800">
+                        {formatNumber(data.stockLoss.unitsLost)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Entries</p>
+                      <p className="text-lg font-semibold text-gray-800">
+                        {data.stockLoss.count}
+                      </p>
+                    </div>
+                  </div>
+                  {data.stockLoss.byProduct?.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {data.stockLoss.byProduct.map((pr: any) => (
+                        <span
+                          key={pr.productId}
+                          className="text-xs bg-white border border-rose-100 rounded px-2 py-1 text-gray-700"
+                        >
+                          {pr.name} - {pr.quantity} - {formatCurrency(pr.cost)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1715,7 +1913,7 @@ export default function ReportsPage() {
                             {p.productName}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-500">
-                            {p.sku || "—"}
+                            {p.sku || " "}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-green-700">
                             {p.completedQty}
@@ -1876,7 +2074,7 @@ export default function ReportsPage() {
                                   {p.productName}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-gray-500">
-                                  {p.sku || "—"}
+                                  {p.sku || " "}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right text-green-700">
                                   {p.completedQty}
@@ -1970,7 +2168,7 @@ export default function ReportsPage() {
                                   ? sale.items
                                   : [
                                       {
-                                        productName: "—",
+                                        productName: " ",
                                         sku: "",
                                         quantity: sale.itemQuantity || 0,
                                         subtotal: sale.totalAmount || 0,
@@ -1993,13 +2191,13 @@ export default function ReportsPage() {
                                         className="px-4 py-2 text-sm text-gray-500 font-mono align-top"
                                         rowSpan={lineItems.length}
                                       >
-                                        {sale.shipmentNumber || "—"}
+                                        {sale.shipmentNumber || " "}
                                       </td>
                                       <td
                                         className="px-4 py-2 text-sm text-gray-500 font-mono align-top"
                                         rowSpan={lineItems.length}
                                       >
-                                        {sale.trackingNumber || "—"}
+                                        {sale.trackingNumber || " "}
                                       </td>
                                       <td
                                         className="px-4 py-2 text-sm text-gray-500 align-top"
@@ -2007,7 +2205,7 @@ export default function ReportsPage() {
                                       >
                                         {sale.date
                                           ? new Date(sale.date).toLocaleDateString()
-                                          : "—"}
+                                          : " "}
                                       </td>
                                       <td
                                         className="px-4 py-2 text-sm text-gray-500 align-top"
@@ -2015,7 +2213,7 @@ export default function ReportsPage() {
                                       >
                                         {sale.orderCreatedAt
                                           ? formatDateTime(sale.orderCreatedAt)
-                                          : "—"}
+                                          : " "}
                                       </td>
                                       <td
                                         className="px-4 py-2 text-sm text-gray-500 align-top"
@@ -2023,7 +2221,7 @@ export default function ReportsPage() {
                                       >
                                         {sale.orderUpdatedAt
                                           ? formatDateTime(sale.orderUpdatedAt)
-                                          : "—"}
+                                          : " "}
                                       </td>
                                       <td
                                         className="px-4 py-2 text-sm text-gray-700 align-top"
@@ -2045,10 +2243,10 @@ export default function ReportsPage() {
                                     </>
                                   ) : null}
                                   <td className="px-4 py-2 text-sm text-gray-800">
-                                    {item.productName || "—"}
+                                    {item.productName || " "}
                                   </td>
                                   <td className="px-4 py-2 text-sm text-gray-400 font-mono">
-                                    {item.sku || "—"}
+                                    {item.sku || " "}
                                   </td>
                                   {ii === 0 ? (
                                     <td
@@ -2083,7 +2281,7 @@ export default function ReportsPage() {
                                               : "bg-gray-100 text-gray-700"
                                         }`}
                                       >
-                                        {sale.paymentStatus || "—"}
+                                        {sale.paymentStatus || " "}
                                       </span>
                                       {sale.paymentMethod && (
                                         <div className="text-[10px] text-gray-400 mt-0.5">
@@ -2278,7 +2476,7 @@ export default function ReportsPage() {
                             <td className="px-4 py-4 text-sm text-red-700">{customer.returnedOrders ?? 0}</td>
                             <td className="px-4 py-4 text-sm font-semibold text-gray-900">{formatCurrency(customer.totalSpent)}</td>
                             <td className="px-4 py-4 text-sm text-gray-500">
-                              {customer.lastPurchase ? new Date(customer.lastPurchase).toLocaleDateString() : "—"}
+                              {customer.lastPurchase ? new Date(customer.lastPurchase).toLocaleDateString() : " "}
                             </td>
                           </tr>
                           {isExpanded && hasOrders && (
@@ -2299,11 +2497,11 @@ export default function ReportsPage() {
                                   <tbody>
                                     {customer.orders.map((order: any, oi: number) => (
                                       <tr key={oi} className="border-t border-gray-100">
-                                        <td className="py-1 pr-3 font-mono text-orange-600">{order.saleNumber || "—"}</td>
-                                        <td className="py-1 pr-3">{order.date ? formatDateTime(order.date) : "—"}</td>
-                                        <td className="py-1 pr-3">{(order.status || "—").replace(/_/g, " ")}</td>
-                                        <td className="py-1 pr-3 capitalize">{order.category || "—"}</td>
-                                        <td className="py-1 pr-3">{order.channel || "—"}</td>
+                                        <td className="py-1 pr-3 font-mono text-orange-600">{order.saleNumber || " "}</td>
+                                        <td className="py-1 pr-3">{order.date ? formatDateTime(order.date) : " "}</td>
+                                        <td className="py-1 pr-3">{(order.status || " ").replace(/_/g, " ")}</td>
+                                        <td className="py-1 pr-3 capitalize">{order.category || " "}</td>
+                                        <td className="py-1 pr-3">{order.channel || " "}</td>
                                         <td className="py-1 pr-3 text-right">{formatCurrency(order.totalAmount)}</td>
                                         <td className="py-1 text-right text-green-700">{formatCurrency(order.paidAmount)}</td>
                                       </tr>
@@ -2458,7 +2656,7 @@ export default function ReportsPage() {
                                     {loc.sales.map((sale: any, si: number) => (
                                       <tr key={si} className="border-t border-gray-50">
                                         <td className="py-1 pr-2 font-mono text-orange-600">{sale.saleNumber}</td>
-                                        <td className="py-1 pr-2">{sale.date ? formatDateTime(sale.date) : "—"}</td>
+                                        <td className="py-1 pr-2">{sale.date ? formatDateTime(sale.date) : " "}</td>
                                         <td className="py-1 pr-2">{sale.customerName}</td>
                                         <td className="py-1 pr-2">{sale.staffName}</td>
                                         <td className="py-1 pr-2">{(sale.status || "").replace(/_/g, " ")}</td>
@@ -2529,6 +2727,77 @@ export default function ReportsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Stock loss sits inside cost of goods sold, so it is shown right
+                    under the profit figures it explains. When the setting is off
+                    the figure is still surfaced, clearly marked as not applied,
+                    so the owner can see what it would cost them. */}
+                {data?.stockLossDetail &&
+                  (data.stockLossDetail.cogsLoss > 0 ||
+                    data.stockLossDetail.opexConsumption > 0) && (
+                    <div
+                      className={`mt-4 rounded-lg border p-4 ${
+                        data.stockLossDetail.included
+                          ? "border-red-200 bg-red-50"
+                          : "border-gray-200 bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h5 className="text-sm font-semibold text-gray-800">
+                          Stock Loss &amp; Wastage
+                        </h5>
+                        {!data.stockLossDetail.included && (
+                          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">
+                            not deducted &mdash; turn on in report settings
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
+                        <div>
+                          <p className="text-xs text-gray-500">
+                            Damaged / expired / stolen
+                          </p>
+                          <p className="text-xl font-bold text-red-600">
+                            {formatCurrency(data.stockLossDetail.cogsLoss)}
+                          </p>
+                          <p className="text-xs text-gray-400">in cost of goods sold</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Internal consumption</p>
+                          <p className="text-xl font-bold text-amber-600">
+                            {formatCurrency(data.stockLossDetail.opexConsumption)}
+                          </p>
+                          <p className="text-xs text-gray-400">operating expense</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Recovered</p>
+                          <p className="text-xl font-bold text-green-600">
+                            {formatCurrency(data.stockLossDetail.totalRecovered)}
+                          </p>
+                          <p className="text-xs text-gray-400">scrap / supplier credit</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Entries</p>
+                          <p className="text-xl font-bold text-gray-700">
+                            {data.stockLossDetail.count}
+                          </p>
+                        </div>
+                      </div>
+
+                      {data.stockLossDetail.byType?.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {data.stockLossDetail.byType.map((t: any) => (
+                            <span
+                              key={t.usageType}
+                              className="rounded-full bg-white px-3 py-1 text-xs text-gray-700 border border-gray-200"
+                            >
+                              {t.label}: {formatCurrency(t.cost)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
               </div>
             )}
 
@@ -2639,6 +2908,17 @@ export default function ReportsPage() {
                     <p className="text-sm text-gray-600">Sale Refunds</p>
                     <p className="text-2xl font-bold text-orange-600">
                       {formatCurrency(data.operatingExpenses?.saleRefunds)}
+                    </p>
+                  </div>
+                  {/* Demo units, samples and internal use: goods the business
+                      consumed itself, so they sit below the gross-profit line. */}
+                  <div className="bg-amber-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Internal Consumption</p>
+                    <p className="text-2xl font-bold text-amber-600">
+                      {formatCurrency(data.operatingExpenses?.internalConsumption)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      demo, samples, internal use
                     </p>
                   </div>
                   {/* <div className="bg-yellow-50 p-4 rounded-lg">
@@ -3011,6 +3291,177 @@ export default function ReportsPage() {
           </div>
         );
 
+      case ReportType.STOCK_LOSS:
+        return (
+          <div className="space-y-6">
+            {/* Summary. Unlike the P&L, this report always shows the figures
+                whether or not they are currently deducted from profit - the
+                owner asked to see the losses. */}
+            {data?.summary && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Net Loss</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {formatCurrency(data.summary.netLoss)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {formatCurrency(data.summary.totalGrossLoss)} lost,{" "}
+                    {formatCurrency(data.summary.totalRecovered)} recovered
+                  </p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Charged to COGS</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {formatCurrency(data.summary.cogsLoss)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">reduces gross profit</p>
+                </div>
+                <div className="bg-amber-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Internal Consumption</p>
+                  <p className="text-2xl font-bold text-amber-600">
+                    {formatCurrency(data.summary.opexConsumption)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">operating expense</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Units Lost</p>
+                  <p className="text-2xl font-bold text-gray-700">
+                    {data.summary.unitsLost}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    across {data.summary.entryCount} entries
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* By reason - tells the owner whether to fix handling, ordering or
+                security, which is the whole point of splitting the reasons. */}
+            {data?.byType?.length > 0 && (
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 mb-3">
+                  Loss by Reason
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Entries</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Units</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Net Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.byType.map((t: any) => (
+                        <tr key={t.usageType}>
+                          <td className="px-4 py-2 text-sm text-gray-900">{t.label}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{t.count}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{t.quantity}</td>
+                          <td className="px-4 py-2 text-sm font-semibold text-red-600 text-right">
+                            {formatCurrency(t.cost)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Worst products */}
+            {data?.byProduct?.length > 0 && (
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 mb-3">
+                  Top Products by Loss
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Units</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Net Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.byProduct.map((p: any) => (
+                        <tr key={p.productId}>
+                          <td className="px-4 py-2 text-sm text-gray-900">{p.name}</td>
+                          <td className="px-4 py-2 text-sm text-gray-500">{p.sku || "-"}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{p.quantity}</td>
+                          <td className="px-4 py-2 text-sm font-semibold text-red-600 text-right">
+                            {formatCurrency(p.cost)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Every entry, so a figure can always be traced to who logged what */}
+            {data?.rows?.length > 0 && (
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 mb-3">All Entries</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Net Loss</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Logged By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.rows.map((r: any) => (
+                        <tr key={r.id}>
+                          <td className="px-4 py-2 text-sm text-gray-600">
+                            {r.occurredAt ? new Date(r.occurredAt).toLocaleDateString() : "-"}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900">
+                            {r.productName}
+                            {r.sku && <span className="ml-1 text-xs text-gray-400">{r.sku}</span>}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600">{r.locationName || "-"}</td>
+                          <td className="px-4 py-2 text-sm text-gray-600">
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs">
+                              {r.usageTypeLabel}
+                            </span>
+                            {r.reason && (
+                              <span className="ml-2 text-xs text-gray-400">{r.reason}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600 text-right">{r.quantity}</td>
+                          <td className="px-4 py-2 text-sm font-semibold text-red-600 text-right">
+                            {formatCurrency(r.netLoss)}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-500">{r.loggedBy || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {!data?.rows?.length && (
+              <div className="rounded-lg border border-dashed border-gray-200 py-12 text-center text-gray-400">
+                <p className="font-medium">No stock loss recorded in this period</p>
+                <p className="text-sm mt-1">
+                  Log damaged or written-off stock from the Product Usage page.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return (
           <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-auto">
@@ -3151,7 +3602,7 @@ export default function ReportsPage() {
           </div>
           <p className="mt-1 text-xs text-gray-400">
             {selectedDateBasis === DateBasis.UPDATED
-              ? "Any order updated in the period is included — even an older order — and the date shown is the exact update date."
+              ? "Any order updated in the period is included   even an older order   and the date shown is the exact update date."
               : "Orders included when their created / completed / status-changed date falls in the period."}
           </p>
         </div>
@@ -3185,7 +3636,7 @@ export default function ReportsPage() {
         )}
       </Card>
 
-      {/* Sales Report View — Total / Courier / Offline */}
+      {/* Sales Report View   Total / Courier / Offline */}
       {selectedReport === ReportType.SALES && (
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-1">
@@ -3297,6 +3748,32 @@ export default function ReportsPage() {
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includeSupplierPayment ? "translate-x-6" : "translate-x-1"}`}
+              />
+            </button>
+          </label>
+
+          <label className="flex items-center justify-between cursor-pointer group">
+            <div>
+              <span className="text-sm font-medium text-gray-800">
+                Deduct Stock Loss from Profit
+              </span>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Damaged, expired, lost and stolen stock is charged to cost of goods
+                sold; demo units and samples become operating expenses. Turning this
+                on changes profit figures for past periods too.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={includeStockLoss}
+              disabled={savingSettings}
+              onClick={() =>
+                handleToggleSetting("reportIncludeStockLoss", !includeStockLoss)
+              }
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 disabled:opacity-50 ${includeStockLoss ? "bg-orange-500" : "bg-gray-300"}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includeStockLoss ? "translate-x-6" : "translate-x-1"}`}
               />
             </button>
           </label>

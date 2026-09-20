@@ -83,19 +83,19 @@ export default function ViewReturnModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Customer Name</label>
-                  <p className="text-gray-900">{returnItem.customerName || returnItem.customer?.name || '—'}</p>
+                  <p className="text-gray-900">{returnItem.customerName || returnItem.customer?.name || ' '}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Phone Number</label>
-                  <p className="text-gray-900">{returnItem.customerPhone || returnItem.customer?.phone || '—'}</p>
+                  <p className="text-gray-900">{returnItem.customerPhone || returnItem.customer?.phone || ' '}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <p className="text-gray-900">{returnItem.customerEmail || returnItem.customer?.email || '—'}</p>
+                  <p className="text-gray-900">{returnItem.customerEmail || returnItem.customer?.email || ' '}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Customer ID</label>
-                  <p className="text-gray-900">{returnItem.customer?.customerId || returnItem.customerId || '—'}</p>
+                  <p className="text-gray-900">{returnItem.customer?.customerId || returnItem.customerId || ' '}</p>
                 </div>
               </div>
             </div>

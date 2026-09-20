@@ -1,4 +1,4 @@
-# SellMate Vertical Modules — Documentation Index
+# SellMate Vertical Modules   Documentation Index
 
 This folder explains how to use each vertical module in **SellMate**, with full workflows and Sri Lanka–style examples.
 
@@ -22,10 +22,10 @@ See also: [industry-features.md](./industry-features.md)
 
 ## Shared building blocks
 
-- **Customers** — used by rental, wash, garage, trade-in, towing, CRM.
-- **Website CMS** — public storefront; contact/order forms create CRM tasks.
-- **Appointments** — shared online booking for garage, car wash, rental.
-- **Branches / locations** — multi-branch orgs filter ops by location where applicable.
+- **Customers**   used by rental, wash, garage, trade-in, towing, CRM.
+- **Website CMS**   public storefront; contact/order forms create CRM tasks.
+- **Appointments**   shared online booking for garage, car wash, rental.
+- **Branches / locations**   multi-branch orgs filter ops by location where applicable.
 
 ## Public sites (local)
 

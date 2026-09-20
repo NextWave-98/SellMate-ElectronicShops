@@ -100,7 +100,7 @@ export default function AccountingReportsPage() {
               <div className="flex justify-between text-sm font-semibold border-t mt-1 pt-1"><span>Total Equity</span><span>{money(bs.totalEquity)}</span></div>
             </div>
           </div>
-          <p className={`text-xs mt-3 ${bs.balanced ? 'text-green-600' : 'text-red-600'}`}>{bs.balanced ? '✓ Balanced (Assets = Liabilities + Equity)' : '⚠ Not balanced — check entries'}</p>
+          <p className={`text-xs mt-3 ${bs.balanced ? 'text-green-600' : 'text-red-600'}`}>{bs.balanced ? '✓ Balanced (Assets = Liabilities + Equity)' : '⚠ Not balanced   check entries'}</p>
         </CardContent></Card>
       )}
 

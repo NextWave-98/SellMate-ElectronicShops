@@ -1,5 +1,5 @@
 // Auto-derive Sale Job fields from the POS cart for the advance-payment flow.
-// The advance-payment path never asks "is this a job?" — job type, title and
+// The advance-payment path never asks "is this a job?"   job type, title and
 // due date are inferred; the user only chooses priority.
 
 import type { SaleJobType } from '../../types/saleJob.types';

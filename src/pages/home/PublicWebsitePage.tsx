@@ -5,7 +5,7 @@ import { Phone, Mail, MapPin, Star, CalendarDays, Loader2 } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://gadget-chain-manager-backend.vercel.app/api';
 
-/** PUBLIC company website rendered from CMS content — /site/:businessId */
+/** PUBLIC company website rendered from CMS content   /site/:businessId */
 export default function PublicWebsitePage() {
   const { businessId } = useParams();
   const [data, setData] = useState<any>(null);
@@ -106,7 +106,7 @@ export default function PublicWebsitePage() {
                 <div key={r.id} className="bg-white rounded-xl p-5 shadow-sm">
                   <div className="flex gap-0.5 mb-2">{Array.from({ length: r.rating }).map((_, i) => <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}</div>
                   <p className="text-sm text-gray-600">&ldquo;{r.content}&rdquo;</p>
-                  <p className="text-xs text-gray-400 mt-2">— {r.author}{r.role ? `, ${r.role}` : ''}</p>
+                  <p className="text-xs text-gray-400 mt-2">  {r.author}{r.role ? `, ${r.role}` : ''}</p>
                 </div>
               ))}
             </div>

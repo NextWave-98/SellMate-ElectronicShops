@@ -213,6 +213,9 @@ const POSSettingsPage: React.FC = () => {
   const [orgWhatsappLink, setOrgWhatsappLink] = useState("");
   const [orgStaffManagementEnabled, setOrgStaffManagementEnabled] = useState(true);
   const [orgSupplierOrdersEnabled, setOrgSupplierOrdersEnabled] = useState(true);
+  // Warranty starts OFF, unlike the two above. An organization asks for it.
+  const [orgWarrantyEnabled, setOrgWarrantyEnabled] = useState(false);
+  const [orgWarrantyAutoGenerate, setOrgWarrantyAutoGenerate] = useState(true);
   const [savingOrg, setSavingOrg] = useState(false);
 
   useEffect(() => {
@@ -252,6 +255,8 @@ const POSSettingsPage: React.FC = () => {
       setOrgWhatsappLink(businessData.whatsappGroupLink ?? "");
       setOrgStaffManagementEnabled(businessData.staffManagementEnabled ?? true);
       setOrgSupplierOrdersEnabled(businessData.supplierOrdersEnabled ?? true);
+      setOrgWarrantyEnabled(businessData.warrantyEnabled ?? false);
+      setOrgWarrantyAutoGenerate(businessData.warrantyAutoGenerate ?? true);
     }
   }, [businessData]);
 
@@ -284,6 +289,8 @@ const POSSettingsPage: React.FC = () => {
       whatsappGroupLink: orgWhatsappLink || undefined,
       staffManagementEnabled: orgStaffManagementEnabled,
       supplierOrdersEnabled: orgSupplierOrdersEnabled,
+      warrantyEnabled: orgWarrantyEnabled,
+      warrantyAutoGenerate: orgWarrantyAutoGenerate,
     });
     setSavingOrg(false);
     if (result.success) {
@@ -306,6 +313,8 @@ const POSSettingsPage: React.FC = () => {
     orgWhatsappLink,
     orgStaffManagementEnabled,
     orgSupplierOrdersEnabled,
+    orgWarrantyEnabled,
+    orgWarrantyAutoGenerate,
     updatePOSSettings,
   ]);
 
@@ -634,7 +643,7 @@ const POSSettingsPage: React.FC = () => {
                     </p>
                     <p className="text-xs text-gray-500">
                       Default is OFF. When ON, all branches share ONE central
-                      stock pool — you don't assign stock to branches. Every
+                      stock pool   you don't assign stock to branches. Every
                       branch sale reads from and deducts the selected
                       warehouse's inventory. Sales still report under each
                       branch.
@@ -654,7 +663,7 @@ const POSSettingsPage: React.FC = () => {
                     onChange={(e) => setOrgCentralLocationId(e.target.value)}
                     className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30"
                   >
-                    <option value="">— Select warehouse / location —</option>
+                    <option value="">  Select warehouse / location  </option>
                     {centralLocations.map((loc) => (
                       <option key={loc.id} value={loc.id}>
                         {loc.name}
@@ -896,6 +905,43 @@ const POSSettingsPage: React.FC = () => {
                     <p className="text-xs text-gray-500">Allow suppliers, purchase orders, and goods receipts.</p>
                   </span>
                 </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={orgWarrantyEnabled}
+                    onChange={(e) => setOrgWarrantyEnabled(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="text-sm font-medium text-gray-800">Warranty</span>
+                    <p className="text-xs text-gray-500">
+                      Show the warranty pages and allow warranty cards and claims.
+                      Turning this off only hides the feature   existing warranty
+                      cards are kept and come back if you switch it on again.
+                    </p>
+                  </span>
+                </label>
+                {orgWarrantyEnabled && (
+                  <label className="flex items-start gap-3 cursor-pointer pl-7">
+                    <input
+                      type="checkbox"
+                      checked={orgWarrantyAutoGenerate}
+                      onChange={(e) => setOrgWarrantyAutoGenerate(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="text-sm font-medium text-gray-800">
+                        Create warranty cards automatically
+                      </span>
+                      <p className="text-xs text-gray-500">
+                        When a product that has warranty months is sold, issue its
+                        warranty card straight away, linked to that sale. Products
+                        with no warranty period are never affected. Turn this off to
+                        create warranty cards by hand instead.
+                      </p>
+                    </span>
+                  </label>
+                )}
               </div>
 
               <button
@@ -932,7 +978,7 @@ const POSSettingsPage: React.FC = () => {
                 onChange={(e) => setSelectedLocationId(e.target.value)}
                 className="w-full sm:w-80 appearance-none bg-white/30 backdrop-blur-sm border border-white/40 rounded-xl px-4 py-2.5 pr-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
               >
-                <option value="">— Select a branch —</option>
+                <option value="">  Select a branch  </option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}

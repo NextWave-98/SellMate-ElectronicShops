@@ -125,7 +125,7 @@ export default function BulkScanReturnModal({
       let sale: any = null;
       let shipment: any = null;
 
-      // 1) Shipment lookup — matches tracking number, shipment number (SHP-…), or AWB
+      // 1) Shipment lookup   matches tracking number, shipment number (SHP-…), or AWB
       const trackRes = await lookupFetch({
         method: 'GET',
         silent: true,
@@ -148,7 +148,7 @@ export default function BulkScanReturnModal({
         }
       }
 
-      // 2) Search by sale number (GET — POST /sales/pos creates a sale, not search)
+      // 2) Search by sale number (GET   POST /sales/pos creates a sale, not search)
       if (!sale) {
         const searchRes = await lookupFetch({
           method: 'GET',
@@ -163,7 +163,7 @@ export default function BulkScanReturnModal({
 
       if (!sale) {
         if (shipment) {
-          toast.error('Shipment found but has no linked sale — cannot load products');
+          toast.error('Shipment found but has no linked sale   cannot load products');
         } else {
           toast.error('No shipment or sale found for that number');
         }
@@ -371,7 +371,7 @@ export default function BulkScanReturnModal({
                   className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-400"
                 />
                 <AlertTriangle className="w-4 h-4 text-red-500" />
-                Damaged parcel — scan items as damaged (won't restock)
+                Damaged parcel   scan items as damaged (won't restock)
               </label>
               <div className="flex gap-2">
                 <input

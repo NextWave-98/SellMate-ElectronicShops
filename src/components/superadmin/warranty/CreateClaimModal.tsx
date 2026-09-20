@@ -1,9 +1,9 @@
-import { X, ClipboardCheck, AlertCircle, Package } from 'lucide-react';
+import { X, ClipboardCheck, AlertCircle, Package, ShieldCheck, ShieldX, Info } from 'lucide-react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import useWarranty, { type WarrantyCard } from '../../../hooks/useWarranty';
+import useWarranty, { type WarrantyCard, type ClaimEligibility } from '../../../hooks/useWarranty';
 
 interface CreateClaimModalProps {
   isOpen: boolean;
@@ -27,6 +27,30 @@ const validationSchema = Yup.object({
 export default function CreateClaimModal({ isOpen, onClose, warranty, onSuccess }: CreateClaimModalProps) {
   const [loading, setLoading] = useState(false);
   const warrantyHook = useWarranty();
+  const { getClaimEligibility } = warrantyHook;
+
+  // Eligibility   advisory only. It tells whoever is filing the claim what
+  // should be covered, whether the DOA window is still open, and how many
+  // claims are left; it never blocks the form. The final call stays with
+  // the person filing it, same as everywhere else this system offers guidance.
+  const [eligibility, setEligibility] = useState<ClaimEligibility | null>(null);
+  const [loadingEligibility, setLoadingEligibility] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !warranty?.id) {
+      setEligibility(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingEligibility(true);
+      const res = await getClaimEligibility(warranty.id);
+      if (!cancelled && res?.data) setEligibility(res.data as ClaimEligibility);
+      setLoadingEligibility(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, warranty?.id]);
 
   const formik = useFormik({
     initialValues: {
@@ -121,6 +145,62 @@ export default function CreateClaimModal({ isOpen, onClose, warranty, onSuccess 
                 </div>
               </div>
             </div>
+
+            {/* Eligibility   advisory guidance, never a gate */}
+            {loadingEligibility ? (
+              <p className="text-xs text-gray-400">Checking coverage…</p>
+            ) : eligibility && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-blue-900">{eligibility.summary}</p>
+                </div>
+
+                {(eligibility.covered.length > 0 || eligibility.excluded.length > 0) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {eligibility.covered.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 mb-1">Covered</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {eligibility.covered.map(name => (
+                            <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
+                              <ShieldCheck className="w-3 h-3" /> {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {eligibility.excluded.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 mb-1">Excluded</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {eligibility.excluded.map(name => (
+                            <span key={name} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">
+                              <ShieldX className="w-3 h-3" /> {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600 pt-1 border-t border-blue-100">
+                  {eligibility.doa.days != null && (
+                    <span>
+                      DOA: {eligibility.doa.withinWindow ? 'within window' : 'window passed'}
+                      {eligibility.doa.daysRemaining != null && ` (${eligibility.doa.daysRemaining} day(s) remaining)`}
+                    </span>
+                  )}
+                  {eligibility.claims.limit != null && (
+                    <span>
+                      Claims: {eligibility.claims.used} used, {eligibility.claims.remaining} of {eligibility.claims.limit} remaining
+                    </span>
+                  )}
+                  {eligibility.provider && <span>Provider: {eligibility.provider}</span>}
+                </div>
+              </div>
+            )}
 
             {/* Warning for non-active warranties */}
             {!isWarrantyActive && (

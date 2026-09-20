@@ -423,7 +423,7 @@ const SmsAutomationPage: React.FC = () => {
             {settings && (
               <p className="text-xs text-muted-foreground mt-3">
                 Settings last updated{' '}
-                {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString() : '—'}
+                {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString() : ' '}
               </p>
             )}
           </CardContent>

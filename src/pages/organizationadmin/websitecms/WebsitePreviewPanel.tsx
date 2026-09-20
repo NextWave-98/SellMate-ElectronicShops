@@ -90,7 +90,7 @@ export default function WebsitePreviewPanel({
       </div>
       <p className="border-t px-3 py-2 text-xs text-muted-foreground">
         {previewToken
-          ? 'Preview shows your saved draft — live site unchanged until Publish.'
+          ? 'Preview shows your saved draft   live site unchanged until Publish.'
           : 'Save draft to preview unpublished changes.'}
       </p>
     </div>

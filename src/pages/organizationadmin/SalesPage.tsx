@@ -549,7 +549,7 @@ export default function SalesPage() {
       const response = await getSaleById(sale.id);
       if (response?.success && response?.data) {
         const raw = response.data as any;
-        // Backend may nest customer / use items|transactions aliases — normalize for the modal.
+        // Backend may nest customer / use items|transactions aliases   normalize for the modal.
         const customer =
           raw.customer && typeof raw.customer === 'object' ? raw.customer : null;
         setSaleDetailsModal({
@@ -588,7 +588,7 @@ export default function SalesPage() {
   };
 
   const handleViewPendingItems = async (sale: Sale) => {
-    const label = `${(sale as any).invoiceNumber || ''} — ${(sale as any).customerName || 'Walk-in'}`;
+    const label = `${(sale as any).invoiceNumber || ''}   ${(sale as any).customerName || 'Walk-in'}`;
     setPendingItemsModal({ label, loading: true, items: [] });
     try {
       const res = await getSaleById(sale.id);
@@ -1730,7 +1730,7 @@ export default function SalesPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              Add Payment — {wooPaySale?.saleNumber}
+              Add Payment   {wooPaySale?.saleNumber}
             </DialogTitle>
           </DialogHeader>
           {wooPaySale && (
@@ -1829,7 +1829,7 @@ export default function SalesPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Package className="w-4 h-4 text-orange-500" />
-              Sale Items — {pendingItemsModal?.label}
+              Sale Items   {pendingItemsModal?.label}
             </DialogTitle>
           </DialogHeader>
           {pendingItemsModal?.loading ? (
@@ -1854,7 +1854,7 @@ export default function SalesPage() {
                     <TableRow key={i}>
                       <TableCell className="text-xs text-gray-400">{i + 1}</TableCell>
                       <TableCell className="text-sm">
-                        <div className="font-medium">{item.product?.name || item.productName || '—'}</div>
+                        <div className="font-medium">{item.product?.name || item.productName || ' '}</div>
                         {(item.product?.sku || item.sku) && (
                           <div className="text-xs text-gray-400">{item.product?.sku || item.sku}</div>
                         )}
@@ -1862,7 +1862,7 @@ export default function SalesPage() {
                       <TableCell className="text-sm text-right">{item.quantity}</TableCell>
                       <TableCell className="text-sm text-right">{formatCurrency(item.unitPrice)}</TableCell>
                       <TableCell className="text-sm text-right">
-                        {item.discount > 0 ? formatCurrency(item.discount) : '—'}
+                        {item.discount > 0 ? formatCurrency(item.discount) : ' '}
                       </TableCell>
                       <TableCell className="text-sm text-right font-semibold">
                         {formatCurrency(item.totalPrice ?? (item.unitPrice * item.quantity))}
@@ -1891,7 +1891,7 @@ export default function SalesPage() {
               Sale Details
               {saleDetailsModal?.data && (
                 <span className="text-gray-500 font-normal text-sm ml-1">
-                  — {String(saleDetailsModal.data.invoiceNumber || saleDetailsModal.data.saleNumber || saleDetailsModal.data.id || '')}
+                    {String(saleDetailsModal.data.invoiceNumber || saleDetailsModal.data.saleNumber || saleDetailsModal.data.id || '')}
                 </span>
               )}
             </DialogTitle>
@@ -1939,7 +1939,7 @@ export default function SalesPage() {
                   d.soldByName ||
                   null;
                 const paymentMethodLabel =
-                  typeof d.paymentMethod === 'string' ? d.paymentMethod : '—';
+                  typeof d.paymentMethod === 'string' ? d.paymentMethod : ' ';
 
                 const badge = (text: string, color: string) => (
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{text}</span>
@@ -1954,8 +1954,8 @@ export default function SalesPage() {
                 };
 
                 const textOrDash = (value: unknown) => {
-                  if (value == null || value === '') return '—';
-                  if (typeof value === 'object') return '—';
+                  if (value == null || value === '') return ' ';
+                  if (typeof value === 'object') return ' ';
                   return String(value);
                 };
 
@@ -1968,7 +1968,7 @@ export default function SalesPage() {
                       </div>
                       <div>
                         <p className="text-xs text-gray-400 mb-0.5">Date</p>
-                        <p className="font-medium">{d.createdAt ? new Date(d.createdAt).toLocaleString() : '—'}</p>
+                        <p className="font-medium">{d.createdAt ? new Date(d.createdAt).toLocaleString() : ' '}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-400 mb-0.5">Status</p>
@@ -2033,7 +2033,7 @@ export default function SalesPage() {
                                 const productName =
                                   item.productName ||
                                   item.product?.name ||
-                                  '—';
+                                  ' ';
                                 const sku =
                                   typeof item.product?.sku === 'string'
                                     ? item.product.sku
@@ -2075,7 +2075,7 @@ export default function SalesPage() {
                                     <TableCell className="text-sm text-right">
                                       {Number(item.discount || item.discountAmount || 0) > 0
                                         ? formatCurrency(Number(item.discount || item.discountAmount || 0))
-                                        : '—'}
+                                        : ' '}
                                     </TableCell>
                                     <TableCell className="text-sm text-right font-semibold">
                                       {formatCurrency(lineTotal)}
@@ -2138,7 +2138,7 @@ export default function SalesPage() {
                                   <TableCell className="text-xs">
                                     {(p.createdAt || p.date)
                                       ? new Date(p.createdAt || p.date).toLocaleString()
-                                      : '—'}
+                                      : ' '}
                                   </TableCell>
                                   <TableCell className="text-xs">
                                     {textOrDash(p.paymentMethod || p.method)}

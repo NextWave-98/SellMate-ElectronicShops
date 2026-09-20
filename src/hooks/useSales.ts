@@ -3,11 +3,13 @@ import { useCallback } from "react";
 import useFetch from "./useFetch";
 import {
   DEFAULT_PRINTER_CONFIG,
+  createDefaultPrinterConfig,
   type PrinterConfig,
 } from "@/lib/printerConfig";
 import {
   isIOSDevice,
   isMobilePOSDevice,
+  usesStarNativePrint,
   printHtmlInNewTab,
   showAirPrintFallbackHint,
   tryStarMobilePrint,
@@ -423,6 +425,7 @@ const useSales = () => {
         tax?: number;
         warrantyMonths?: number;
         reloadPhone?: string;
+        serialNumber?: string;
       }>;
       payments?: Array<{
         method:
@@ -438,13 +441,70 @@ const useSales = () => {
         reference?: string;
       }>;
       type: "DIRECT_SALE" | "INVOICE_SALE" | "QUOTE";
+      saleType?: "POS" | "WHOLESALE" | "RETAIL" | "DIRECT";
+      saleChannel?: string;
       discount?: number;
       discountType?: "PERCENTAGE" | "FIXED";
       notes?: string;
+      loyaltyRedeemPoints?: number;
     }) => {
       return posFetch.fetchData({
         endpoint: "/sales/pos",
         method: "POST",
+        data: saleData,
+      });
+    },
+    [posFetch],
+  );
+
+  const updateSale = useCallback(
+    async (
+      saleId: string,
+      saleData: {
+        locationId: string;
+        soldById: string;
+        customerId?: string;
+        customerName?: string;
+        customerPhone?: string;
+        customerEmail?: string;
+        items: Array<{
+          productId: string;
+          quantity: number;
+          unitPrice: number;
+          costPrice?: number;
+          discount?: number;
+          discountType?: "PERCENTAGE" | "FIXED";
+          tax?: number;
+          warrantyMonths?: number;
+          reloadPhone?: string;
+          serialNumber?: string;
+        }>;
+        payments?: Array<{
+          method:
+            | "CASH"
+            | "CARD"
+            | "BANK_TRANSFER"
+            | "CHEQUE"
+            | "MOBILE_MONEY"
+            | "KOKO"
+            | "MINTPAY"
+            | "PAYZY"
+            | "COD";
+          amount: number;
+          reference?: string;
+        }>;
+        saleType?: "POS" | "WHOLESALE" | "RETAIL" | "DIRECT";
+        saleChannel?: string;
+        discount?: number;
+        discountType?: "PERCENTAGE" | "FIXED";
+        notes?: string;
+        advanceDueDate?: string;
+        businessId?: string;
+      },
+    ) => {
+      return posFetch.fetchData({
+        endpoint: `/sales/pos/${saleId}`,
+        method: "PUT",
         data: saleData,
       });
     },
@@ -652,7 +712,7 @@ const useSales = () => {
    * window.print()). For completely silent printing with no dialog, launch
    * Chrome with the --kiosk-printing flag, OR use QZ Tray (preferred).
    *
-   * NOTE: An <iframe> approach does NOT work for PDFs in Chrome — the PDF plugin
+   * NOTE: An <iframe> approach does NOT work for PDFs in Chrome   the PDF plugin
    * blocks iframe.contentWindow.print() and triggers a download instead.
    */
   /**
@@ -665,7 +725,7 @@ const useSales = () => {
    * 2. Create a 1×1-px invisible <iframe> appended to document.body.
    * 3. Write the HTML into the iframe document (iframeDoc.write(html)).
    * 4. The HTML itself contains <script>window.print()</script> which runs in
-   *    the iframe's own JS context — this is NOT treated as a popup and is
+   *    the iframe's own JS context   this is NOT treated as a popup and is
    *    never blocked by Chrome/Edge popup blocker.
    * 5. The OS print dialog appears targeting the DEFAULT system printer (e.g.
    *    Xprinter XP-365B).  With --kiosk-printing Chrome flag, no dialog shown.
@@ -711,18 +771,20 @@ const useSales = () => {
     ): Promise<void> => {
       const printerConf =
         options.printerConf ??
-        (isMobilePOSDevice() ? { ...DEFAULT_PRINTER_CONFIG } : null);
+        (usesStarNativePrint()
+          ? createDefaultPrinterConfig()
+          : null);
       const format =
         options.format ??
         (printerConf?.paperWidth === "58mm" || printerConf?.paperWidth === "80mm"
           ? printerConf.paperWidth
           : "58mm");
       console.log(
-        `[AutoPrint] saleId=${saleId}, format=${format}, mobile=${isMobilePOSDevice()}`,
+        `[AutoPrint] saleId=${saleId}, format=${format}, starNative=${usesStarNativePrint()}`,
       );
 
-      // ── Mobile Star path (WebPRNT / PassPRNT) — desktop unchanged ─────────
-      if (printerConf && isMobilePOSDevice()) {
+      // ── Star native path (webPRNT Browser / PassPRNT / LAN WebPRNT) ───────
+      if (printerConf && usesStarNativePrint()) {
         let commands: number[] | undefined;
         const paperWidth =
           format === "58mm" ? "58mm" : format === "80mm" ? "80mm" : printerConf.paperWidth;
@@ -759,7 +821,6 @@ const useSales = () => {
         console.error("[AutoPrint] Failed: could not fetch HTML receipt");
         return;
       }
-      console.log("[AutoPrint] HTML receipt fetched successfully");
 
       // ── iPad/iPhone: new tab (iframe print blocked by Safari) ─────────────
       if (isIOSDevice()) {
@@ -826,6 +887,7 @@ const useSales = () => {
       type?: "DIRECT_SALE" | "INVOICE_SALE" | "QUOTE";
       startDate?: string;
       endDate?: string;
+      search?: string;
       page?: number;
       limit?: number;
     }) => {
@@ -839,6 +901,8 @@ const useSales = () => {
       if (filters?.startDate)
         queryParams.append("startDate", filters.startDate);
       if (filters?.endDate) queryParams.append("endDate", filters.endDate);
+      if (filters?.search?.trim())
+        queryParams.append("search", filters.search.trim());
       if (filters?.page) queryParams.append("page", filters.page.toString());
       if (filters?.limit) queryParams.append("limit", filters.limit.toString());
 
@@ -856,6 +920,18 @@ const useSales = () => {
     async (id: string) => {
       return posFetch.fetchData({
         endpoint: `/sales/${id}`,
+        method: "GET",
+        silent: true,
+      });
+    },
+    [posFetch],
+  );
+
+  /** POS sale detail (items + payments)   preferred for edit/reprint loaders */
+  const getPosSaleById = useCallback(
+    async (id: string) => {
+      return posFetch.fetchData({
+        endpoint: `/sales/pos/${id}`,
         method: "GET",
         silent: true,
       });
@@ -920,6 +996,25 @@ const useSales = () => {
         endpoint: `/sales/pos/${saleId}/payments`,
         method: "GET",
       }),
+    [posFetch],
+  );
+
+  const exchangeSale = useCallback(
+    async (
+      saleId: string,
+      payload: {
+        returnItems: Array<{ productId: string; quantity: number }>;
+        reason: string;
+        refundMethod?: "CASH" | "CARD" | "BANK_TRANSFER";
+        replacement: Record<string, unknown>;
+      },
+    ) => {
+      return posFetch.fetchData({
+        endpoint: `/sales/pos/${saleId}/exchange`,
+        method: "POST",
+        data: payload,
+      });
+    },
     [posFetch],
   );
 
@@ -1111,6 +1206,7 @@ const useSales = () => {
 
     // POS Operations
     createSale,
+    updateSale,
     downloadInvoice,
     downloadAcknowledgement,
     printAcknowledgement,
@@ -1120,11 +1216,13 @@ const useSales = () => {
     getESCPOSData,
     getSales,
     getSaleById,
+    getPosSaleById,
     addPaymentToSale,
     getSalePayments,
     completePendingPayment,
     bulkCompletePayments,
     createRefund,
+    exchangeSale,
     deleteSale,
     cancelSale,
     getPendingSales,

@@ -28,7 +28,7 @@ function resolvePublicSiteBase(industryType: string): { base: string; label: str
   if (industryType === 'ELECTRONICS' || industryType === 'CLOTHING') {
     return shop ? { base: shop, label: 'View shop site' } : null;
   }
-  // Vehicle rental glass storefront (:3002) — not for car wash
+  // Vehicle rental glass storefront (:3002)   not for car wash
   if (industryType === 'VEHICLE_RENTAL') {
     return rental ? { base: rental, label: 'View rental site' } : null;
   }

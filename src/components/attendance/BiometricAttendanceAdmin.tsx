@@ -54,7 +54,13 @@ export function BiometricAttendanceAdmin({ staffList }: { staffList: StaffItem[]
         axios.get(`${BASE_URL}/attendance/biometric/settings`, { headers: authHeaders(), withCredentials: true }),
         axios.get(`${BASE_URL}/attendance/biometric/fallbacks/pending`, { headers: authHeaders(), withCredentials: true }),
       ]);
-      setSettings(sRes.data?.data ?? sRes.data);
+      const raw = sRes.data?.data ?? sRes.data;
+      setSettings({
+        enabled: raw.enabled ?? false,
+        enforceCheckIn: raw.enforceCheckIn ?? false,
+        enforceCheckOut: raw.enforceCheckOut ?? false,
+        maxRetries: raw.maxRetries ?? 3,
+      });
       const fd = fRes.data?.data?.data ?? fRes.data?.data ?? [];
       setFallbacks(Array.isArray(fd) ? fd : []);
     } catch {
@@ -152,7 +158,7 @@ export function BiometricAttendanceAdmin({ staffList }: { staffList: StaffItem[]
                   <TableCell>{r.staff?.user?.name ?? r.staffId}</TableCell>
                   <TableCell>{r.action}</TableCell>
                   <TableCell>{r.attendanceDate}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">{r.reason ?? '—'}</TableCell>
+                  <TableCell className="max-w-[200px] truncate">{r.reason ?? ' '}</TableCell>
                   <TableCell className="space-x-2">
                     <Button size="sm" onClick={() => reviewFallback(r.id, true)}>Approve</Button>
                     <Button size="sm" variant="outline" onClick={() => reviewFallback(r.id, false)}>Reject</Button>

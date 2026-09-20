@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Loader2, Search, X } from 'lucide-react';
 
 /**
- * AsyncSearchSelect — a reusable, server-backed searchable dropdown.
+ * AsyncSearchSelect   a reusable, server-backed searchable dropdown.
  *
  * Instead of pre-loading 500–1000 records into a <select>, this component
  * fetches only the top ~20 matches from the server as the user types
@@ -98,7 +98,7 @@ export default function AsyncSearchSelect<T>({
     setLoading(true);
     fetcherRef.current(search)
       .then((results) => {
-        if (seq !== requestSeq.current) return; // stale response — ignore
+        if (seq !== requestSeq.current) return; // stale response   ignore
         setOptions(Array.isArray(results) ? results : []);
         setHighlighted(-1);
       })

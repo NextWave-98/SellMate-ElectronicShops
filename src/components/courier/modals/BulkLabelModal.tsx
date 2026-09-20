@@ -53,7 +53,7 @@ export const BulkLabelModal = ({
     <Dialog open onOpenChange={(open) => { if (!open && !loading) onClose(); }}>
       <DialogContent className="flex max-h-[min(90vh,100dvh)] max-w-md flex-col gap-0 overflow-hidden p-0">
         <DialogHeader>
-          <DialogTitle>Bulk Labels — {shipmentCount} shipment{shipmentCount !== 1 ? 's' : ''}</DialogTitle>
+          <DialogTitle>Bulk Labels   {shipmentCount} shipment{shipmentCount !== 1 ? 's' : ''}</DialogTitle>
           <DialogDescription>
             Choose label format and size, then print or download all selected shipments in one PDF.
           </DialogDescription>
@@ -96,7 +96,7 @@ export const BulkLabelModal = ({
                   className={theme.radioInput}
                   disabled={loading}
                 />
-                <span>Normal Post label (A4 — 8 per page)</span>
+                <span>Normal Post label (A4   8 per page)</span>
               </label>
             </div>
           </div>

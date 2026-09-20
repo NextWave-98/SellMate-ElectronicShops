@@ -11,7 +11,8 @@ export type IndustryFeature =
   | 'appointment'
   | 'towing'
   | 'accounting'
-  | 'retail'; // POS / products / inventory / sales
+  | 'inventory' // products / stock / GRN / suppliers (garage spare parts too)
+  | 'retail'; // POS / sales / orders
 
 /**
  * Feature → industry matrix.
@@ -22,7 +23,8 @@ export type IndustryFeature =
  * rental                       : VEHICLE_RENTAL only
  * carwash                      : CAR_WASH only
  * garage                       : GARAGE only
- * retail (POS/products/sales)  : ELECTRONICS, CLOTHING, GENERAL
+ * inventory (products/stock)   : ELECTRONICS, CLOTHING, GARAGE, GENERAL
+ * retail (POS/sales/orders)    : ELECTRONICS, CLOTHING, GENERAL
  */
 export function industryAllowsFeature(
   industryType: IndustryType,
@@ -49,6 +51,9 @@ export function industryAllowsFeature(
       return industryType === 'GARAGE' || industryType === 'VEHICLE_RENTAL';
     case 'accounting':
       return true; // available to every industry
+    case 'inventory':
+      // Garages keep a spare-parts stock and issue it to job sheets
+      return industryType === 'ELECTRONICS' || industryType === 'CLOTHING' || industryType === 'GARAGE';
     case 'retail':
       return industryType === 'ELECTRONICS' || industryType === 'CLOTHING';
     default:

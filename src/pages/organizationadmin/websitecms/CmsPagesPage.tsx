@@ -14,7 +14,7 @@ function slugify(title: string) {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-/** Custom CMS pages — create, edit, delete. */
+/** Custom CMS pages   create, edit, delete. */
 export default function CmsPagesPage() {
   const { listPages, createPage, updatePage, deletePage } = useCms();
   const [pages, setPages] = useState<any[]>([]);

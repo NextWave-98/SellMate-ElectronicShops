@@ -2,7 +2,7 @@ export type PrintPdfPageSize = 'A5-landscape';
 
 /**
  * Ensures a blob response is a PDF. When responseType is "blob", Axios error
- * bodies (JSON) also arrive as Blobs — printing those shows
+ * bodies (JSON) also arrive as Blobs   printing those shows
  * {"success":false,"message":"Internal server error"} in the print dialog.
  */
 export async function ensurePdfBlob(blob: Blob): Promise<Blob> {
@@ -27,7 +27,7 @@ export async function ensurePdfBlob(blob: Blob): Promise<Blob> {
     const parsed = JSON.parse(text) as { message?: string; success?: boolean };
     if (parsed?.message) message = parsed.message;
   } catch {
-    // not JSON — keep generic message
+    // not JSON   keep generic message
   }
   throw new Error(message);
 }

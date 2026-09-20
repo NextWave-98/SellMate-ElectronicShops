@@ -32,6 +32,14 @@ import useBusinessProfile from '../../../hooks/useBusinessProfile';
 import useCustomer, { type Customer as CustomerType } from '../../../hooks/useCustomer';
 import useCourier from '../../../hooks/useCourier';
 import { useLocation } from '../../../hooks/useLocation';
+import {
+  getShipmentEditZone,
+  canEditField,
+  humanStatus,
+  isAdminRole,
+  diffShipment,
+  type ShipmentChange,
+} from '../../../utils/shipmentEditPolicy';
 import { useAppSelector } from '../../../store/hooks';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -207,6 +215,19 @@ export const CourierShipmentModal = ({
   const theme = getTheme(variant);
   const isEditMode = !!initialData?.id;
   const { user } = useAppSelector((state) => state.auth);
+  const userRoleName = user?.role?.name;
+  const isAdminRoleLocal = isAdminRole(userRoleName);
+
+  // Edit policy   mirrors the backend. LOCKED shipments are read-only; once the
+  // courier holds the parcel only an admin may touch the few fields that still
+  // mean anything (see utils/shipmentEditPolicy.ts).
+  const editZone = getShipmentEditZone(initialData?.status as string | undefined);
+  const isLockedForEdit = isEditMode && editZone === 'LOCKED';
+  const isPostDispatchEdit = isEditMode && editZone === 'POST_DISPATCH';
+  const fieldEditable = (field: string) =>
+    !isEditMode || canEditField(editZone, field, userRoleName);
+  const [editReason, setEditReason] = useState('');
+  const [pendingChanges, setPendingChanges] = useState<ShipmentChange[] | null>(null);
   const { getAllInventory } = useInventory();
   const { loadBusinessProfile } = useBusinessProfile();
   const { getCustomers, createCustomer } = useCustomer();
@@ -518,6 +539,40 @@ export const CourierShipmentModal = ({
     };
   }, []);
 
+  /**
+   * EDIT MODE: hydrate the line items from the shipment's linked sale.
+   *
+   * Without this the product list starts empty, so invoiceTotal computes to 0 and
+   * the form would post declaredValue: 0 / codAmount: 0   silently wiping the COD
+   * value of a live order. The list endpoint already returns sale.saleItems, so no
+   * extra request is needed.
+   */
+  React.useEffect(() => {
+    if (!isEditMode) return;
+    const items = (initialData as any)?.sale?.saleItems ?? (initialData as any)?.saleItems;
+    if (!Array.isArray(items) || items.length === 0) return;
+    setSelectedProducts((prev) => {
+      if (prev.length > 0) return prev;
+      return items.map((si: any) => ({
+        id: si.productId ?? si.id,
+        name: si.productName ?? si.name ?? 'Item',
+        sku: si.sku ?? '',
+        price: Number(si.unitPrice ?? 0),
+        costPrice: Number(si.costPrice ?? 0),
+        stock: 0,
+        quantity: Number(si.quantity ?? 1),
+      }));
+    });
+  }, [isEditMode, initialData]);
+
+  /** EDIT MODE: charges that live outside formData still need seeding. */
+  React.useEffect(() => {
+    if (!isEditMode || !initialData) return;
+    setActualShippingCost(Number((initialData as any).actualShippingCost ?? 0));
+    const pm = (initialData as any).paymentMethod;
+    if (pm) setPaymentMethod(pm as ShipmentPaymentMethod);
+  }, [isEditMode, initialData]);
+
   // Pre-select products from initialProducts once inventory is loaded
   React.useEffect(() => {
     if (!initialProducts?.length || !products.length || selectedProducts.length > 0) return;
@@ -526,7 +581,7 @@ export const CourierShipmentModal = ({
       const itemSku = norm(item.sku);
       const itemName = norm(item.name);
       const found =
-        // 0. Exact local product id (resolved by backend — most reliable)
+        // 0. Exact local product id (resolved by backend   most reliable)
         (item.productId ? products.find((p) => p.id === item.productId) : undefined) ??
         // 1. SKU exact match
         (itemSku ? products.find((p) => norm(p.sku) === itemSku) : undefined) ??
@@ -703,11 +758,82 @@ export const CourierShipmentModal = ({
     [invoiceTotal, actualCourierCost, costOfGoods]
   );
 
+  /**
+   * EDIT MODE payload.
+   *
+   * Only the fields the edit endpoint accepts, and only the ones that actually
+   * changed. Sending the full create-payload here is what made the old edit
+   * silently no-op: the backend dropped everything it didn't recognise and the
+   * user still got a success toast.
+   */
+  const buildEditPayload = (): Record<string, any> => {
+    const all: Record<string, any> = {
+      recipientName: formData.recipientName,
+      recipientPhone: formData.recipientPhone,
+      recipientPhone2: formData.recipientPhone2 || null,
+      recipientEmail: formData.recipientEmail || null,
+      recipientAddress: formData.recipientAddress,
+      recipientCity: formData.recipientCity,
+      recipientDistrict: formData.recipientDistrict || null,
+      recipientPostalCode: formData.recipientPostalCode || null,
+      weight: toSafeNumber(formData.weight),
+      length: formData.length != null ? toSafeNumber(formData.length) : null,
+      width: formData.width != null ? toSafeNumber(formData.width) : null,
+      height: formData.height != null ? toSafeNumber(formData.height) : null,
+      numberOfPieces: Math.max(1, Math.round(toSafeNumber(formData.numberOfPieces) || 1)),
+      description: formData.description?.trim() || null,
+      // Same guard as codAmount: a shipment whose sale items could not be loaded
+      // must not have its declared value zeroed out.
+      declaredValue:
+        invoiceTotal > 0 ? invoiceTotal : toSafeNumber((initialData as any)?.declaredValue),
+      shippingCharge: toSafeNumber(formData.shippingCharge),
+      insuranceCharge: toSafeNumber(formData.insuranceCharge),
+      additionalCharges: toSafeNumber(formData.additionalCharges),
+      actualShippingCost: toSafeNumber(actualShippingCost),
+      codEnabled: paymentMethod === 'cod',
+      // Never fall through to 0: an empty product list must not wipe a live COD.
+      codAmount:
+        paymentMethod === 'cod'
+          ? (invoiceTotal > 0 ? invoiceTotal : toSafeNumber((initialData as any)?.codAmount))
+          : 0,
+      notes: formData.notes?.trim() || null,
+      deliveryInstructions: formData.deliveryInstructions?.trim() || null,
+    };
+
+    // Post-dispatch: strip anything the backend policy would reject anyway.
+    const permitted = Object.fromEntries(
+      Object.entries(all).filter(([field]) => fieldEditable(field)),
+    );
+    if (editReason.trim()) permitted.editReason = editReason.trim();
+    return permitted;
+  };
+
+  const submitEdit = async (payload: Record<string, any>) => {
+    setIsSubmitting(true);
+    try {
+      const result = await onSave(payload as Partial<CourierShipment>);
+      if (result?.success) {
+        const warnings: string[] = result.warnings ?? [];
+        warnings.forEach((w) => toast(w, { icon: '⚠️', duration: 6000 }));
+        const changed = Object.keys(result.changes ?? {}).length;
+        toast.success(
+          changed > 0
+            ? `Shipment updated   ${changed} field${changed === 1 ? '' : 's'} saved`
+            : 'No changes to save',
+        );
+        onClose();
+      }
+    } finally {
+      setIsSubmitting(false);
+      setPendingChanges(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.courierServiceId) {
-      toast.error('Please select a courier service');
+    if (isLockedForEdit) {
+      toast.error(`This shipment is ${humanStatus(initialData?.status as string)} and can no longer be edited.`);
       return;
     }
 
@@ -716,7 +842,28 @@ export const CourierShipmentModal = ({
       return;
     }
 
-    if (!isEditMode && selectedProducts.length === 0) {
+    // ---- EDIT: preview the diff, then save --------------------------------
+    if (isEditMode) {
+      if (isPostDispatchEdit && !editReason.trim()) {
+        toast.error('A reason is required   the courier already has this parcel.');
+        return;
+      }
+      const payload = buildEditPayload();
+      const changes = diffShipment(initialData as Record<string, any>, payload);
+      if (changes.length === 0) {
+        toast('Nothing changed.');
+        return;
+      }
+      setPendingChanges(changes);
+      return;
+    }
+
+    if (!formData.courierServiceId) {
+      toast.error('Please select a courier service');
+      return;
+    }
+
+    if (selectedProducts.length === 0) {
       toast.error('Please add at least one product');
       return;
     }
@@ -795,7 +942,7 @@ export const CourierShipmentModal = ({
 
   return (
     <div className="glass-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      {/* Possible duplicate order warning — user can review and still continue */}
+      {/* Possible duplicate order warning   user can review and still continue */}
       {phoneInsights?.hasPossibleDuplicate && !duplicateDismissed && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
@@ -895,6 +1042,43 @@ export const CourierShipmentModal = ({
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="glass-modal-scroll space-y-6 px-6 py-6">
+
+          {/* ---- Edit policy banner -------------------------------------- */}
+          {isLockedForEdit && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <p className="font-semibold">
+                This shipment is {humanStatus(initialData?.status as string)}   it can no longer be edited.
+              </p>
+              <p className="mt-1 text-red-700">
+                Stock movements and profit reports already depend on these values. Create a
+                return or a new shipment instead.
+              </p>
+            </div>
+          )}
+
+          {isPostDispatchEdit && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">
+                The courier already has this parcel ({humanStatus(initialData?.status as string)}).
+              </p>
+              <p className="mt-1">
+                Changing the address or the COD value here will not reach the driver. Only{' '}
+                <strong>phone, delivery instructions, notes, actual courier cost and the estimated
+                delivery date</strong> will be saved   anything else you type is ignored.
+                {!isAdminRoleLocal && ' Only an admin can save changes at this stage.'}
+              </p>
+              <div className="mt-3">
+                <Label className="mb-1 text-amber-900">Reason for this edit *</Label>
+                <Input
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  placeholder="e.g. Customer gave a new contact number"
+                  maxLength={255}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
 
             {/* Customer (Recipient) */}
@@ -1288,7 +1472,7 @@ export const CourierShipmentModal = ({
                   </div>
                   {phoneInsights.riskLevel === 'HIGH' && (
                     <p className="mt-1 text-red-700 font-medium">
-                      High return rate — verify this customer before shipping.
+                      High return rate   verify this customer before shipping.
                     </p>
                   )}
                 </div>
@@ -1364,7 +1548,7 @@ export const CourierShipmentModal = ({
                             }}
                           >
                             {c.name}
-                            {c.stateName ? <span className="text-gray-400 ml-1">— {c.stateName}</span> : null}
+                            {c.stateName ? <span className="text-gray-400 ml-1">  {c.stateName}</span> : null}
                           </li>
                         ))}
                     </ul>
@@ -1402,7 +1586,7 @@ export const CourierShipmentModal = ({
                             }}
                           >
                             {c.name}
-                            <span className="text-gray-400 ml-1">— {c.district}</span>
+                            <span className="text-gray-400 ml-1">  {c.district}</span>
                           </li>
                         ))}
                     </ul>
@@ -1586,7 +1770,7 @@ export const CourierShipmentModal = ({
             <div className="col-span-2 border-t pt-4 mt-2">
               <h3 className="font-medium text-gray-900 mb-1">Charges</h3>
               <p className="text-xs text-gray-500 mb-3">
-                "Shipping to Customer" appears on the invoice. "Actual Shipping Cost" is what you pay the courier — used only for P&amp;L.
+                "Shipping to Customer" appears on the invoice. "Actual Shipping Cost" is what you pay the courier   used only for P&amp;L.
               </p>
             </div>
 
@@ -1614,7 +1798,7 @@ export const CourierShipmentModal = ({
                 onChange={(e) => setActualShippingCost(parseNumberInput(e.target.value))}
                 className="mt-1"
               />
-              <p className="text-xs text-gray-500 mt-1">What you actually pay the courier — for P&amp;L only</p>
+              <p className="text-xs text-gray-500 mt-1">What you actually pay the courier   for P&amp;L only</p>
             </div>
 
             <div>
@@ -1815,7 +1999,7 @@ export const CourierShipmentModal = ({
                   </div>
                 </div>
 
-                {/* P&L breakdown — leftover (gross) profit, always shown when COGS known */}
+                {/* P&L breakdown   leftover (gross) profit, always shown when COGS known */}
                 {costOfGoods > 0 && (
                   <div className="border-t border-gray-200 pt-3 mt-1">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">P&amp;L Estimate</p>
@@ -1863,7 +2047,7 @@ export const CourierShipmentModal = ({
               </div>
             )}
 
-            {/* Payment Confirmation for Bank Transfer / Online Payment — admin only when staff permissions limited */}
+            {/* Payment Confirmation for Bank Transfer / Online Payment   admin only when staff permissions limited */}
             {(paymentMethod === 'bank' || paymentMethod === 'online') && staffPermissionsLimited && (
               <div className="col-span-2 border border-amber-200 rounded-lg p-3 bg-amber-50 text-sm text-amber-800">
                 Payment confirmation is handled by an admin. This order will be saved with pending payment status.
@@ -1994,11 +2178,58 @@ export const CourierShipmentModal = ({
 
           </div>
 
+          {/* ---- Change preview: never save an edit the user hasn't seen ---- */}
+          {pendingChanges && (
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
+                <h3 className="text-base font-semibold text-gray-900">
+                  Save these {pendingChanges.length} change{pendingChanges.length === 1 ? '' : 's'}?
+                </h3>
+                <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto text-sm">
+                  {pendingChanges.map((c) => (
+                    <li key={c.field} className="rounded-md bg-gray-50 px-3 py-2">
+                      <span className="font-medium text-gray-700">{c.label}</span>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                        <span className="text-gray-500 line-through">
+                          {c.from === null || c.from === undefined || c.from === '' ? ' ' : String(c.from)}
+                        </span>
+                        <span className="text-gray-400">→</span>
+                        <span className="font-semibold text-gray-900">
+                          {c.to === null || c.to === undefined || c.to === '' ? ' ' : String(c.to)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-4 flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setPendingChanges(null)} disabled={isSubmitting}>
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    className={cn(theme.bg, theme.hover, 'text-white')}
+                    disabled={isSubmitting}
+                    onClick={() => void submitEdit(buildEditPayload())}
+                  >
+                    {isSubmitting ? 'Saving...' : 'Save changes'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="glass-modal-footer flex justify-end gap-3">
             <Button type="button" onClick={onClose} variant="outline" disabled={isSubmitting || customerLoading}>
-              Cancel
+              {isLockedForEdit ? 'Close' : 'Cancel'}
             </Button>
-            <Button type="submit" className={cn(theme.bg, theme.hover, 'text-white flex items-center gap-2')} disabled={isSubmitting || customerLoading}>
+            <Button
+              type="submit"
+              className={cn(theme.bg, theme.hover, 'text-white flex items-center gap-2')}
+              disabled={isSubmitting || customerLoading || isLockedForEdit || (isPostDispatchEdit && !isAdminRoleLocal)}
+            >
               {isSubmitting || customerLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />

@@ -27,7 +27,24 @@ import {
   type MobilePrintMode,
   type PrinterConfig,
 } from "@/lib/printerConfig";
-import { isMobilePOSDevice, tryPassPRNT } from "@/lib/starPrint";
+import {
+  isMobilePOSDevice,
+  isStarWebPrntBrowser,
+  tryPassPRNT,
+  tryStarWebPrntBrowserOpenDrawer,
+  tryStarWebPrntBrowserTestPrint,
+} from "@/lib/starPrint";
+
+function buildPassPrntTestHtml(paperWidth: "58mm" | "80mm"): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page { size: ${paperWidth} auto; margin: 2mm; }
+    body { width: ${paperWidth}; margin: 0; font-family: monospace; text-align: center; }
+    hr { border: 0; border-top: 1px dashed #000; }
+  </style></head><body>
+    <h2>SELLMATE</h2><hr><p>PassPRNT test successful</p>
+    <p>Paper: ${paperWidth}</p><hr><p>Printer settings are ready.</p>
+  </body></html>`;
+}
 
 interface PrinterSettingsProps {
   /** Branch / location ID – used as the localStorage namespace key */
@@ -38,7 +55,9 @@ const QZ_DOWNLOAD_URL = "https://qz.io/download/";
 const STAR_PRINTER_PATTERN = /\b(star|tsp|mcp|mc-print|mpop)\b/i;
 
 export function PrinterSettings({ locationId }: PrinterSettingsProps) {
-  const isMobile = isMobilePOSDevice();
+  const isStarBrowser = isStarWebPrntBrowser();
+  const isMobile = isMobilePOSDevice() && !isStarBrowser;
+  const isQzDesktop = !isMobile && !isStarBrowser;
   const {
     isConnected,
     error,
@@ -50,7 +69,9 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
   } = usePrinter();
 
   const [config, setConfig] = useState<PrinterConfig>(() => {
-    return getPrinterConfig(locationId) ?? { ...DEFAULT_PRINTER_CONFIG };
+    const saved = getPrinterConfig(locationId);
+    if (saved) return saved;
+    return { ...DEFAULT_PRINTER_CONFIG };
   });
   const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
@@ -64,15 +85,18 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
 
   // Reload config whenever locationId changes
   useEffect(() => {
-    setConfig(getPrinterConfig(locationId) ?? { ...DEFAULT_PRINTER_CONFIG });
+    const saved = getPrinterConfig(locationId);
+    setConfig(
+      saved ?? { ...DEFAULT_PRINTER_CONFIG },
+    );
     setAvailablePrinters([]);
     setStatusMsg(null);
-  }, [locationId]);
+  }, [locationId, isStarBrowser]);
 
   // Auto-connect on mount / location change if a printer was previously saved
   const hasAutoConnected = useRef(false);
   useEffect(() => {
-    if (!locationId || hasAutoConnected.current) return;
+    if (!locationId || hasAutoConnected.current || isStarBrowser) return;
     const saved = getPrinterConfig(locationId);
     if (saved?.printerName && !isConnected) {
       hasAutoConnected.current = true;
@@ -139,7 +163,7 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
       setPrinterConfig(locationId, config);
       const saved = getPrinterConfig(locationId);
       if (!saved || JSON.stringify(saved) !== JSON.stringify(config)) {
-        throw new Error("Browser storage did not retain the printer settings");
+        throw new Error("Browser storage has not retained the printer settings");
       }
       showStatus("success", "Printer settings saved");
       toast.success("PassPRNT settings saved on this device");
@@ -153,19 +177,66 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
     }
   };
 
+  const handleStarBrowserTestPrint = async () => {
+    setTestPrinting(true);
+    try {
+      const result = await tryStarWebPrntBrowserTestPrint(config.paperWidth);
+      if (result.ok) {
+        showStatus("success", "Test page sent to mPOP");
+        toast.success("Test print sent");
+        return;
+      }
+
+      // Previous working path: PassPRNT HTML (before Star-browser localhost routing).
+      const launched = tryPassPRNT(buildPassPrntTestHtml(config.paperWidth), {
+        paperWidth: config.paperWidth,
+      });
+      if (launched) {
+        showStatus("success", "Opening PassPRNT test print…");
+        toast.success("WebPRNT unavailable   opened PassPRNT");
+        return;
+      }
+
+      const message =
+        result.error ??
+        "Print failed   pair mPOP in Star webPRNT Browser or install PassPRNT";
+      showStatus("error", message);
+      toast.error(message);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Test print failed";
+      showStatus("error", message);
+    } finally {
+      setTestPrinting(false);
+    }
+  };
+
+  const handleStarBrowserDrawer = async () => {
+    setTestDrawer(true);
+    try {
+      const result = await tryStarWebPrntBrowserOpenDrawer();
+      if (result.ok) {
+        showStatus("success", "Drawer kick sent");
+      } else {
+        showStatus(
+          "error",
+          result.error ?? "Drawer kick failed   check mPOP Bluetooth pairing",
+        );
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Drawer test failed";
+      showStatus("error", message);
+    } finally {
+      setTestDrawer(false);
+    }
+  };
+
   const handleMobileTestPrint = () => {
     const width = config.paperWidth;
-    const launched = tryPassPRNT(
-      `<!doctype html><html><head><meta charset="utf-8"><style>
-        @page { size: ${width} auto; margin: 2mm; }
-        body { width: ${width}; margin: 0; font-family: monospace; text-align: center; }
-        hr { border: 0; border-top: 1px dashed #000; }
-      </style></head><body>
-        <h2>SELLMATE</h2><hr><p>PassPRNT test successful</p>
-        <p>Paper: ${width}</p><hr><p>Printer settings are ready.</p>
-      </body></html>`,
-      { paperWidth: width },
-    );
+    const launched = tryPassPRNT(buildPassPrntTestHtml(width), {
+      paperWidth: width,
+    });
 
     if (launched) {
       toast.success("Opening Star PassPRNT…");
@@ -256,12 +327,14 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
     <div className="rounded-lg border bg-card p-5 space-y-5 max-w-lg">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-base">Thermal Printer (ESC/POS)</h3>
-        <Badge variant={isMobile || isConnected ? "default" : "secondary"}>
-          {isMobile
-            ? "PassPRNT Mobile"
-            : isConnected
-              ? "QZ Connected"
-              : "QZ Disconnected"}
+        <Badge variant={isStarBrowser || isMobile || isConnected ? "default" : "secondary"}>
+          {isStarBrowser
+            ? "Star webPRNT Browser"
+            : isMobile
+              ? "PassPRNT Mobile"
+              : isConnected
+                ? "QZ Connected"
+                : "QZ Disconnected"}
         </Badge>
       </div>
 
@@ -288,7 +361,7 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
         </div>
       )}
 
-      {!isMobile && (
+      {!isMobile && !isStarBrowser && (
         <>
           {/* Connect / Disconnect */}
           <Button
@@ -316,7 +389,14 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
         </>
       )}
 
-      {isMobile ? (
+      {isStarBrowser ? (
+        <p className="text-xs text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 rounded-md px-3 py-2">
+          In <strong>Star webPRNT Browser → Settings</strong>, select{" "}
+          <strong>MODEL: mPOP (StarPRNT)</strong> and choose the paired mPOP
+          under <strong>SELECTED PRINTER</strong>. No QZ Tray is needed. Then
+          keep Paper Width at 58mm, save, and tap Test Print.
+        </p>
+      ) : isMobile ? (
         <p className="text-xs text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 rounded-md px-3 py-2">
           Select the mPOP inside <strong>Star PassPRNT</strong>. Mobile printers
           do not appear in the desktop QZ printer list.
@@ -328,12 +408,54 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
         </p>
       )}
 
-      <Separator />
+      {isStarBrowser && (
+        <>
+          <div className="space-y-2 rounded-md border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-4">
+            <Label className="text-sm font-semibold">
+              Receipt print size (paper roll width)
+            </Label>
+            <p className="text-xs text-amber-900 dark:text-amber-100">
+              Star webPRNT Browser does not show a browser print dialog. SellMate
+              tries localhost WebPRNT first, then <strong>PassPRNT</strong> (the
+              method that worked before). mPOP uses <strong>58mm</strong>. Its
+              factory emulation is StarPRNT, so MODEL must normally be{" "}
+              <strong>mPOP (StarPRNT)</strong>, not plain mPOP.
+            </p>
+            <div className="flex gap-4 pt-1">
+              {(["80mm", "58mm"] as const).map((w) => (
+                <label
+                  key={w}
+                  className="flex items-center gap-2 cursor-pointer text-sm font-medium"
+                >
+                  <input
+                    type="radio"
+                    name="paperWidthStar"
+                    value={w}
+                    checked={config.paperWidth === w}
+                    onChange={() =>
+                      setConfig((prev) => ({ ...prev, paperWidth: w }))
+                    }
+                  />
+                  {w}
+                </label>
+              ))}
+            </div>
+            {config.paperWidth === "58mm" && (
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                58mm selected   if print looks small on the left with empty
+                space, switch to 80mm.
+              </p>
+            )}
+          </div>
+          <Separator />
+        </>
+      )}
 
+      {!isStarBrowser && (
       <div className="space-y-3 rounded-md border border-sky-200 dark:border-sky-800 bg-sky-50/50 dark:bg-sky-950/30 p-4">
         <h4 className="text-sm font-semibold">
-          Mobile / iPad — Star Print
-          {isMobilePOSDevice() && (
+          Mobile / iPad   Star Print
+          {(isMobilePOSDevice()) && (
             <Badge variant="default" className="ml-2 text-xs">
               This device
             </Badge>
@@ -354,8 +476,8 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
             }
           >
             <option value="auto">Auto (WebPRNT if IP set, else PassPRNT)</option>
-            <option value="passprnt">PassPRNT — Bluetooth Star (iPad/phone)</option>
-            <option value="webprnt">WebPRNT — Wi‑Fi/LAN Star only</option>
+            <option value="passprnt">PassPRNT   Bluetooth Star (iPad/phone)</option>
+            <option value="webprnt">WebPRNT   Wi‑Fi/LAN Star only</option>
             <option value="browser">Browser / AirPrint only</option>
           </select>
         </div>
@@ -415,11 +537,12 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
           </div>
         </div>
       </div>
+      )}
 
       <Separator />
 
-      {/* QZ printer selection is desktop-only; PassPRNT owns mobile selection. */}
-      {!isMobile && (
+      {/* QZ printer selection is desktop-only; PassPRNT / webPRNT Browser own mobile selection. */}
+      {!isMobile && !isStarBrowser && (
         <div className="space-y-1.5">
           <Label htmlFor="printer-select">Printer</Label>
           <div className="flex gap-2">
@@ -451,7 +574,8 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
         </div>
       )}
 
-      {/* Paper width */}
+      {/* Paper width (desktop / PassPRNT   Star browser uses highlighted block above) */}
+      {!isStarBrowser && (
       <div className="space-y-1.5">
         <Label>Paper Width</Label>
         <div className="flex gap-4">
@@ -474,8 +598,9 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
           ))}
         </div>
       </div>
+      )}
 
-      <Separator />
+      {!isStarBrowser && <Separator />}
 
       {/* Behaviour toggles */}
       <div className="space-y-3">
@@ -516,25 +641,43 @@ export function PrinterSettings({ locationId }: PrinterSettingsProps) {
           type="button"
           variant="outline"
           size="sm"
-          onClick={isMobile ? handleMobileTestPrint : handleTestPrint}
+          onClick={
+            isStarBrowser
+              ? handleStarBrowserTestPrint
+              : isMobile
+                ? handleMobileTestPrint
+                : handleTestPrint
+          }
           disabled={
-            isMobile
-              ? config.mobilePrintMode !== "passprnt"
-              : !isConnected || !config.printerName || testPrinting
+            isStarBrowser
+              ? testPrinting
+              : isMobile
+                ? testPrinting ||
+                  (config.mobilePrintMode === "browser" &&
+                    !config.starWebPrntHost?.trim())
+                : !isConnected || !config.printerName || testPrinting
           }
         >
           {testPrinting
             ? "Printing…"
-            : isMobile
-              ? "Test PassPRNT"
-              : "Test Print"}
+            : isStarBrowser
+              ? "Test Print"
+              : isMobile
+                ? "Test PassPRNT"
+                : "Test Print"}
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={handleTestDrawer}
-          disabled={!isConnected || !config.printerName || testDrawer}
+          onClick={
+            isStarBrowser ? handleStarBrowserDrawer : handleTestDrawer
+          }
+          disabled={
+            isStarBrowser
+              ? testDrawer
+              : !isConnected || !config.printerName || testDrawer
+          }
         >
           {testDrawer ? "Opening…" : "Test Drawer"}
         </Button>

@@ -96,7 +96,7 @@ function PayloadValue({ fieldKey, value }: { fieldKey: string; value: unknown })
                 <td className="px-2 py-1.5 text-gray-400">{i + 1}</td>
                 {cols.map(c => (
                   <td key={c} className="px-2 py-1.5 text-gray-700">
-                    {row[c] == null ? <span className="text-gray-300">—</span> : String(row[c])}
+                    {row[c] == null ? <span className="text-gray-300"> </span> : String(row[c])}
                   </td>
                 ))}
               </tr>
@@ -122,7 +122,7 @@ function PayloadValue({ fieldKey, value }: { fieldKey: string; value: unknown })
   // Plain object → nested key-value
   if (typeof value === 'object' && value !== null) {
     const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v != null && v !== '');
-    if (entries.length === 0) return <span className="text-gray-300 text-xs">—</span>;
+    if (entries.length === 0) return <span className="text-gray-300 text-xs"> </span>;
     return (
       <div className="space-y-0.5 pl-2 border-l-2 border-gray-200">
         {entries.map(([k, v]) => (
@@ -222,7 +222,7 @@ export default function ActivityLogsPage() {
     setToDate('');
     setSearch('');
     setPage(1);
-    // Reload immediately with empty filters — passing them explicitly avoids
+    // Reload immediately with empty filters   passing them explicitly avoids
     // reading the not-yet-updated state.
     load({ pg: 1, filters: {} });
   };
@@ -495,7 +495,7 @@ export default function ActivityLogsPage() {
                           <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
                             <User className="w-3.5 h-3.5 text-violet-600" />
                           </div>
-                          <span className="text-gray-600 text-xs truncate max-w-36">{log.userName ?? '—'}</span>
+                          <span className="text-gray-600 text-xs truncate max-w-36">{log.userName ?? ' '}</span>
                         </div>
                       </td>
                       {/* Record ID */}
@@ -505,12 +505,12 @@ export default function ActivityLogsPage() {
                             {log.recordId.length > 12 ? `${log.recordId.slice(0, 8)}…` : log.recordId}
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-gray-300"> </span>
                         )}
                       </td>
                       {/* IP */}
                       <td className="px-5 py-3.5">
-                        <span className="text-xs text-gray-400 font-mono">{log.ipAddress ?? '—'}</span>
+                        <span className="text-xs text-gray-400 font-mono">{log.ipAddress ?? ' '}</span>
                       </td>
                       {/* Time */}
                       <td className="px-5 py-3.5 text-right">
@@ -634,7 +634,7 @@ export default function ActivityLogsPage() {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-500">
                     <User className="w-3.5 h-3.5" />
-                    {log.userName ?? '—'}
+                    {log.userName ?? ' '}
                     {log.ipAddress && <span className="ml-2 font-mono text-gray-400">{log.ipAddress}</span>}
                   </div>
                   <p className="text-xs text-gray-400">{formatDateTime(log.createdAt)}</p>

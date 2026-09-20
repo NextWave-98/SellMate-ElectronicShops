@@ -95,7 +95,7 @@ export default function PendingApprovalShipments() {
         adjustedDiscountValue: Number(state?.discountValue ?? 0),
         adjustedShippingCharge: Number(state?.shippingCharge ?? resolveDefaultShippingCharge(shipment)),
       });
-      toast.success('Order approved — courier booking created');
+      toast.success('Order approved   courier booking created');
       setShipments(prev => prev.filter(s => s.id !== shipment.id));
     } catch {
       toast.error('Failed to approve order');
@@ -176,7 +176,7 @@ export default function PendingApprovalShipments() {
 
               <div className="text-right flex-shrink-0">
                 <p className="text-sm font-bold text-gray-800">{formatCurrency(previewTotal)}</p>
-                <p className="text-[11px] text-gray-400">{s.createdAt ? formatDateTime(s.createdAt) : '—'}</p>
+                <p className="text-[11px] text-gray-400">{s.createdAt ? formatDateTime(s.createdAt) : ' '}</p>
               </div>
 
               <button

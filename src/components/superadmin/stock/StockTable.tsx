@@ -278,7 +278,7 @@ export default function StockTable({ items, onEdit, onDelete, onView, onRestock,
                 </TableCell>
                 <TableCell>
                   <div className="text-sm text-gray-600 max-w-xs truncate" title={item.description || ''}>
-                    {item.description || '—'}
+                    {item.description || ' '}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -320,7 +320,7 @@ export default function StockTable({ items, onEdit, onDelete, onView, onRestock,
                       {loadingVariants.has(item.id) ? 'Loading...' : `${(variantData[item.id] ?? []).length > 0 ? (variantData[item.id] ?? []).length : ''} Variants`}
                     </button>
                   ) : (
-                    <span className="text-xs text-gray-400">—</span>
+                    <span className="text-xs text-gray-400"> </span>
                   )}
                 </TableCell>
                 {/* Actions */}

@@ -10,7 +10,7 @@ import { useCrm } from '../../hooks/useCrm';
 /**
  * Self-contained dashboard widget row for the newer modules
  * (appointments, towing, CRM). Each widget only appears if its module
- * responds (i.e. the org has access) — otherwise it stays hidden.
+ * responds (i.e. the org has access)   otherwise it stays hidden.
  */
 export default function OperationsWidgets() {
   const appt = useAppointment();

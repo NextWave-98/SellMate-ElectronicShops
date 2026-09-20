@@ -735,7 +735,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     // Validate payment method specific inputs
     if (selectedPaymentMethod === 'cash') {
       if (isAdvanceMode) {
-        // Advance/layaway mode — partial cash is allowed
+        // Advance/layaway mode   partial cash is allowed
         const advance = parseFloat(partialAmountInput);
         if (partialAmountInput === '' || isNaN(advance) || advance < 0) {
           toast.error('Please enter the advance amount');
@@ -1922,7 +1922,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                           disabled={isProcessing}
                         />
                         <label htmlFor="advanceMode" className="text-sm font-medium text-amber-800 cursor-pointer">
-                          Advance Payment (Layaway) — accept partial cash deposit
+                          Advance Payment (Layaway)   accept partial cash deposit
                         </label>
                       </div>
 

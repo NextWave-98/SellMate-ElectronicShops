@@ -129,11 +129,11 @@ export default function RentalClaimsPage() {
             {claims.map((c) => (
               <tr key={c.id} className="border-t">
                 <td className="p-3 font-medium">{c.claimNo}</td>
-                <td className="p-3">{c.vehicle?.registrationNo || '—'}</td>
+                <td className="p-3">{c.vehicle?.registrationNo || ' '}</td>
                 <td className="p-3">{c.insurer}</td>
-                <td className="p-3">{c.incidentDate || '—'}</td>
+                <td className="p-3">{c.incidentDate || ' '}</td>
                 <td className="p-3">Rs {Number(c.claimedAmount).toLocaleString()}</td>
-                <td className="p-3">{c.approvedAmount != null ? `Rs ${Number(c.approvedAmount).toLocaleString()}` : '—'}</td>
+                <td className="p-3">{c.approvedAmount != null ? `Rs ${Number(c.approvedAmount).toLocaleString()}` : ' '}</td>
                 <td className="p-3"><Badge className={statusColor[c.status] || 'bg-gray-100 text-gray-700'}>{c.status}</Badge></td>
                 <td className="p-3">
                   <div className="flex items-center gap-1.5">
@@ -160,7 +160,7 @@ export default function RentalClaimsPage() {
             <div className="col-span-2"><Label>Vehicle *</Label>
               <select className={selectCls} value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
                 <option value="">Select vehicle</option>
-                {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNo} — {v.make} {v.model}</option>)}
+                {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNo}   {v.make} {v.model}</option>)}
               </select>
             </div>
             <div><Label>Claim No *</Label><Input value={form.claimNo} onChange={(e) => setForm({ ...form, claimNo: e.target.value })} /></div>

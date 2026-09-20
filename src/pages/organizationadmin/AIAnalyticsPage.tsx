@@ -77,7 +77,7 @@ const MetricCard = ({
     </div>
     <div className="min-w-0">
       <p className="text-xs text-gray-500 truncate">{label}</p>
-      <p className="text-lg font-bold text-gray-900 leading-tight">{value ?? '—'}</p>
+      <p className="text-lg font-bold text-gray-900 leading-tight">{value ?? ' '}</p>
       {sub && <p className="text-xs text-gray-400 truncate">{sub}</p>}
     </div>
   </div>
@@ -351,9 +351,9 @@ const AIAnalyticsPage: React.FC = () => {
     textareaRef.current?.focus();
   };
 
-  const fmt = (v: unknown) => (v == null ? '—' : Number(v).toLocaleString());
+  const fmt = (v: unknown) => (v == null ? ' ' : Number(v).toLocaleString());
   // const fmtCur = (v: unknown) =>
-  //   v == null ? '—' : `$${parseFloat(String(v)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  //   v == null ? ' ' : `$${parseFloat(String(v)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const activeProviderLabel = aiSettings 
     ? AI_PROVIDER_LABELS[aiSettings.provider] 
     : 'System Default';
@@ -378,7 +378,7 @@ const AIAnalyticsPage: React.FC = () => {
               </span>
             </h1>
             <p className="text-sm text-gray-500">
-              Real-time AI insights for your organization — sales, inventory, WooCommerce & more.
+              Real-time AI insights for your organization   sales, inventory, WooCommerce & more.
             </p>
           </div>
         </div>
@@ -634,7 +634,7 @@ const AIAnalyticsPage: React.FC = () => {
                             <span className="ml-1 text-gray-400 font-normal">({p.brand})</span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-gray-500">{p.category || '—'}</td>
+                        <td className="px-4 py-2 text-gray-500">{p.category || ' '}</td>
                         <td className="px-4 py-2 text-right text-gray-700">{fmt(p.units_sold)}</td>
                         <td className="px-4 py-2 text-right font-semibold text-green-600">
                           {formatCurrency(p.total_revenue)}
@@ -966,11 +966,11 @@ const AIAnalyticsPage: React.FC = () => {
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-700 space-y-1">
                 <p className="font-semibold text-amber-800">About AI Providers</p>
                 <ul className="list-disc list-inside space-y-0.5 text-xs text-amber-700">
-                  <li><strong>OpenRouter</strong> — Access many models with one key. <span className="text-amber-600">openrouter.ai</span></li>
-                  <li><strong>OpenAI / ChatGPT</strong> — GPT-4o and more. <span className="text-amber-600">platform.openai.com</span></li>
-                  <li><strong>Google Gemini</strong> — Gemini 1.5 Pro, Flash. <span className="text-amber-600">aistudio.google.com</span></li>
-                  <li><strong>Anthropic Claude</strong> — Claude 3.5 Sonnet &amp; Haiku. <span className="text-amber-600">console.anthropic.com</span></li>
-                  <li><strong>Grok (xAI)</strong> — xAI's Grok models. <span className="text-amber-600">console.x.ai</span></li>
+                  <li><strong>OpenRouter</strong>   Access many models with one key. <span className="text-amber-600">openrouter.ai</span></li>
+                  <li><strong>OpenAI / ChatGPT</strong>   GPT-4o and more. <span className="text-amber-600">platform.openai.com</span></li>
+                  <li><strong>Google Gemini</strong>   Gemini 1.5 Pro, Flash. <span className="text-amber-600">aistudio.google.com</span></li>
+                  <li><strong>Anthropic Claude</strong>   Claude 3.5 Sonnet &amp; Haiku. <span className="text-amber-600">console.anthropic.com</span></li>
+                  <li><strong>Grok (xAI)</strong>   xAI's Grok models. <span className="text-amber-600">console.x.ai</span></li>
                 </ul>
                 <p className="text-xs text-amber-600 mt-2">Your API key is encrypted at rest using AES-256-GCM and never exposed in the UI.</p>
               </div>

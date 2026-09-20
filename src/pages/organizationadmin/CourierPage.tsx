@@ -23,7 +23,7 @@ import { CourierShipmentModal, TrackingModal, LabelDownloadModal, BulkLabelModal
 import { useCourierModalVariant } from '@/hooks/useCourierModalVariant';
 import PendingApprovalShipments from '../../components/courier/PendingApprovalShipments';
 
-/** Stable identity — must not be recreated each render. */
+/** Stable identity   must not be recreated each render. */
 const ORG_SHIPMENT_SCOPE = { scope: 'org' as const };
 
 const CourierPage = () => {
@@ -420,7 +420,7 @@ const CourierPage = () => {
             <Tag className="w-5 h-5 text-amber-600" />
             <div>
               <h2 className="text-base font-bold text-gray-800">Discount Orders Awaiting Approval</h2>
-              <p className="text-xs text-gray-500">Orders created by staff with a discount — review and approve to send to courier</p>
+              <p className="text-xs text-gray-500">Orders created by staff with a discount   review and approve to send to courier</p>
             </div>
           </div>
           <PendingApprovalShipments />
@@ -664,7 +664,7 @@ const CourierPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Package className="w-4 h-4 text-orange-500" />
-              Sale Items — {itemsModal?.label}
+              Sale Items   {itemsModal?.label}
             </DialogTitle>
           </DialogHeader>
           {itemsModal?.loading ? (
@@ -691,7 +691,7 @@ const CourierPage = () => {
                     <TableRow key={i}>
                       <TableCell className="text-xs text-gray-400">{i + 1}</TableCell>
                       <TableCell className="text-sm">
-                        <div className="font-medium">{item.product?.name || item.productName || '—'}</div>
+                        <div className="font-medium">{item.product?.name || item.productName || ' '}</div>
                         {(item.product?.sku || item.sku) && (
                           <div className="text-xs text-gray-400">{item.product?.sku || item.sku}</div>
                         )}
@@ -699,7 +699,7 @@ const CourierPage = () => {
                       <TableCell className="text-sm text-right">{item.quantity}</TableCell>
                       <TableCell className="text-sm text-right">{formatCurrency(item.unitPrice)}</TableCell>
                       <TableCell className="text-sm text-right">
-                        {item.discount > 0 ? formatCurrency(item.discount) : '—'}
+                        {item.discount > 0 ? formatCurrency(item.discount) : ' '}
                       </TableCell>
                       <TableCell className="text-sm text-right font-semibold">
                         {formatCurrency(item.totalPrice ?? (item.unitPrice * item.quantity))}
@@ -721,7 +721,7 @@ const CourierPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <FileText className="w-4 h-4 text-blue-600" />
-              Update Shipment Numbers — {selectedIds.size} Shipment{selectedIds.size !== 1 ? 's' : ''}
+              Update Shipment Numbers   {selectedIds.size} Shipment{selectedIds.size !== 1 ? 's' : ''}
             </DialogTitle>
             <DialogDescription>
               New shipment numbers will be auto-generated for all selected shipments.

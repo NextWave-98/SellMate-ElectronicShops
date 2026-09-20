@@ -262,7 +262,7 @@ export default function SalesTable({ sales, onView, onCancel, onRefund, onDelete
                   {sale.items.length > 0 && (
                     <div className="text-xs text-gray-500 mt-0.5 max-w-[140px]">
                       {sale.items.slice(0, 2).map((item, i) => (
-                        <div key={i} className="truncate">{item.productName || '—'}</div>
+                        <div key={i} className="truncate">{item.productName || ' '}</div>
                       ))}
                       {sale.items.length > 2 && (
                         <div className="text-gray-400">+{sale.items.length - 2} more</div>

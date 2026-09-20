@@ -184,6 +184,14 @@ interface CreateProductData {
   variantAttributes?: Record<string, any>;
   isService?: boolean;
   isReload?: boolean;
+  // Unit of measure. Omitted, the product stays piece-priced.
+  sellBy?: 'UNIT' | 'WEIGHT' | 'VOLUME' | 'LENGTH';
+  unitOfMeasure?: 'PCS' | 'KG' | 'G' | 'L' | 'ML' | 'M' | 'CM';
+  /** Smallest sellable increment, e.g. 0.01 kg. */
+  qtyStep?: number;
+  minSaleQty?: number;
+  /** Decimal places to display: 3 for kg, 0 for pieces. */
+  qtyDecimals?: number;
 }
 
 interface UpdateProductData extends Partial<CreateProductData> {

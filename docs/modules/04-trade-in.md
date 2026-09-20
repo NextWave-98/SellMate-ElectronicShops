@@ -1,4 +1,4 @@
-# Trade-In — Full Guide
+# Trade-In   Full Guide
 
 **Industry:** `ELECTRONICS` only (or `GENERAL`)  
 **Permission:** `tradein.*`  
@@ -31,7 +31,7 @@ Electronics buyback / trade-in: configure price **rules** by device and conditio
 
 ## Setup
 
-1. Open **Rules** — define offers by brand, model, storage, condition (and any other rule fields your UI exposes).
+1. Open **Rules**   define offers by brand, model, storage, condition (and any other rule fields your UI exposes).
 2. Keep **Products / inventory** ready if accepted devices should be restocked as used/refurb SKUs.
 3. Ensure **Customers** exist for walk-in trade-ins.
 
@@ -43,7 +43,7 @@ Electronics buyback / trade-in: configure price **rules** by device and conditio
 2. Staff assess condition against a **rule** → system shows **offer value**.
 3. Create **trade-in** case (customer, device details, offer).
 4. Outcomes:
-   - **Accept** — credit toward new sale and/or cash payout; optionally book device into used stock.
+   - **Accept**   credit toward new sale and/or cash payout; optionally book device into used stock.
    - **Reject** / let offer expire.
 5. If credited on a sale, complete the POS / sales flow with the trade-in discount / payment line as your process defines.
 
@@ -56,14 +56,14 @@ Assess → Offer → Accept / Reject / Expire
 
 ## Connections
 
-- **Customers** — party on the trade-in.
-- **POS / Sales / Inventory** — credit on sale; used stock intake.
-- **CRM** — optional follow-up if offer is pending.
+- **Customers**   party on the trade-in.
+- **POS / Sales / Inventory**   credit on sale; used stock intake.
+- **CRM**   optional follow-up if offer is pending.
 - No dedicated public trade-in page (staff-led / in-store).
 
 ---
 
-## Full example — Gadget Hub (Pettah)
+## Full example   Gadget Hub (Pettah)
 
 **Rule:** iPhone 12, 128GB, condition **Good** → offer **LKR 85,000**.
 

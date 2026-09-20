@@ -40,6 +40,18 @@ import {
   Truck,
   Briefcase,
   Monitor,
+  Tv2,
+  LayoutGrid,
+  Columns2,
+  Keyboard,
+  Pause,
+  Split,
+  History,
+  Lock,
+  FileText,
+  ArrowLeftRight,
+  Pencil,
+  ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatCurrency } from "../../utils/currency";
@@ -53,8 +65,23 @@ import CashDrawerOpenOverlay from "../../components/branch/pos/CashDrawerOpenOve
 import CashDrawerBlocker from "../../components/branch/pos/CashDrawerBlocker";
 import POSSettingsBlocker from "../../components/branch/pos/POSSettingsBlocker";
 import { usePOSSettings } from "../../hooks/usePOSSettings";
-import { getPrinterConfig, resolveThermalPaperFormat } from "../../lib/printerConfig";
-import useCashDrawer from "../../hooks/useCashDrawer";
+import { getPrinterConfig, resolveThermalPaperFormat, createDefaultPrinterConfig } from "../../lib/printerConfig";
+import { usesStarNativePrint } from "../../lib/starPrint";
+import useCashDrawer, {
+  type CashDrawerRecord,
+  type DayBalanceSummary,
+} from "../../hooks/useCashDrawer";
+import usePosHeldCart, {
+  type PosHeldCartRecord,
+  type HeldCartSnapshot,
+} from "../../hooks/usePosHeldCart";
+import usePosQuotation, {
+  type PosQuotationRecord,
+} from "../../hooks/usePosQuotation";
+import usePosExpense, {
+  type PosDaySummary,
+  type PosExpenseRecord,
+} from "../../hooks/usePosExpense";
 import useCourier, { CourierMode } from "../../hooks/useCourier";
 import useBusinessProfile from "../../hooks/useBusinessProfile";
 import {
@@ -63,6 +90,24 @@ import {
   publishCustomerDisplay,
   type CustomerDisplayStatus,
 } from "../../lib/customerDisplaySync";
+import { openCustomerDisplayWindow } from "../../lib/customerDisplayWindow";
+import { renderPoleDisplay } from "../../lib/poleDisplay";
+import { usePoleDisplay } from "../../hooks/usePoleDisplay";
+import PoleDisplayModal from "../../components/branch/pos/PoleDisplayModal";
+import PosReturnDrawer from "../../components/branch/pos/PosReturnDrawer";
+import QuantityKeypadModal from "../../components/branch/pos/QuantityKeypadModal";
+import {
+  formatQty,
+  formatUnitPrice,
+  isWeighted,
+  minQtyOf,
+  roundQty,
+  snapQty,
+  stepOf,
+  type SellBy,
+  type UnitOfMeasure,
+} from "../../utils/qty";
+import PosExchangeDrawer from "../../components/branch/pos/PosExchangeDrawer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +118,7 @@ interface Product {
   price: number;
   originalPrice?: number;
   costPrice?: number;
+  wholesalePrice?: number;
   discountInfo?: {
     discountName: string;
     discountType: "PERCENTAGE" | "FIXED";
@@ -89,7 +135,16 @@ interface Product {
   productCode?: string;
   isService?: boolean;
   isReload?: boolean;
+  // Unit of measure. Absent / 'UNIT' means the product is counted in pieces,
+  // which is how everything behaved before weight pricing existed.
+  sellBy?: SellBy;
+  unitOfMeasure?: UnitOfMeasure;
+  qtyStep?: number;
+  minSaleQty?: number;
+  qtyDecimals?: number;
 }
+
+type LineDiscountType = "FIXED" | "PERCENTAGE";
 
 interface CartItem {
   id: string;
@@ -105,6 +160,115 @@ interface CartItem {
   isService?: boolean;
   isReload?: boolean;
   reloadPhone?: string;
+  sellBy?: SellBy;
+  unitOfMeasure?: UnitOfMeasure;
+  qtyStep?: number;
+  minSaleQty?: number;
+  qtyDecimals?: number;
+  lineDiscountType?: LineDiscountType;
+  lineDiscountValue?: number;
+  serialNumber?: string;
+  /**
+   * Whether this line should actually produce a warranty card.
+   *
+   * Undefined means yes   a product that carries warranty issues a card, which
+   * is the behaviour every existing line already had. Setting it false is the
+   * cashier saying "not on this one": no card, no serial demanded, and the
+   * line is sent with zero months so the backend issues nothing either.
+   * Some customers do not want it, some stock is sold as-is, and the sale
+   * should not be blocked over it.
+   */
+  issueWarranty?: boolean;
+}
+
+/**
+ * The warranty badge, for wherever a product or a cart line is shown.
+ *
+ * Drawn only for products that actually carry a warranty   a phone case shows
+ * nothing at all, exactly as before. The point is that the cashier can see, at
+ * the moment of selling, whether this line will produce a warranty card,
+ * rather than finding out afterwards from the printed bill.
+ */
+function WarrantyBadge({
+  months,
+  compact = false,
+}: {
+  months?: number;
+  compact?: boolean;
+}) {
+  const m = Number(months || 0);
+  if (!(m > 0)) return null;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold ${
+        compact ? "px-1 py-0 text-[9px]" : "px-1.5 py-0.5 text-[10px]"
+      }`}
+      title={`This item carries a ${m}-month warranty   a warranty card is issued when it sells`}
+    >
+      <ShieldCheck className={compact ? "w-2.5 h-2.5" : "w-3 h-3"} />
+      {m}m
+    </span>
+  );
+}
+
+function lineDiscountLkr(item: {
+  price: number;
+  quantity: number;
+  isReload?: boolean;
+  lineDiscountType?: LineDiscountType;
+  lineDiscountValue?: number;
+}): number {
+  if (item.isReload) return 0;
+  const gross = Number(item.price) * Number(item.quantity);
+  const value = Number(item.lineDiscountValue) || 0;
+  if (value <= 0 || gross <= 0) return 0;
+  if (item.lineDiscountType === "PERCENTAGE") {
+    return Math.min((gross * value) / 100, gross);
+  }
+  return Math.min(value, gross);
+}
+
+function cartLineTotal(item: {
+  price: number;
+  quantity: number;
+  isReload?: boolean;
+  lineDiscountType?: LineDiscountType;
+  lineDiscountValue?: number;
+}): number {
+  return Math.max(0, Number(item.price) * Number(item.quantity) - lineDiscountLkr(item));
+}
+
+function isWarrantyCartLine(item: {
+  warrantyMonths?: number;
+  isService?: boolean;
+  isReload?: boolean;
+}): boolean {
+  return (item.warrantyMonths || 0) > 0 && !item.isService && !item.isReload;
+}
+
+/**
+ * A line that CAN carry a warranty and has not been opted out of.
+ *
+ * isWarrantyCartLine answers "could this have a warranty"; this answers "will
+ * it". The serial number is demanded, and the card is issued, only for the
+ * second   opting out must not leave the sale stuck behind a field nobody
+ * needs to fill.
+ */
+function isWarrantyIssuingLine(item: {
+  warrantyMonths?: number;
+  isService?: boolean;
+  isReload?: boolean;
+  issueWarranty?: boolean;
+}): boolean {
+  return isWarrantyCartLine(item) && item.issueWarranty !== false;
+}
+
+function normalizeCustomerResult(raw: CustomerResult): CustomerResult {
+  const row = raw as CustomerResult & { loyalty_points?: number };
+  return {
+    ...raw,
+    loyaltyPoints: Number(row.loyaltyPoints ?? row.loyalty_points ?? 0),
+  };
 }
 
 interface InventoryItem {
@@ -114,6 +278,7 @@ interface InventoryItem {
     name: string;
     unitPrice: number;
     costPrice?: number;
+    wholesalePrice?: number;
     category?: { name: string };
     primaryImage?: string;
     model?: string;
@@ -143,6 +308,7 @@ interface CustomerResult {
   email?: string;
   address?: string;
   city?: string;
+  loyaltyPoints?: number;
 }
 
 interface LocationDetails {
@@ -155,6 +321,47 @@ interface LocationDetails {
 }
 
 type CheckoutStep = "cart" | "customer" | "payment" | "success";
+type QuickPosLayout = "classic" | "checkout";
+
+const QUICK_POS_LAYOUT_KEY = "gadgetchain_quick_pos_layout";
+
+function parseQuickPosLayout(value: string | null | undefined): QuickPosLayout | null {
+  return value === "checkout" || value === "classic" ? value : null;
+}
+
+function readQuickPosLayout(): QuickPosLayout {
+  try {
+    const fromLs = parseQuickPosLayout(localStorage.getItem(QUICK_POS_LAYOUT_KEY));
+    if (fromLs) return fromLs;
+  } catch {
+    // ignore private mode
+  }
+  try {
+    const match = document.cookie.match(
+      new RegExp(`(?:^|; )${QUICK_POS_LAYOUT_KEY}=([^;]*)`),
+    );
+    const fromCookie = parseQuickPosLayout(
+      match ? decodeURIComponent(match[1]) : null,
+    );
+    if (fromCookie) return fromCookie;
+  } catch {
+    // ignore cookie parse failures
+  }
+  return "classic";
+}
+
+function persistQuickPosLayout(next: QuickPosLayout) {
+  try {
+    localStorage.setItem(QUICK_POS_LAYOUT_KEY, next);
+  } catch {
+    // ignore private mode
+  }
+  try {
+    document.cookie = `${QUICK_POS_LAYOUT_KEY}=${next}; path=/; max-age=31536000; SameSite=Lax`;
+  } catch {
+    // ignore cookie write failures
+  }
+}
 type PaymentMethod =
   | "CASH"
   | "CARD"
@@ -163,6 +370,29 @@ type PaymentMethod =
   | "KOKO"
   | "MINTPAY"
   | "PAZY";
+
+type SplitPayMethod = "CASH" | "CARD" | "BANK_TRANSFER";
+
+interface SplitTenderRow {
+  id: string;
+  method: SplitPayMethod;
+  amount: string;
+}
+
+interface RecentPosSale {
+  id: string;
+  saleNumber: string;
+  totalAmount: number;
+  paymentMethod: string;
+  customerName?: string;
+  createdAt: string;
+}
+
+const SPLIT_PAY_OPTIONS: { val: SplitPayMethod; label: string }[] = [
+  { val: "CASH", label: "Cash" },
+  { val: "CARD", label: "Card" },
+  { val: "BANK_TRANSFER", label: "Bank" },
+];
 
 interface SaleResult {
   saleId: string;
@@ -178,6 +408,14 @@ const SCANNER_HID_THRESHOLD_MS = 45;
 const SCANNER_RESET_AFTER_MS = 400;
 const SCANNER_MIN_LENGTH = 4;
 const COURIER_TRACKING_MIN_LENGTH = 4;
+const POS_OPEN_CART_BACKUP_KEY = "gadgetchain_pos_open_cart";
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return target.isContentEditable;
+}
 
 const normalizeCourierTrackingScan = (raw: string): string => {
   return raw.replace(/[\r\n\t]/g, "").trim().toUpperCase();
@@ -249,10 +487,13 @@ const QuickPOSPage: React.FC = () => {
   const { getAllInventory } = useInventory();
   const {
     createSale,
+    updateSale,
     downloadInvoice,
     getSaleById,
+    getPosSaleById,
     printAcknowledgement,
     silentPrintInvoice,
+    getSales,
   } = useSales();
   const { searchCustomers, createCustomer } = useCustomer();
   const { getBranches, getLocationById } = useLocation();
@@ -270,7 +511,18 @@ const QuickPOSPage: React.FC = () => {
   } = usePOSSettings();
   const posSettings = getPOSSettings();
   const { businessData, loadBusinessProfile } = useBusinessProfile();
-  const { getActiveDrawer } = useCashDrawer();
+  const { getActiveDrawer, getDayBalance, closeDrawer } = useCashDrawer();
+  const { listHeldCarts, createHeldCart, getHeldCart, discardHeldCart } =
+    usePosHeldCart();
+  const {
+    listQuotations,
+    createQuotation,
+    getQuotation,
+    convertQuotation,
+    voidQuotation,
+  } = usePosQuotation();
+  const { listExpenses, createExpense, voidExpense, getDaySummary } =
+    usePosExpense();
 
   const isOrgAdmin = !user?.locationId && !user?.branchId;
 
@@ -289,6 +541,8 @@ const QuickPOSPage: React.FC = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [jumpPageInput, setJumpPageInput] = useState("1");
   const [reloadProviderId, setReloadProviderId] = useState<string | null>(null);
+  /** Product awaiting a weight / volume entry, or null when the keypad is closed. */
+  const [keypadProduct, setKeypadProduct] = useState<Product | null>(null);
   const [reloadPhone, setReloadPhone] = useState("");
   const [reloadAmount, setReloadAmount] = useState("");
 
@@ -301,7 +555,13 @@ const QuickPOSPage: React.FC = () => {
   const resolvePrinterConf = useCallback(() => {
     const locId =
       user?.locationId || user?.branchId || selectedLocationId || "";
-    return locId ? getPrinterConfig(locId) : null;
+    if (!locId) return null;
+    const saved = getPrinterConfig(locId);
+    if (saved) return saved;
+    if (usesStarNativePrint()) {
+      return createDefaultPrinterConfig();
+    }
+    return null;
   }, [user?.locationId, user?.branchId, selectedLocationId]);
 
   const resolveThermalFormat = useCallback(
@@ -318,6 +578,12 @@ const QuickPOSPage: React.FC = () => {
   const { scanProduct, scanning } = useBarcode();
   const scannerBufferRef = useRef("");
   const scannerLastTimeRef = useRef(0);
+  const productSearchInputRef = useRef<HTMLInputElement>(null);
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [showHeldCarts, setShowHeldCarts] = useState(false);
+  const [heldCarts, setHeldCarts] = useState<PosHeldCartRecord[]>([]);
+  const [holdingCart, setHoldingCart] = useState(false);
+  const cartBackupRestoredRef = useRef(false);
 
   // ── Cart
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -328,6 +594,17 @@ const QuickPOSPage: React.FC = () => {
 
   // ── Checkout wizard
   const [step, setStep] = useState<CheckoutStep>("cart");
+  const [posLayout, setPosLayout] = useState<QuickPosLayout>(readQuickPosLayout);
+  const isCheckoutLayout = posLayout === "checkout";
+
+  const changePosLayout = useCallback((next: QuickPosLayout) => {
+    setPosLayout(next);
+    persistQuickPosLayout(next);
+  }, []);
+
+  useEffect(() => {
+    persistQuickPosLayout(posLayout);
+  }, [posLayout]);
 
   // ── Customer step
   const [customerSearch, setCustomerSearch] = useState("");
@@ -360,6 +637,10 @@ const QuickPOSPage: React.FC = () => {
 
   // ── Payment step
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const paymentMethodRef = useRef<PaymentMethod>("CASH");
+  paymentMethodRef.current = paymentMethod;
+  const [splitRows, setSplitRows] = useState<SplitTenderRow[]>([]);
+  const splitRowIdRef = useRef(2);
   const [cashReceived, setCashReceived] = useState("");
   const [partialAmountInput, setPartialAmountInput] = useState("");
   const [isAdvancePayment, setIsAdvancePayment] = useState(false);
@@ -381,6 +662,38 @@ const QuickPOSPage: React.FC = () => {
   // ── Cash drawer gate
   const [drawerChecked, setDrawerChecked] = useState(false);
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
+  const [activeDrawerRecord, setActiveDrawerRecord] =
+    useState<CashDrawerRecord | null>(null);
+  const [dayBalance, setDayBalance] = useState<DayBalanceSummary | null>(null);
+  const [showRegister, setShowRegister] = useState(false);
+  const [showCloseRegister, setShowCloseRegister] = useState(false);
+  const [closingCash, setClosingCash] = useState("");
+  const [closingNotes, setClosingNotes] = useState("");
+  const [registerBusy, setRegisterBusy] = useState(false);
+  const [recentSales, setRecentSales] = useState<RecentPosSale[]>([]);
+  const [showRecentSales, setShowRecentSales] = useState(false);
+  const [reprintingSaleId, setReprintingSaleId] = useState<string | null>(null);
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
+  const [editingSaleNumber, setEditingSaleNumber] = useState<string | null>(
+    null,
+  );
+  const [loadingEditSaleId, setLoadingEditSaleId] = useState<string | null>(
+    null,
+  );
+  const [showPosReturn, setShowPosReturn] = useState(false);
+  const [showPosExchange, setShowPosExchange] = useState(false);
+  const [quotations, setQuotations] = useState<PosQuotationRecord[]>([]);
+  const [showQuotations, setShowQuotations] = useState(false);
+  const [savingQuote, setSavingQuote] = useState(false);
+  const [openQuoteId, setOpenQuoteId] = useState<string | null>(null);
+  const [loyaltyRedeemInput, setLoyaltyRedeemInput] = useState("");
+  const [daySummary, setDaySummary] = useState<PosDaySummary | null>(null);
+  const [posExpenses, setPosExpenses] = useState<PosExpenseRecord[]>([]);
+  const [pettyAmount, setPettyAmount] = useState("");
+  const [pettyCategory, setPettyCategory] = useState("OTHER");
+  const [pettyNote, setPettyNote] = useState("");
+  const [savingPetty, setSavingPetty] = useState(false);
+  const [useWholesalePrices, setUseWholesalePrices] = useState(false);
 
   // ── Success step
   const [saleResult, setSaleResult] = useState<SaleResult | null>(null);
@@ -418,7 +731,7 @@ const QuickPOSPage: React.FC = () => {
 
   useEffect(() => {
     if (isOrgAdmin) {
-      // Org admin not tied to a specific location — skip the gate
+      // Org admin not tied to a specific location   skip the gate
       setDrawerChecked(true);
       setDrawerIsOpen(true);
       return;
@@ -427,7 +740,8 @@ const QuickPOSPage: React.FC = () => {
     if (!locationId) return;
     getActiveDrawer(locationId)
       .then((res: any) => {
-        const drawer = res?.data ?? null;
+        const drawer = (res?.data as CashDrawerRecord | null) ?? null;
+        setActiveDrawerRecord(drawer);
         setDrawerIsOpen(!!drawer);
       })
       .catch(() => {
@@ -519,6 +833,7 @@ const QuickPOSPage: React.FC = () => {
   const staffDiscountHidden = businessData?.posStaffDiscountHidden ?? false;
   const customerDisplayEnabled =
     businessData?.posCustomerDisplayEnabled ?? false;
+  const poleDisplay = usePoleDisplay();
   const orgDefaultDiscountType =
     businessData?.posDefaultDiscountType ?? ("FIXED" as const);
   const orgDefaultDiscountValue = Number(businessData?.posDefaultDiscountValue ?? 0);
@@ -536,6 +851,16 @@ const QuickPOSPage: React.FC = () => {
   const mapInventoryItemToProduct = useCallback((i: InventoryItem): Product => {
     const unitPrice = Number(i.product?.unitPrice) || 0;
     const discountInfo = i.product?.discountInfo ?? null;
+    // Unit-of-measure columns are newer than the inventory hook's row type.
+    const uom = i.product as
+      | {
+          sellBy?: string;
+          unitOfMeasure?: string;
+          qtyStep?: number;
+          minSaleQty?: number;
+          qtyDecimals?: number;
+        }
+      | undefined;
     const effectivePrice = discountInfo
       ? discountInfo.effectivePrice
       : unitPrice;
@@ -546,6 +871,7 @@ const QuickPOSPage: React.FC = () => {
       price: effectivePrice,
       originalPrice: discountInfo ? unitPrice : undefined,
       costPrice: Number(i.product?.costPrice) || 0,
+      wholesalePrice: Number(i.product?.wholesalePrice) || 0,
       discountInfo,
       stock: i.availableQuantity || 0,
       category: i.product?.category?.name?.toLowerCase() ?? "other",
@@ -556,6 +882,11 @@ const QuickPOSPage: React.FC = () => {
       productCode: i.product?.productCode,
       isService: i.product?.isService ?? false,
       isReload: i.product?.isReload ?? false,
+      sellBy: (uom?.sellBy ?? "UNIT") as SellBy,
+      unitOfMeasure: (uom?.unitOfMeasure ?? "PCS") as UnitOfMeasure,
+      qtyStep: Number(uom?.qtyStep ?? 1),
+      minSaleQty: Number(uom?.minSaleQty ?? 1),
+      qtyDecimals: Number(uom?.qtyDecimals ?? 0),
     };
   }, []);
 
@@ -649,14 +980,22 @@ const QuickPOSPage: React.FC = () => {
       : typeFilteredProducts.filter((p) => p.category === selectedCategory);
   const totalPages = Math.max(1, Math.ceil((totalProducts || 0) / pageSize));
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const discountVal = (() => {
+  const grossSubtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const lineDiscountTotal = cart.reduce((s, i) => s + lineDiscountLkr(i), 0);
+  const subtotal = Math.max(0, grossSubtotal - lineDiscountTotal);
+  const billDiscount = (() => {
     const d = parseFloat(discountAmount) || 0;
     if (d <= 0) return 0;
     if (discountType === "PERCENTAGE")
       return Math.min((subtotal * d) / 100, subtotal);
     return Math.min(d, subtotal);
   })();
+  const loyaltyAvailable = Number(selectedCustomer?.loyaltyPoints) || 0;
+  const loyaltyRedeem = Math.min(
+    loyaltyAvailable,
+    Math.max(0, Math.floor(parseFloat(loyaltyRedeemInput) || 0)),
+  );
+  const discountVal = Math.min(subtotal, billDiscount + loyaltyRedeem);
   const productTotal = subtotal - discountVal;
   const courierPieces = cart.reduce((sum, item) => sum + item.quantity, 0);
   const courierChargesTotal =
@@ -666,6 +1005,8 @@ const QuickPOSPage: React.FC = () => {
   const total = courierEnabled
     ? productTotal + courierChargesTotal
     : productTotal;
+  const posLocationId =
+    user?.locationId || user?.branchId || selectedLocationId;
   const change =
     paymentMethod === "CASH" && !isAdvancePayment
       ? Math.max(0, (parseFloat(cashReceived) || 0) - total)
@@ -682,6 +1023,41 @@ const QuickPOSPage: React.FC = () => {
   );
 
   const syncCustomerDisplay = useCallback(() => {
+    const displayItems = cart.map((item) => ({
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      lineTotal: cartLineTotal(item),
+    }));
+
+    const lastItem = (() => {
+      const lastId = lastDisplayItemIdRef.current;
+      const match = lastId
+        ? cart.find((item) => item.id === lastId)
+        : undefined;
+      const item = match ?? cart[cart.length - 1];
+      if (!item) return null;
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        lineTotal: cartLineTotal(item),
+      };
+    })();
+
+    // Counter-top serial pole display runs independently of the second-screen
+    // window   it only needs the cable connected.
+    renderPoleDisplay({
+      items: displayItems,
+      lastItem,
+      total,
+      status: mapStepToDisplayStatus(step),
+      businessName: businessData?.name,
+      change: change > 0 ? change : undefined,
+    });
+
     const sessionId = customerDisplaySessionRef.current;
     if (!sessionId || !customerDisplayEnabled) return;
 
@@ -696,28 +1072,8 @@ const QuickPOSPage: React.FC = () => {
     publishCustomerDisplay({
       sessionId,
       businessName: businessData?.name,
-      items: cart.map((item) => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        lineTotal: item.price * item.quantity,
-      })),
-      lastItem: (() => {
-        const lastId = lastDisplayItemIdRef.current;
-        const match = lastId
-          ? cart.find((item) => item.id === lastId)
-          : undefined;
-        const item = match ?? cart[cart.length - 1];
-        if (!item) return null;
-        return {
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          lineTotal: item.price * item.quantity,
-        };
-      })(),
+      items: displayItems,
+      lastItem,
       itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
       subtotal,
       discount: discountVal,
@@ -728,6 +1084,7 @@ const QuickPOSPage: React.FC = () => {
   }, [
     businessData?.name,
     cart,
+    change,
     customerDisplayEnabled,
     discountVal,
     mapStepToDisplayStatus,
@@ -738,7 +1095,9 @@ const QuickPOSPage: React.FC = () => {
 
   useEffect(() => {
     syncCustomerDisplay();
-  }, [syncCustomerDisplay]);
+    // poleDisplay.connected re-pushes the current cart the moment the
+    // pole display cable comes online, instead of waiting for the next scan.
+  }, [syncCustomerDisplay, poleDisplay.connected]);
 
   const openCustomerDisplay = useCallback(() => {
     if (!customerDisplayEnabled) return;
@@ -752,23 +1111,22 @@ const QuickPOSPage: React.FC = () => {
 
     const sessionId = createCustomerDisplaySessionId();
     customerDisplaySessionRef.current = sessionId;
-    const popup = window.open(
-      `/pos/customer-display?session=${encodeURIComponent(sessionId)}`,
-      "pos_customer_display",
-      "width=1024,height=768",
-    );
-    if (!popup) {
-      customerDisplaySessionRef.current = null;
-      toast.error("Pop-up blocked. Allow pop-ups to open the customer display.");
-      return;
-    }
-    customerDisplayWindowRef.current = popup;
-    setCustomerDisplayActive(true);
-    syncCustomerDisplay();
-    // Re-broadcast after the new window has time to subscribe.
-    window.setTimeout(() => {
+    void syncCustomerDisplay();
+    void (async () => {
+      const popup = await openCustomerDisplayWindow(sessionId);
+      if (!popup) {
+        customerDisplaySessionRef.current = null;
+        toast.error("Pop-up blocked. Allow pop-ups to open the customer display.");
+        return;
+      }
+      customerDisplayWindowRef.current = popup;
+      setCustomerDisplayActive(true);
       syncCustomerDisplay();
-    }, 300);
+      // Re-broadcast after the new window has time to subscribe.
+      window.setTimeout(() => {
+        syncCustomerDisplay();
+      }, 300);
+    })();
   }, [customerDisplayEnabled, syncCustomerDisplay]);
 
   useEffect(() => {
@@ -806,6 +1164,399 @@ const QuickPOSPage: React.FC = () => {
     paymentMethod !== "CASH" && partialAmountInput
       ? Math.max(0, paidAmount - total)
       : 0;
+  const canSplitPay =
+    !courierEnabled &&
+    !isAdvancePayment &&
+    !["KOKO", "MINTPAY", "PAZY", "COD"].includes(paymentMethod);
+  const isSplitTender = canSplitPay && splitRows.length >= 2;
+  const splitAllocated = splitRows.reduce(
+    (sum, row) => sum + (parseFloat(row.amount) || 0),
+    0,
+  );
+  const splitRemainder = Math.round((total - splitAllocated) * 100) / 100;
+  const splitOk =
+    isSplitTender &&
+    splitRows.filter((row) => (parseFloat(row.amount) || 0) > 0.001).length >=
+      2 &&
+    Math.abs(splitRemainder) < 0.05;
+
+  const loadRecentSales = useCallback(async () => {
+    if (!posLocationId) {
+      setRecentSales([]);
+      return;
+    }
+    try {
+      const response = await getSales({
+        locationId: posLocationId,
+        status: "COMPLETED",
+        page: 1,
+        limit: 20,
+      });
+      const payload = (response as any)?.data;
+      const rows = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      setRecentSales(
+        rows.map((sale: any) => ({
+          id: sale.id,
+          saleNumber: sale.saleNumber || sale.sale_number || sale.id,
+          totalAmount: Number(sale.totalAmount ?? sale.total_amount ?? 0),
+          paymentMethod: String(sale.paymentMethod || sale.payment_method || ""),
+          customerName: sale.customerName || sale.customer_name || undefined,
+          createdAt: sale.createdAt || sale.created_at || "",
+        })),
+      );
+    } catch {
+      setRecentSales([]);
+    }
+  }, [getSales, posLocationId]);
+
+  const openRegister = useCallback(async () => {
+    const locationId = posLocationId;
+    if (!locationId) {
+      toast.error("Select a branch/location to view the register");
+      return;
+    }
+    setShowRegister(true);
+    setRegisterBusy(true);
+    try {
+      const [drawerRes, balanceRes, profitRes, expenseRes] = await Promise.all([
+        getActiveDrawer(locationId),
+        getDayBalance(locationId),
+        getDaySummary(locationId),
+        listExpenses(locationId),
+      ]);
+      const drawer = ((drawerRes as any)?.data as CashDrawerRecord | null) ?? null;
+      setActiveDrawerRecord(drawer);
+      if (!isOrgAdmin) setDrawerIsOpen(!!drawer);
+      setDayBalance(((balanceRes as any)?.data as DayBalanceSummary | null) ?? null);
+      setDaySummary(((profitRes as any)?.data as PosDaySummary | null) ?? null);
+      const expenseRows = (expenseRes as any)?.data;
+      setPosExpenses(Array.isArray(expenseRows) ? expenseRows : []);
+    } catch {
+      toast.error("Could not load register");
+    } finally {
+      setRegisterBusy(false);
+    }
+  }, [getActiveDrawer, getDayBalance, getDaySummary, listExpenses, isOrgAdmin, posLocationId]);
+
+  const submitPettyExpense = async () => {
+    if (!posLocationId) {
+      toast.error("Select a branch/location first");
+      return;
+    }
+    const amount = Number(pettyAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a petty cash amount");
+      return;
+    }
+    setSavingPetty(true);
+    try {
+      const res = await createExpense({
+        locationId: posLocationId,
+        amount,
+        category: pettyCategory,
+        note: pettyNote.trim() || undefined,
+      });
+      if (!res?.success && !res?.data) {
+        throw new Error(res?.message || "Failed to record expense");
+      }
+      toast.success("Petty cash recorded");
+      setPettyAmount("");
+      setPettyNote("");
+      await openRegister();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not record expense");
+    } finally {
+      setSavingPetty(false);
+    }
+  };
+
+  const submitCloseRegister = useCallback(async () => {
+    if (!activeDrawerRecord?.id) {
+      toast.error("No open register for this location");
+      return;
+    }
+    const counted = parseFloat(closingCash);
+    if (Number.isNaN(counted) || counted < 0) {
+      toast.error("Enter counted cash");
+      return;
+    }
+    setRegisterBusy(true);
+    try {
+      await closeDrawer(
+        activeDrawerRecord.id,
+        counted,
+        closingNotes.trim() || undefined,
+      );
+      toast.success("Register closed");
+      setShowCloseRegister(false);
+      setShowRegister(false);
+      setClosingCash("");
+      setClosingNotes("");
+      setActiveDrawerRecord(null);
+      if (!isOrgAdmin) setDrawerIsOpen(false);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Could not close register";
+      toast.error(message);
+    } finally {
+      setRegisterBusy(false);
+    }
+  }, [activeDrawerRecord, closeDrawer, closingCash, closingNotes, isOrgAdmin]);
+
+  const reprintRecentSale = useCallback(
+    async (sale: RecentPosSale) => {
+      setReprintingSaleId(sale.id);
+      try {
+        await silentPrintInvoice(sale.id, {
+          format: resolveThermalFormat(),
+          printerConf: resolvePrinterConf(),
+        });
+        toast.success(`Reprinted ${sale.saleNumber}`);
+      } catch {
+        toast.error("Failed to reprint. Check printer connection.");
+      } finally {
+        setReprintingSaleId(null);
+      }
+    },
+    [resolvePrinterConf, resolveThermalFormat, silentPrintInvoice],
+  );
+
+  const startEditRecentSale = useCallback(
+    async (sale: RecentPosSale) => {
+      if (cart.length > 0 && !editingSaleId) {
+        const ok = window.confirm(
+          "Current cart will be replaced with this sale. Continue?",
+        );
+        if (!ok) return;
+      }
+      setLoadingEditSaleId(sale.id);
+      try {
+        const res = await getPosSaleById(sale.id);
+        const data = (res as any)?.data?.data ?? (res as any)?.data ?? res;
+        if (!data?.id) throw new Error("Sale not found");
+
+        if (data.shipment?.id || data.courierShipmentId) {
+          throw new Error(
+            "Courier sales cannot be edited from Recent. Update the shipment instead.",
+          );
+        }
+        const refunds = data.saleRefunds || data.refunds || [];
+        if (Array.isArray(refunds) && refunds.length > 0) {
+          throw new Error("This sale has refunds and cannot be edited.");
+        }
+        const status = String(data.status || "").toUpperCase();
+        if (
+          status === "CANCELLED" ||
+          status === "REFUNDED" ||
+          status === "PARTIAL_REFUND"
+        ) {
+          throw new Error(`Cannot edit a ${status.toLowerCase()} sale.`);
+        }
+
+        const lines: CartItem[] = (
+          data.saleItems ||
+          data.items ||
+          []
+        ).map((item: any, idx: number) => {
+          const product = item.product || {};
+          const productId = item.productId || product.id;
+          const catalog = products.find((p) => p.productId === productId);
+          const qty = Number(item.quantity) || 1;
+          const unitPrice = Number(item.unitPrice ?? item.unit_price ?? 0);
+          const lineDiscount = Number(
+            item.discountAmount ?? item.discount_amount ?? item.discount ?? 0,
+          );
+          const isReload =
+            catalog?.isReload === true ||
+            product.isReload === true ||
+            Boolean(item.reloadPhone);
+          const isService =
+            catalog?.isService === true || product.isService === true;
+          const liveStock = Number(catalog?.stock ?? 0);
+          // Stock on shelf already excludes this sale's qty   add it back for edit.
+          const editableStock = liveStock + qty;
+          const serialized =
+            Number(item.warrantyMonths || catalog?.warrantyMonths || 0) > 0 &&
+            !isService &&
+            !isReload;
+          return {
+            id: serialized
+              ? `edit-${item.id || idx}-${Date.now()}`
+              : catalog?.id || productId,
+            productId,
+            name: item.productName || product.name || catalog?.name || "Item",
+            price: unitPrice,
+            costPrice: Number(
+              item.costPrice ?? product.costPrice ?? catalog?.costPrice ?? 0,
+            ),
+            quantity: qty,
+            stock: editableStock,
+            category:
+              product.category?.name || catalog?.category || "General",
+            warrantyMonths: Number(
+              item.warrantyMonths || catalog?.warrantyMonths || 0,
+            ),
+            isService,
+            isReload,
+            reloadPhone: item.reloadPhone || undefined,
+            serialNumber: item.serialNumber || undefined,
+            ...(lineDiscount > 0
+              ? {
+                  lineDiscountType: "FIXED" as const,
+                  lineDiscountValue: lineDiscount,
+                }
+              : {}),
+          };
+        });
+
+        if (lines.length === 0) {
+          throw new Error("Sale has no line items to edit.");
+        }
+
+        clearCart();
+        setCart(lines);
+        lastDisplayItemIdRef.current = lines[lines.length - 1]?.id ?? null;
+
+        const cust = data.customer;
+        if (cust?.id) {
+          setSelectedCustomer({
+            id: cust.id,
+            name: cust.name || data.customerName || "",
+            phone: cust.phone || data.customerPhone || "",
+            email: cust.email || data.customerEmail || "",
+          } as any);
+          setCustomerSearch(cust.name || data.customerName || "");
+        } else {
+          setSelectedCustomer(null);
+          setCustomerSearch("");
+        }
+        setCustomerName(data.customerName || cust?.name || "");
+        setCustomerPhone(data.customerPhone || cust?.phone || "");
+        setCustomerEmail(data.customerEmail || cust?.email || "");
+
+        const headerDiscount = Number(
+          data.discountAmount ?? data.discount ?? 0,
+        );
+        if (headerDiscount > 0) {
+          setDiscountAmount(String(headerDiscount));
+          setDiscountType("FIXED");
+        }
+
+        const payments = data.salePayments || data.payments || [];
+        if (Array.isArray(payments) && payments.length >= 2) {
+          setSplitRows(
+            payments.map((p: any, i: number) => ({
+              id: `edit-pay-${i}`,
+              method: (String(p.paymentMethod || p.method || "CASH").toUpperCase() ===
+              "BANK_TRANSFER"
+                ? "BANK_TRANSFER"
+                : String(p.paymentMethod || p.method || "CASH").toUpperCase() ===
+                    "CARD"
+                  ? "CARD"
+                  : "CASH") as SplitPayMethod,
+              amount: String(Number(p.amount) || 0),
+            })),
+          );
+        } else if (Array.isArray(payments) && payments.length === 1) {
+          const pm = String(
+            payments[0].paymentMethod || payments[0].method || data.paymentMethod || "CASH",
+          ).toUpperCase();
+          const method = (
+            ["CARD", "BANK_TRANSFER", "KOKO", "MINTPAY", "PAYZY", "PAZY", "COD"].includes(pm)
+              ? pm === "PAYZY"
+                ? "PAZY"
+                : pm
+              : "CASH"
+          ) as PaymentMethod;
+          setPaymentMethod(method);
+          paymentMethodRef.current = method;
+          if (method === "CASH") {
+            setCashReceived(String(Number(payments[0].amount) || 0));
+          }
+        } else if (data.paymentMethod) {
+          const pm = String(data.paymentMethod).toUpperCase();
+          const method = (
+            ["CARD", "BANK_TRANSFER", "KOKO", "MINTPAY", "PAYZY", "PAZY"].includes(pm)
+              ? pm === "PAYZY"
+                ? "PAZY"
+                : pm
+              : "CASH"
+          ) as PaymentMethod;
+          setPaymentMethod(method);
+          paymentMethodRef.current = method;
+        }
+
+        setEditingSaleId(data.id);
+        setEditingSaleNumber(
+          data.saleNumber || data.sale_number || sale.saleNumber,
+        );
+        setCourierEnabled(false);
+        setShowRecentSales(false);
+        setStep("cart");
+        toast.success(
+          `Editing ${data.saleNumber || sale.saleNumber}   update cart then save`,
+        );
+      } catch (err: unknown) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not load sale for edit",
+        );
+      } finally {
+        setLoadingEditSaleId(null);
+      }
+    },
+    // clearCart is stable enough in this component; include deps used above
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cart.length, editingSaleId, getPosSaleById, products],
+  );
+
+  const enableSplitTender = () => {
+    const first: SplitPayMethod =
+      paymentMethod === "CARD" || paymentMethod === "BANK_TRANSFER"
+        ? paymentMethod
+        : "CASH";
+    const second: SplitPayMethod = first === "CASH" ? "CARD" : "CASH";
+    splitRowIdRef.current = 2;
+    setSplitRows([
+      { id: "1", method: first, amount: total > 0 ? total.toFixed(2) : "" },
+      { id: "2", method: second, amount: "" },
+    ]);
+    setPartialAmountInput("");
+  };
+
+  const updateSplitRow = (
+    id: string,
+    patch: Partial<Pick<SplitTenderRow, "method" | "amount">>,
+  ) => {
+    setSplitRows((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+    );
+  };
+
+  const addSplitRow = () => {
+    splitRowIdRef.current += 1;
+    const used = new Set(splitRows.map((row) => row.method));
+    const nextMethod =
+      SPLIT_PAY_OPTIONS.find((opt) => !used.has(opt.val))?.val || "CASH";
+    setSplitRows((prev) => [
+      ...prev,
+      {
+        id: String(splitRowIdRef.current),
+        method: nextMethod,
+        amount: splitRemainder > 0 ? splitRemainder.toFixed(2) : "",
+      },
+    ]);
+  };
+
+  const removeSplitRow = (id: string) => {
+    setSplitRows((prev) => {
+      const next = prev.filter((row) => row.id !== id);
+      return next.length < 2 ? [] : next;
+    });
+  };
 
   // ─── Barcode scan handler ───────────────────────────────────────────────────
 
@@ -918,7 +1669,7 @@ const QuickPOSPage: React.FC = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (showScanner || showBarcodeSelect || showCourierTrackingScanner)
+      if (showScanner || showBarcodeSelect || showCourierTrackingScanner || showPosReturn)
         return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
@@ -962,10 +1713,34 @@ const QuickPOSPage: React.FC = () => {
 
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [showScanner, showBarcodeSelect, showCourierTrackingScanner]);
+  }, [showScanner, showBarcodeSelect, showCourierTrackingScanner, showPosReturn]);
 
   // ─── Cart actions ───────────────────────────────────────────────────────────
 
+  const wholesaleUnitPrice = (product: Product, wholesale: boolean) =>
+    wholesale && Number(product.wholesalePrice) > 0
+      ? Number(product.wholesalePrice)
+      : product.price;
+
+  const applyWholesaleMode = (next: boolean) => {
+    setUseWholesalePrices(next);
+    setCart((prev) =>
+      prev.map((item) => {
+        const product = products.find((p) => p.productId === item.productId);
+        if (!product) return item;
+        return { ...item, price: wholesaleUnitPrice(product, next) };
+      }),
+    );
+    toast.success(next ? "Wholesale prices on" : "Retail prices on");
+  };
+
+  /**
+   * Add a product to the cart.
+   *
+   * Products sold by weight, volume or length cannot just get "1" added: one
+   * kilo of rice is rarely what was asked for. Those open the quantity keypad
+   * first, and land here through addWeighedToCart once an amount is entered.
+   */
   const addToCart = (product: Product) => {
     if (product.isReload) {
       setSelectedItemType("reload");
@@ -976,9 +1751,26 @@ const QuickPOSPage: React.FC = () => {
       toast.error(`${product.name} is out of stock`);
       return;
     }
+    if (isWeighted(product)) {
+      setKeypadProduct(product);
+      return;
+    }
     lastDisplayItemIdRef.current = product.id;
+    const sellPrice = wholesaleUnitPrice(product, useWholesalePrices);
     setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id);
+      const serialized = isWarrantyCartLine(product);
+      if (serialized) {
+        const sameQty = prev
+          .filter((i) => i.productId === product.productId)
+          .reduce((sum, i) => sum + i.quantity, 0);
+        if (!product.isService && sameQty >= product.stock) {
+          toast.error(`Only ${product.stock} units available`);
+          return prev;
+        }
+      }
+      const existing = serialized
+        ? undefined
+        : prev.find((i) => i.id === product.id);
       if (existing) {
         if (!product.isService && existing.quantity >= product.stock) {
           toast.error(`Only ${product.stock} units available`);
@@ -989,13 +1781,14 @@ const QuickPOSPage: React.FC = () => {
         );
       }
       toast.success(`${product.name} added`, { duration: 1500 });
+      const lineId = serialized ? `${product.id}:${Date.now()}` : product.id;
       return [
         ...prev,
         {
-          id: product.id,
+          id: lineId,
           productId: product.productId,
           name: product.name,
-          price: product.price,
+          price: sellPrice,
           costPrice: product.costPrice || 0,
           quantity: 1,
           stock: product.stock,
@@ -1004,9 +1797,79 @@ const QuickPOSPage: React.FC = () => {
           warrantyMonths: product.warrantyMonths || 0,
           isService: product.isService ?? false,
           isReload: false,
+          sellBy: product.sellBy,
+          unitOfMeasure: product.unitOfMeasure,
+          qtyStep: product.qtyStep,
+          minSaleQty: product.minSaleQty,
+          qtyDecimals: product.qtyDecimals,
+          lineDiscountType: "FIXED",
+          lineDiscountValue: 0,
+          serialNumber: "",
         },
       ];
     });
+  };
+
+  /**
+   * Commit a quantity chosen on the keypad.
+   *
+   * Adds to any existing line for the same product rather than creating a second
+   * one   weighing the same item twice at the counter is normal, and two lines
+   * for 250 g and 250 g reads worse on the bill than one for 500 g.
+   */
+  const addWeighedToCart = (product: Product, quantity: number) => {
+    const qty = snapQty(quantity, product);
+    if (qty <= 0) return;
+
+    lastDisplayItemIdRef.current = product.id;
+    const sellPrice = wholesaleUnitPrice(product, useWholesalePrices);
+
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === product.id);
+      const alreadyInCart = existing ? Number(existing.quantity) : 0;
+      const total = roundQty(alreadyInCart + qty);
+
+      if (!product.isService && total > Number(product.stock || 0)) {
+        toast.error(
+          `Only ${formatQty(Number(product.stock || 0), product)} available`,
+        );
+        return prev;
+      }
+
+      if (existing) {
+        return prev.map((i) => (i.id === product.id ? { ...i, quantity: total } : i));
+      }
+
+      toast.success(`${formatQty(qty, product)} ${product.name} added`, {
+        duration: 1500,
+      });
+      return [
+        ...prev,
+        {
+          id: product.id,
+          productId: product.productId,
+          name: product.name,
+          price: sellPrice,
+          costPrice: product.costPrice || 0,
+          quantity: qty,
+          stock: product.stock,
+          category: product.category,
+          image: product.image,
+          warrantyMonths: product.warrantyMonths || 0,
+          isService: product.isService ?? false,
+          isReload: false,
+          sellBy: product.sellBy,
+          unitOfMeasure: product.unitOfMeasure,
+          qtyStep: product.qtyStep,
+          minSaleQty: product.minSaleQty,
+          qtyDecimals: product.qtyDecimals,
+          lineDiscountType: "FIXED",
+          lineDiscountValue: 0,
+          serialNumber: "",
+        },
+      ];
+    });
+    setKeypadProduct(null);
   };
 
   const addReloadToCart = () => {
@@ -1068,6 +1931,8 @@ const QuickPOSPage: React.FC = () => {
           warrantyMonths: 0,
           isService: false,
           isReload: true,
+          lineDiscountType: "FIXED",
+          lineDiscountValue: 0,
           ...(phone ? { reloadPhone: phone } : {}),
         },
       ];
@@ -1081,12 +1946,72 @@ const QuickPOSPage: React.FC = () => {
     setReloadAmount("");
   };
 
+  /**
+   * Turn this line's warranty on or off.
+   *
+   * Clearing the serial when warranty is switched off keeps the two honest:
+   * a serial captured for a card that will not exist is just a stale value
+   * waiting to be sent somewhere it does not belong.
+   */
+  const setLineWarranty = (id: string, issue: boolean) => {
+    lastDisplayItemIdRef.current = id;
+    setCart((prev) =>
+      prev.map((i) =>
+        i.id === id
+          ? {
+              ...i,
+              issueWarranty: issue,
+              ...(issue ? {} : { serialNumber: "" }),
+            }
+          : i,
+      ),
+    );
+  };
+
+  const updateSerialNumber = (id: string, value: string) => {
+    lastDisplayItemIdRef.current = id;
+    setCart((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, serialNumber: value.slice(0, 64) } : i,
+      ),
+    );
+  };
+
   const updateQty = (id: string, qty: number) => {
+    const line = cart.find((i) => i.id === id);
+
+    // Weighted lines step by the product's own increment (10 g, 100 ml) and drop
+    // out of the cart below their minimum rather than at zero, so tapping "-" on
+    // a 100 g minimum item removes it instead of leaving an unsellable 50 g.
+    if (line && isWeighted(line)) {
+      const snapped = roundQty(qty);
+      if (snapped < minQtyOf(line)) {
+        setCart((prev) => prev.filter((i) => i.id !== id));
+        return;
+      }
+      const product = products.find((pr) => pr.id === id);
+      const maxStock = editingSaleId
+        ? Number(line.stock ?? product?.stock ?? 0)
+        : Number(product?.stock ?? line.stock ?? 0);
+      if (!line.isService && maxStock > 0 && snapped > maxStock) {
+        toast.error(`Only ${formatQty(maxStock, line)} available`);
+        return;
+      }
+      lastDisplayItemIdRef.current = id;
+      setCart((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, quantity: snapped } : i)),
+      );
+      return;
+    }
+
     if (qty <= 0) {
       setCart((prev) => prev.filter((i) => i.id !== id));
       return;
     }
     const cartItem = cart.find((i) => i.id === id);
+    if (cartItem && isWarrantyCartLine(cartItem)) {
+      return;
+    }
     if (cartItem?.isReload) {
       const product = products.find((p) => p.productId === cartItem.productId && p.isReload);
       const balance = product?.stock ?? cartItem.stock;
@@ -1110,8 +2035,16 @@ const QuickPOSPage: React.FC = () => {
       return;
     }
     const product = products.find((p) => p.id === id);
-    if (product && !cartItem?.isService && qty > product.stock) {
-      toast.error(`Only ${product.stock} units available`);
+    const maxStock = editingSaleId
+      ? Number(cartItem?.stock ?? product?.stock ?? 0)
+      : Number(product?.stock ?? 0);
+    if (
+      (product || editingSaleId) &&
+      !cartItem?.isService &&
+      maxStock > 0 &&
+      qty > maxStock
+    ) {
+      toast.error(`Only ${maxStock} units available`);
       return;
     }
     lastDisplayItemIdRef.current = id;
@@ -1126,6 +2059,23 @@ const QuickPOSPage: React.FC = () => {
     setCart((prev) =>
       prev.map((i) =>
         i.id === id && i.isService ? { ...i, price: value } : i,
+      ),
+    );
+  };
+
+  const updateLineDiscount = (
+    id: string,
+    type: LineDiscountType,
+    rawValue: string,
+  ) => {
+    const parsed = rawValue === "" ? 0 : parseFloat(rawValue);
+    const value = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    lastDisplayItemIdRef.current = id;
+    setCart((prev) =>
+      prev.map((i) =>
+        i.id === id && !i.isReload
+          ? { ...i, lineDiscountType: type, lineDiscountValue: value }
+          : i,
       ),
     );
   };
@@ -1167,6 +2117,11 @@ const QuickPOSPage: React.FC = () => {
     setNotes("");
     setSaleJob({ isJob: false, jobType: "PHOTO_FRAME", title: "" });
     setSaleResult(null);
+    setSplitRows([]);
+    setLoyaltyRedeemInput("");
+    setOpenQuoteId(null);
+    setEditingSaleId(null);
+    setEditingSaleNumber(null);
   };
 
   // ─── Customer search ────────────────────────────────────────────────────────
@@ -1188,7 +2143,7 @@ const QuickPOSPage: React.FC = () => {
         if (Array.isArray(data)) list = data;
         else if (Array.isArray(data?.customers)) list = data.customers;
         else if (Array.isArray(data?.data)) list = data.data;
-        setCustomerResults(list);
+        setCustomerResults(list.map(normalizeCustomerResult));
       } catch {
         setCustomerResults([]);
       } finally {
@@ -1389,6 +2344,9 @@ const QuickPOSPage: React.FC = () => {
   // ─── Process sale ───────────────────────────────────────────────────────────
 
   const handleProcessSale = async () => {
+    // Read from ref so express Cash/Card can set the method synchronously
+    // before this runs, without waiting for a React state flush.
+    const paymentMethod = paymentMethodRef.current;
     const locationId = user?.locationId || user?.branchId || selectedLocationId;
     if (!locationId || !user?.id) {
       if (isOrgAdmin && !selectedLocationId) {
@@ -1404,14 +2362,52 @@ const QuickPOSPage: React.FC = () => {
       toast.error("Cart is empty");
       return;
     }
+    const missingImei = cart.find(
+      (item) => isWarrantyIssuingLine(item) && !String(item.serialNumber || "").trim(),
+    );
+    if (missingImei) {
+      toast.error(`Enter IMEI / serial for ${missingImei.name}`);
+      return;
+    }
     if (!validateCourierDetails()) return;
+
+    if (editingSaleId && courierEnabled) {
+      toast.error("Disable courier delivery while editing a sale");
+      return;
+    }
 
     if (paymentMethod === "COD" && !courierEnabled) {
       toast.error("COD is only available for courier delivery");
       return;
     }
 
-    if (paymentMethod === "CASH" && !isAdvancePayment) {
+    const useSplit = splitRows.length >= 2 && canSplitPay;
+    if (useSplit) {
+      const splitPayments = splitRows
+        .map((row) => ({
+          method: row.method,
+          amount: parseFloat(row.amount) || 0,
+        }))
+        .filter((row) => row.amount > 0.001);
+      if (splitPayments.length < 2) {
+        toast.error("Add at least two payment amounts to split");
+        return;
+      }
+      const splitSum = splitPayments.reduce((sum, row) => sum + row.amount, 0);
+      if (Math.abs(splitSum - total) > 0.05) {
+        toast.error("Split amounts must equal the total");
+        return;
+      }
+      const cashAlloc =
+        splitPayments.find((row) => row.method === "CASH")?.amount || 0;
+      if (cashAlloc > 0 && cashReceived.trim() !== "") {
+        const received = parseFloat(cashReceived) || 0;
+        if (received < cashAlloc) {
+          toast.error("Cash received is less than the cash portion");
+          return;
+        }
+      }
+    } else if (paymentMethod === "CASH" && !isAdvancePayment) {
       const received = cashReceived.trim() === "" ? total : parseFloat(cashReceived) || 0;
       if (received < total) {
         toast.error("Cash received is less than total amount");
@@ -1503,12 +2499,17 @@ const QuickPOSPage: React.FC = () => {
         quantity: item.quantity,
         unitPrice: Number(item.price),
         costPrice: item.costPrice || 0,
-        discount: 0,
+        discount: lineDiscountLkr(item),
         discountType: "FIXED" as const,
         tax: 0,
-        warrantyMonths: item.warrantyMonths || 0,
+        warrantyMonths: isWarrantyIssuingLine(item)
+          ? item.warrantyMonths || 0
+          : 0,
         ...(item.isReload && item.reloadPhone
           ? { reloadPhone: item.reloadPhone }
+          : {}),
+        ...(item.serialNumber?.trim()
+          ? { serialNumber: item.serialNumber.trim() }
           : {}),
       }));
 
@@ -1521,6 +2522,9 @@ const QuickPOSPage: React.FC = () => {
       }));
 
       if (courierEnabled) {
+        if (editingSaleId) {
+          throw new Error("Cannot convert an edited sale into a courier shipment");
+        }
         const shipmentPm = mapPaymentToShipmentMethod(paymentMethod);
         const isCodShipment = shipmentPm === "cod";
         const paymentFlags = getShipmentPaymentFlags(shipmentPm, total);
@@ -1528,7 +2532,9 @@ const QuickPOSPage: React.FC = () => {
           .map((item) =>
             item.isReload
               ? `${item.name}${item.reloadPhone ? ` · ${item.reloadPhone}` : ""} · Rs.${item.quantity}`
-              : `${item.name} x${item.quantity}`,
+              // Weighted lines carry their unit: "Rice x0.5" on a courier manifest
+              // is ambiguous, "Rice 500 g" is not.
+              : `${item.name} ${isWeighted(item) ? formatQty(item.quantity, item) : `x${item.quantity}`}`,
           )
           .join(", ");
         const shipmentResponse = await createCourierShipment({
@@ -1672,28 +2678,52 @@ const QuickPOSPage: React.FC = () => {
           }
         }
         await loadProducts();
+        void loadRecentSales();
         return;
       }
 
       // BNPL methods with no entered amount stay fully deferred (amount=0)
-      const payments = [
-        {
-          method: (paymentMethod === "PAZY" ? "PAYZY" : paymentMethod) as
-            | "CASH"
-            | "CARD"
-            | "BANK_TRANSFER"
-            | "CHEQUE"
-            | "COD"
-            | "KOKO"
-            | "MINTPAY"
-            | "PAYZY",
-          amount: isDeferredMethod ? 0 : paidAmount,
-          reference: `QPOS-${paymentMethod}-${Date.now()}`,
-          receivedById: user.id,
-        },
-      ];
+      const splitPayments = useSplit
+        ? splitRows
+            .map((row) => ({
+              method: row.method as
+                | "CASH"
+                | "CARD"
+                | "BANK_TRANSFER"
+                | "CHEQUE"
+                | "COD"
+                | "KOKO"
+                | "MINTPAY"
+                | "PAYZY",
+              amount: parseFloat(row.amount) || 0,
+              reference: `QPOS-SPLIT-${row.method}-${Date.now()}`,
+              receivedById: user.id,
+            }))
+            .filter((row) => row.amount > 0.001)
+        : [];
+      if (useSplit && splitPayments[0]) {
+        paymentMethodRef.current = splitPayments[0].method as PaymentMethod;
+      }
+      const payments = useSplit
+        ? splitPayments
+        : [
+            {
+              method: (paymentMethod === "PAZY" ? "PAYZY" : paymentMethod) as
+                | "CASH"
+                | "CARD"
+                | "BANK_TRANSFER"
+                | "CHEQUE"
+                | "COD"
+                | "KOKO"
+                | "MINTPAY"
+                | "PAYZY",
+              amount: isDeferredMethod ? 0 : paidAmount,
+              reference: `QPOS-${paymentMethod}-${Date.now()}`,
+              receivedById: user.id,
+            },
+          ];
 
-      const saleRes = await createSale({
+      const salePayload = {
         locationId,
         soldById: user.id,
         customerId,
@@ -1702,24 +2732,53 @@ const QuickPOSPage: React.FC = () => {
         ...(customerEmail.trim() ? { customerEmail: customerEmail.trim() } : {}),
         items: saleItems,
         payments,
-        type: "DIRECT_SALE",
+        type: "DIRECT_SALE" as const,
+        saleType: useWholesalePrices ? ("WHOLESALE" as const) : ("POS" as const),
+        saleChannel: useWholesalePrices ? "WHOLESALE" : "POS",
         discount: discountVal,
-        discountType,
-        notes: notes || "Quick POS Sale",
+        discountType: loyaltyRedeem > 0 ? ("FIXED" as const) : discountType,
+        notes:
+          notes ||
+          [
+            editingSaleId ? "Quick POS Sale (edited)" : "Quick POS Sale",
+            useWholesalePrices ? "WHOLESALE" : null,
+            useSplit ? "SPLIT" : null,
+          ]
+            .filter(Boolean)
+            .join(" | "),
+        ...(!editingSaleId && loyaltyRedeem > 0
+          ? { loyaltyRedeemPoints: loyaltyRedeem }
+          : {}),
         ...(isPartialPayment && advanceDueDate ? { advanceDueDate } : {}),
-        // Auto-create a Sale Job when flagged (works for full, advance & partial sales).
-        ...(saleJob.isJob && saleJob.title.trim()
+        // Do not create a new job when editing an existing sale
+        ...(!editingSaleId && saleJob.isJob && saleJob.title.trim()
           ? { job: { ...saleJob, title: saleJob.title.trim() } }
           : {}),
         ...(user.businessId ? { businessId: user.businessId } : {}),
-      } as any);
+      };
+
+      const saleRes = editingSaleId
+        ? await updateSale(editingSaleId, salePayload as any)
+        : await createSale(salePayload as any);
 
       const saleData = saleRes?.data as any;
-      const saleId = saleData?.sale?.id || saleData?.id;
-      const saleNumber = saleData?.sale?.saleNumber || saleData?.saleNumber;
+      const saleId = saleData?.sale?.id || saleData?.id || editingSaleId;
+      const saleNumber =
+        saleData?.sale?.saleNumber ||
+        saleData?.saleNumber ||
+        editingSaleNumber;
 
       if (!saleId || !saleNumber)
         throw new Error("Invalid response from server");
+
+      if (openQuoteId && !editingSaleId) {
+        await convertQuotation(openQuoteId, saleId).catch(() => undefined);
+        setOpenQuoteId(null);
+      }
+
+      const editedSaleId = editingSaleId;
+      setEditingSaleId(null);
+      setEditingSaleNumber(null);
 
       setSaleResult({
         saleId,
@@ -1735,23 +2794,30 @@ const QuickPOSPage: React.FC = () => {
       });
       setStep("success");
       // Show cash drawer overlay for cash payments
-      if (
-        paymentMethod === "CASH" &&
-        !isDeferredMethod &&
-        posSettings.autoCashDrawer
-      ) {
+      const usedCash =
+        paymentMethod === "CASH" ||
+        (useSplit && splitPayments.some((row) => row.method === "CASH"));
+      if (usedCash && !isDeferredMethod && posSettings.autoCashDrawer) {
         setShowCashDrawer(true);
       }
       toast.success(
-        isDeferredMethod
-          ? `Order ${saleNumber} created – payment pending!`
-          : `Sale ${saleNumber} completed!`,
+        editedSaleId
+          ? `Sale ${saleNumber} updated!`
+          : isDeferredMethod
+            ? `Order ${saleNumber} created – payment pending!`
+            : `Sale ${saleNumber} completed!`,
         { duration: 4000 },
       );
       // Quick POS receipt routing:
       // advance/partial -> /acknowledgement?format=80mm
       // normal sale      -> /invoice/html?format=80mm
-      if (!isDeferredMethod && (posSettings.autoPrintOnSale || isPartialPayment)) {
+      const printerConf = resolvePrinterConf();
+      if (
+        !isDeferredMethod &&
+        (posSettings.autoPrintOnSale ||
+          printerConf?.autoPrintOnSale ||
+          isPartialPayment)
+      ) {
         const cashAmt =
           paymentMethod === "CASH" && !isAdvancePayment
             ? parseFloat(cashReceived) || 0
@@ -1762,12 +2828,13 @@ const QuickPOSPage: React.FC = () => {
           await silentPrintInvoice(saleId, {
             format: resolveThermalFormat(),
             cashReceived: cashAmt > 0 ? cashAmt : undefined,
-            printerConf: resolvePrinterConf(),
-            openDrawer: paymentMethod === "CASH",
+            printerConf,
+            openDrawer: usedCash,
           });
         }
       }
       await loadProducts();
+      void loadRecentSales();
     } catch (e: any) {
       toast.error(e?.message || "Failed to process sale", { duration: 5000 });
     } finally {
@@ -1824,6 +2891,7 @@ const QuickPOSPage: React.FC = () => {
         setPaymentMethod("CASH");
         setCashReceived("");
         setPartialAmountInput("");
+        setSplitRows([]);
         const due = defaultJobDueDate();
         setAdvanceDueDate(due);
         setSaleJob({
@@ -1866,6 +2934,363 @@ const QuickPOSPage: React.FC = () => {
     else if (step === "payment") setStep("customer");
   };
 
+  const expressCheckout = (method: "CASH" | "CARD") => {
+    if (isProcessing || cart.length === 0) return;
+    if (courierEnabled || isAdvancePayment || step !== "cart") {
+      toast.error("Use checkout for courier, advance, or wizard payments");
+      if (step === "cart") setStep("customer");
+      return;
+    }
+    paymentMethodRef.current = method;
+    setPaymentMethod(method);
+    setPartialAmountInput("");
+    setCashReceived("");
+    setSplitRows([]);
+    void handleProcessSale();
+  };
+
+  const requestClearCart = () => {
+    if (cart.length === 0) return;
+    if (window.confirm("Clear the current cart?")) clearCart();
+  };
+
+  const buildHeldSnapshot = (): HeldCartSnapshot => ({
+    cart: cart as unknown as HeldCartSnapshot["cart"],
+    customer: {
+      id: selectedCustomer?.id,
+      name: customerName,
+      phone: customerPhone,
+      email: customerEmail,
+      loyaltyPoints: selectedCustomer?.loyaltyPoints,
+    },
+    discountAmount,
+    discountType,
+    notes,
+    loyaltyRedeemInput,
+  });
+
+  const applyHeldSnapshot = (snap: HeldCartSnapshot) => {
+    const lines = Array.isArray(snap.cart) ? snap.cart : [];
+    setCart(lines as unknown as CartItem[]);
+    lastDisplayItemIdRef.current =
+      (lines[lines.length - 1] as { id?: string } | undefined)?.id ?? null;
+    const customer = snap.customer;
+    if (customer?.id) {
+      setSelectedCustomer({
+        id: customer.id,
+        name: customer.name || "",
+        phone: customer.phone || "",
+        email: customer.email,
+        loyaltyPoints: Number(customer.loyaltyPoints) || 0,
+      });
+    } else {
+      setSelectedCustomer(null);
+    }
+    setCustomerName(customer?.name || "");
+    setCustomerPhone(customer?.phone || "");
+    setCustomerEmail(customer?.email || "");
+    setCustomerSearch(customer?.phone || customer?.name || "");
+    setDiscountAmount(snap.discountAmount || "");
+    if (snap.discountType === "PERCENTAGE" || snap.discountType === "FIXED") {
+      setDiscountType(snap.discountType);
+    }
+    setNotes(snap.notes || "");
+    setLoyaltyRedeemInput(snap.loyaltyRedeemInput || "");
+    setStep("cart");
+  };
+
+  const refreshQuotations = async () => {
+    if (!posLocationId) {
+      setQuotations([]);
+      return;
+    }
+    const res = await listQuotations(posLocationId);
+    const rows = (res?.data as PosQuotationRecord[] | undefined) || [];
+    setQuotations(
+      Array.isArray(rows) ? rows.filter((row) => row.status === "OPEN") : [],
+    );
+  };
+
+  const saveCurrentQuote = async () => {
+    if (cart.length === 0 || savingQuote) return;
+    if (!posLocationId) {
+      toast.error("Select a branch/location before saving a quote");
+      return;
+    }
+    const note =
+      window.prompt(
+        "Quote note (customer name or phone)?",
+        customerName || customerPhone || "",
+      ) ?? "";
+    setSavingQuote(true);
+    try {
+      const res = await createQuotation({
+        locationId: posLocationId,
+        note: note.trim() || undefined,
+        cartJson: buildHeldSnapshot(),
+        itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
+        totalAmount: total,
+        customerId: selectedCustomer?.id,
+        customerName: customerName || selectedCustomer?.name,
+        customerPhone: customerPhone || selectedCustomer?.phone,
+      });
+      const row = res?.data as PosQuotationRecord | undefined;
+      if (!res?.success && !row) {
+        throw new Error(res?.message || "Failed to save quote");
+      }
+      if (row?.id) setOpenQuoteId(row.id);
+      toast.success(row?.quoteNumber ? `Quote ${row.quoteNumber} saved` : "Quote saved");
+      await refreshQuotations();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not save quote";
+      toast.error(message);
+    } finally {
+      setSavingQuote(false);
+    }
+  };
+
+  const resumeQuote = async (id: string) => {
+    if (cart.length > 0) {
+      const ok = window.confirm("Replace the current cart with this quote?");
+      if (!ok) return;
+    }
+    const res = await getQuotation(id);
+    const row = res?.data as PosQuotationRecord | undefined;
+    const snap = row?.cartJson;
+    if (!row?.id || !snap || !Array.isArray(snap.cart) || snap.cart.length === 0) {
+      toast.error("Quote is empty");
+      return;
+    }
+    applyHeldSnapshot(snap);
+    setOpenQuoteId(row.id);
+    setShowQuotations(false);
+    toast.success(row.quoteNumber ? `Loaded ${row.quoteNumber}` : "Quote loaded");
+  };
+
+  const voidQuote = async (id: string) => {
+    if (!window.confirm("Void this quotation?")) return;
+    await voidQuotation(id);
+    if (openQuoteId === id) setOpenQuoteId(null);
+    await refreshQuotations();
+  };
+
+  const refreshHeldCarts = async () => {
+    if (!posLocationId) {
+      setHeldCarts([]);
+      return;
+    }
+    const res = await listHeldCarts(posLocationId);
+    const rows = (res?.data as PosHeldCartRecord[] | undefined) || [];
+    setHeldCarts(Array.isArray(rows) ? rows : []);
+  };
+
+  const holdCurrentCart = async () => {
+    if (cart.length === 0 || holdingCart) return;
+    if (!posLocationId) {
+      toast.error("Select a branch/location before holding the cart");
+      return;
+    }
+    const note =
+      window.prompt(
+        "Hold note (customer name or phone)?",
+        customerName || customerPhone || "",
+      ) ?? "";
+    setHoldingCart(true);
+    try {
+      const res = await createHeldCart({
+        locationId: posLocationId,
+        note: note.trim() || undefined,
+        cartJson: buildHeldSnapshot(),
+        itemCount: cart.reduce((sum, item) => sum + item.quantity, 0),
+        totalAmount: subtotal,
+      });
+      if (!res?.success && !res?.data) {
+        throw new Error(res?.message || "Failed to hold cart");
+      }
+      toast.success("Cart held   no sale or stock change");
+      clearCart();
+      try {
+        sessionStorage.removeItem(POS_OPEN_CART_BACKUP_KEY);
+      } catch {
+        /* ignore */
+      }
+      await refreshHeldCarts();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Could not hold cart";
+      toast.error(message);
+    } finally {
+      setHoldingCart(false);
+    }
+  };
+
+  const resumeHeldCart = async (id: string) => {
+    if (cart.length > 0) {
+      const ok = window.confirm("Replace the current cart with the held cart?");
+      if (!ok) return;
+    }
+    const res = await getHeldCart(id);
+    const row = res?.data as PosHeldCartRecord | undefined;
+    const snap = row?.cartJson;
+    if (!snap || !Array.isArray(snap.cart) || snap.cart.length === 0) {
+      toast.error("Held cart is empty");
+      return;
+    }
+    applyHeldSnapshot(snap);
+    await discardHeldCart(id);
+    setShowHeldCarts(false);
+    toast.success("Held cart restored");
+    await refreshHeldCarts();
+  };
+
+  const discardHeld = async (id: string) => {
+    if (!window.confirm("Discard this held cart?")) return;
+    await discardHeldCart(id);
+    await refreshHeldCarts();
+  };
+
+  useEffect(() => {
+    void refreshHeldCarts();
+    void refreshQuotations();
+    void loadRecentSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posLocationId]);
+
+  useEffect(() => {
+    if (!posLocationId) return;
+    try {
+      sessionStorage.setItem(
+        POS_OPEN_CART_BACKUP_KEY,
+        JSON.stringify({
+          locationId: posLocationId,
+          snapshot: buildHeldSnapshot(),
+          savedAt: Date.now(),
+        }),
+      );
+    } catch {
+      /* ignore quota */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, customerName, customerPhone, customerEmail, discountAmount, discountType, notes, posLocationId]);
+
+  useEffect(() => {
+    if (!posLocationId || cartBackupRestoredRef.current) return;
+    cartBackupRestoredRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(POS_OPEN_CART_BACKUP_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        locationId?: string;
+        savedAt?: number;
+        snapshot?: HeldCartSnapshot;
+      };
+      if (parsed.locationId !== posLocationId) return;
+      if (!parsed.savedAt || Date.now() - parsed.savedAt > 4 * 60 * 60 * 1000) return;
+      if (!parsed.snapshot?.cart?.length) return;
+      applyHeldSnapshot(parsed.snapshot);
+      toast.success("Restored unsaved cart");
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posLocationId]);
+
+  const holdCurrentCartRef = useRef(holdCurrentCart);
+  holdCurrentCartRef.current = holdCurrentCart;
+
+  const expressCheckoutRef = useRef(expressCheckout);
+  expressCheckoutRef.current = expressCheckout;
+  const requestClearCartRef = useRef(requestClearCart);
+  requestClearCartRef.current = requestClearCart;
+
+  const applyWholesaleModeRef = useRef(applyWholesaleMode);
+  applyWholesaleModeRef.current = applyWholesaleMode;
+  const openRegisterRef = useRef(openRegister);
+  openRegisterRef.current = openRegister;
+
+  // Cashier shortcuts. Enter is intentionally NOT bound to pay   HID barcode
+  // scanners send Enter after each scan and must not complete the sale.
+  useEffect(() => {
+    const onShortcut = (e: KeyboardEvent) => {
+      if (
+        showScanner ||
+        showBarcodeSelect ||
+        showCourierTrackingScanner ||
+        showPosReturn ||
+        showPosExchange
+      )
+        return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === "F4") {
+        e.preventDefault();
+        productSearchInputRef.current?.focus();
+        productSearchInputRef.current?.select();
+        return;
+      }
+      if (e.key === "F2") {
+        e.preventDefault();
+        const buttons = document.querySelectorAll<HTMLButtonElement>(
+          "[data-pos-qty-plus]",
+        );
+        buttons[buttons.length - 1]?.focus();
+        return;
+      }
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        if (isEditableKeyboardTarget(e.target)) return;
+        e.preventDefault();
+        setShowShortcutHelp((open) => !open);
+        return;
+      }
+
+      if (isEditableKeyboardTarget(e.target)) return;
+
+      if (e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        expressCheckoutRef.current("CASH");
+        return;
+      }
+      if (e.shiftKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        requestClearCartRef.current();
+        return;
+      }
+      if (e.shiftKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        void holdCurrentCartRef.current();
+        return;
+      }
+      if (e.shiftKey && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        setShowPosReturn(true);
+        return;
+      }
+      if (e.shiftKey && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        applyWholesaleModeRef.current(!useWholesalePrices);
+        return;
+      }
+      if (e.shiftKey && e.key.toLowerCase() === "x") {
+        e.preventDefault();
+        setShowPosExchange(true);
+        return;
+      }
+      if (e.shiftKey && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        void openRegisterRef.current();
+      }
+    };
+
+    document.addEventListener("keydown", onShortcut);
+    return () => document.removeEventListener("keydown", onShortcut);
+  }, [
+    showScanner,
+    showBarcodeSelect,
+    showCourierTrackingScanner,
+    showPosReturn,
+    showPosExchange,
+    useWholesalePrices,
+  ]);
+
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   // Show cash drawer gate for branch-level users before POS is usable
@@ -1875,7 +3300,16 @@ const QuickPOSPage: React.FC = () => {
     return (
       <CashDrawerBlocker
         locationId={branchLocationId}
-        onDrawerOpened={() => setDrawerIsOpen(true)}
+        onDrawerOpened={() => {
+          setDrawerIsOpen(true);
+          getActiveDrawer(branchLocationId)
+            .then((res: any) => {
+              setActiveDrawerRecord(
+                (res?.data as CashDrawerRecord | null) ?? null,
+              );
+            })
+            .catch(() => setActiveDrawerRecord(null));
+        }}
       />
     );
   }
@@ -1897,39 +3331,200 @@ const QuickPOSPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 min-h-[calc(100vh-6rem)] lg:max-w-4xl xl:max-w-6xl 2xl:max-w-6xl min-[1950px]:max-w-[83.333%] w-full max-w-full mx-auto">
+    <div
+      className={
+        isCheckoutLayout
+          ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:h-[calc(100vh-6rem)] min-h-[calc(100vh-6rem)] w-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+          : "flex flex-col lg:flex-row gap-4 min-h-[calc(100vh-6rem)] w-full"
+      }
+    >
+      <PoleDisplayModal open={poleDisplay.setupOpen} onClose={poleDisplay.closeSetup} />
+
+      {/* Weight / volume / length products ask for an amount before joining the
+          cart   see components/branch/pos/QuantityKeypadModal. */}
+      {keypadProduct && (
+        <QuantityKeypadModal
+          product={keypadProduct}
+          initialQuantity={
+            cart.find((i) => i.id === keypadProduct.id)?.quantity ?? undefined
+          }
+          onConfirm={(qty) => {
+            const existing = cart.find((i) => i.id === keypadProduct.id);
+            if (existing) {
+              // Re-opening the keypad on a cart line replaces its amount rather
+              // than adding to it   the cashier is correcting a weight.
+              updateQty(keypadProduct.id, qty);
+              setKeypadProduct(null);
+            } else {
+              addWeighedToCart(keypadProduct, qty);
+            }
+          }}
+          onClose={() => setKeypadProduct(null)}
+        />
+      )}
       {/* ═══ LEFT: Product Grid ═══════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col min-h-[50vh] lg:min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden min-w-0">
+      <div
+        className={
+          isCheckoutLayout
+            ? "flex flex-col min-h-[40vh] lg:min-h-0 lg:h-full border-b lg:border-b-0 lg:border-r border-gray-200 overflow-hidden min-w-0 bg-white"
+            : "flex-[2] flex flex-col min-h-[50vh] lg:min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden min-w-0"
+        }
+      >
         {/* Header */}
-        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
+        <div className={`border-b border-gray-100 flex items-center gap-3 ${isCheckoutLayout ? "p-2.5 flex-wrap" : "p-4"}`}>
           <Zap className="w-5 h-5 text-[#1e3a8a]" />
-          <h1 className="text-lg font-bold text-gray-900">Quick POS</h1>
+          <h1 className={`font-bold text-gray-900 ${isCheckoutLayout ? "text-sm" : "text-lg"}`}>Quick POS</h1>
+          <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50 shrink-0">
+            <button
+              type="button"
+              title="Classic: large product grid"
+              onClick={() => changePosLayout("classic")}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                posLayout === "classic"
+                  ? "bg-white text-[#1e3a8a] shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Classic</span>
+            </button>
+            <button
+              type="button"
+              title="Checkout: compact products, wide payment"
+              onClick={() => changePosLayout("checkout")}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                posLayout === "checkout"
+                  ? "bg-white text-[#1e3a8a] shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Checkout</span>
+            </button>
+          </div>
           {customerDisplayEnabled && (
             <button
               type="button"
               onClick={openCustomerDisplay}
               title="Open customer display on second screen"
-              className={`ml-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 customerDisplayActive
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-transparent"
               }`}
             >
               <Monitor className="w-3.5 h-3.5" />
-              {customerDisplayActive ? "Display on" : "Customer display"}
+              {!isCheckoutLayout && (customerDisplayActive ? "Display on" : "Customer display")}
+            </button>
+          )}
+          {poleDisplay.supported && (
+            <button
+              type="button"
+              onClick={poleDisplay.openSetup}
+              title={
+                poleDisplay.connected
+                  ? "Pole display connected   click to change settings"
+                  : "Set up the counter pole display (serial/COM)"
+              }
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                poleDisplay.connected
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-transparent"
+              }`}
+            >
+              <Tv2 className="w-3.5 h-3.5" />
+              {!isCheckoutLayout && (poleDisplay.connected ? "Pole display on" : "Pole display")}
             </button>
           )}
           <span className="ml-auto text-xs text-gray-400">
             {totalProducts} products
           </span>
+          <button
+            type="button"
+            title="POS return   Shift+R"
+            onClick={() => setShowPosReturn(true)}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Return</span>
+          </button>
+          <button
+            type="button"
+            title="Exchange   cart is the replacement   Shift+X"
+            onClick={() => {
+              if (cart.length === 0) {
+                toast.error("Add replacement items to the cart first");
+                return;
+              }
+              const missingImei = cart.find(
+                (item) =>
+                  isWarrantyIssuingLine(item) &&
+                  !String(item.serialNumber || "").trim(),
+              );
+              if (missingImei) {
+                toast.error(`Enter IMEI / serial for ${missingImei.name}`);
+                return;
+              }
+              setShowPosExchange(true);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Exchange</span>
+          </button>
+          <button
+            type="button"
+            title="Recent completed sales"
+            onClick={() => {
+              void loadRecentSales();
+              setShowRecentSales(true);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Recent</span>
+          </button>
+          <button
+            type="button"
+            title={useWholesalePrices ? "Using wholesale prices   Shift+W" : "Retail prices   Shift+W"}
+            onClick={() => applyWholesaleMode(!useWholesalePrices)}
+            className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold ${
+              useWholesalePrices
+                ? "text-violet-700 bg-violet-50 border border-violet-200"
+                : "text-slate-600 bg-slate-100 hover:bg-slate-200"
+            }`}
+          >
+            <span className="hidden sm:inline">
+              {useWholesalePrices ? "Wholesale" : "Retail"}
+            </span>
+          </button>
+          <button
+            type="button"
+            title="Cash register   Shift+G"
+            onClick={() => void openRegister()}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
+          >
+            <Banknote className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Register</span>
+          </button>
+          <button
+            type="button"
+            title="Keyboard shortcuts"
+            onClick={() => setShowShortcutHelp(true)}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Keys</span>
+          </button>
         </div>
 
         {/* Search + Category */}
-        <div className="p-3 border-b border-gray-100 space-y-2">
+        <div className={`border-b border-gray-100 space-y-2 ${isCheckoutLayout ? "p-2" : "p-3"}`}>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
               <input
+                ref={productSearchInputRef}
                 type="text"
                 placeholder="Search by name, code, SKU, or ID…"
                 value={productSearch}
@@ -1999,7 +3594,7 @@ const QuickPOSPage: React.FC = () => {
         </div>
 
         {/* Product grid / Reload form */}
-        <div className="flex-1 overflow-y-auto p-3">
+        <div className={`flex-1 overflow-y-auto ${isCheckoutLayout ? "p-2" : "p-3"}`}>
           {selectedItemType === "reload" ? (
             <div className="space-y-4">
               {loadingProducts ? (
@@ -2017,7 +3612,7 @@ const QuickPOSPage: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className={isCheckoutLayout ? "grid grid-cols-2 gap-2" : "grid grid-cols-2 sm:grid-cols-3 gap-3"}>
                     {typeFilteredProducts.map((product) => {
                       const selected = reloadProviderId === product.id;
                       return (
@@ -2025,21 +3620,27 @@ const QuickPOSPage: React.FC = () => {
                           key={product.id}
                           type="button"
                           onClick={() => setReloadProviderId(product.id)}
-                          className={`relative flex flex-col bg-white border rounded-xl p-3 text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
+                          className={`relative flex text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/40 ${
+                            isCheckoutLayout
+                              ? "flex-col bg-white border rounded-lg p-2"
+                              : "flex-col bg-white border rounded-xl p-3"
+                          } ${
                             selected
                               ? "border-emerald-600 bg-emerald-50/40"
-                              : "border-gray-200"
+                              : "border-gray-200 bg-white"
                           }`}
                         >
-                          <div className="w-full h-16 rounded-lg mb-2 bg-emerald-50 flex items-center justify-center">
-                            <Smartphone className="w-7 h-7 text-emerald-600" />
+                          <div className={`rounded-lg bg-emerald-50 flex items-center justify-center ${isCheckoutLayout ? "w-full h-12 mb-1.5" : "w-full h-16 mb-2"}`}>
+                            <Smartphone className={isCheckoutLayout ? "w-5 h-5 text-emerald-600" : "w-7 h-7 text-emerald-600"} />
                           </div>
-                          <p className="text-xs font-semibold text-gray-800 line-clamp-2">
-                            {product.name}
-                          </p>
-                          <p className="mt-2 text-[11px] font-medium text-emerald-700">
-                            Balance: Rs.{product.stock.toLocaleString()}
-                          </p>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-gray-800 line-clamp-2">
+                              {product.name}
+                            </p>
+                            <p className="mt-0.5 text-[11px] font-medium text-emerald-700">
+                              Balance: Rs.{product.stock.toLocaleString()}
+                            </p>
+                          </div>
                         </button>
                       );
                     })}
@@ -2048,7 +3649,7 @@ const QuickPOSPage: React.FC = () => {
                   {reloadProviderId && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
                       <p className="text-sm font-semibold text-gray-800">
-                        Reload details —{" "}
+                        Reload details  {" "}
                         {products.find((p) => p.id === reloadProviderId)?.name}
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2069,7 +3670,7 @@ const QuickPOSPage: React.FC = () => {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Amount (LKR)
+                            Amount (LKR) / Cards
                           </label>
                           <input
                             type="number"
@@ -2105,7 +3706,13 @@ const QuickPOSPage: React.FC = () => {
               <p className="text-sm">No items found</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
+            <div
+              className={
+                isCheckoutLayout
+                  ? "grid grid-cols-2 gap-2"
+                  : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3"
+              }
+            >
               {displayedProducts.map((product) => {
                 const inCart = cart.find((i) =>
                   product.isReload
@@ -2117,18 +3724,22 @@ const QuickPOSPage: React.FC = () => {
                     key={product.id}
                     onClick={() => addToCart(product)}
                     disabled={!product.isService && !product.isReload && product.stock <= 0}
-                    className={`relative flex flex-col bg-white border rounded-xl p-3 text-left transition-all hover:shadow-md hover:border-[#1e3a8a]/40 focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${
+                    className={`relative bg-white border text-left transition-all hover:shadow-md hover:border-[#1e3a8a]/40 focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${
+                      isCheckoutLayout
+                        ? "flex flex-col rounded-lg p-2"
+                        : "flex flex-col rounded-xl p-3"
+                    } ${
                       !product.isService && !product.isReload && product.stock <= 0
                         ? "opacity-50 cursor-not-allowed"
                         : "cursor-pointer"
                     } ${inCart ? "border-[#1e3a8a] bg-blue-50/30" : "border-gray-200"}`}
                   >
                     {inCart && !product.isReload && (
-                      <span className="absolute top-2 right-2 bg-[#1e3a8a] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      <span className={`absolute bg-[#1e3a8a] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isCheckoutLayout ? "top-1 right-1" : "top-2 right-2"}`}>
                         {inCart.quantity}
                       </span>
                     )}
-                    {product.discountInfo && (
+                    {product.discountInfo && !isCheckoutLayout && (
                       <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                         {product.discountInfo.discountType === "PERCENTAGE"
                           ? `${product.discountInfo.discountValue}% OFF`
@@ -2139,26 +3750,35 @@ const QuickPOSPage: React.FC = () => {
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="w-full h-28 object-cover rounded-lg mb-2 bg-gray-50"
+                        className={`object-cover rounded-lg bg-gray-50 ${isCheckoutLayout ? "w-full h-16 mb-1.5" : "w-full h-28 mb-2"}`}
                       />
                     ) : (
-                      <div className="w-full h-28 rounded-lg mb-2 bg-gray-100 flex items-center justify-center">
+                      <div className={`rounded-lg bg-gray-100 flex items-center justify-center ${isCheckoutLayout ? "w-full h-16 mb-1.5" : "w-full h-28 mb-2"}`}>
                         {product.isReload ? (
-                          <Smartphone className="w-8 h-8 text-emerald-400" />
+                          <Smartphone className={isCheckoutLayout ? "w-5 h-5 text-emerald-400" : "w-8 h-8 text-emerald-400"} />
                         ) : (
-                          <Package className="w-8 h-8 text-gray-300" />
+                          <Package className={isCheckoutLayout ? "w-5 h-5 text-gray-300" : "w-8 h-8 text-gray-300"} />
                         )}
                       </div>
                     )}
+                    <div className={`min-w-0 ${isCheckoutLayout ? "flex-1" : ""}`}>
                     <p className="text-xs font-semibold text-gray-800 line-clamp-2 leading-tight">
                       {product.name}
                     </p>
-                    {product.brand && (
+                    {!product.isService && !product.isReload && (
+                      <div className="mt-0.5">
+                        <WarrantyBadge
+                          months={product.warrantyMonths}
+                          compact={isCheckoutLayout}
+                        />
+                      </div>
+                    )}
+                    {product.brand && !isCheckoutLayout && (
                       <p className="text-[10px] text-gray-400 mt-0.5">
                         {product.brand}
                       </p>
                     )}
-                    <div className="mt-auto pt-2 flex items-center justify-between">
+                    <div className={`flex items-center justify-between ${isCheckoutLayout ? "pt-0.5 gap-2" : "mt-auto pt-2"}`}>
                       <div>
                         {product.isReload ? (
                           <span className="text-xs font-bold text-emerald-700">
@@ -2166,12 +3786,16 @@ const QuickPOSPage: React.FC = () => {
                           </span>
                         ) : (
                           <>
+                            {/* A weighted product's price is meaningless without
+                                its unit: "Rs. 1,250.00" vs "Rs. 1,250.00 / kg". */}
                             <span
                               className={`text-xs font-bold ${product.discountInfo ? "text-red-600" : "text-[#1e3a8a]"}`}
                             >
-                              {formatCurrency(product.price)}
+                              {isWeighted(product)
+                                ? formatUnitPrice(product.price, product)
+                                : formatCurrency(product.price)}
                             </span>
-                            {product.originalPrice !== undefined && (
+                            {product.originalPrice !== undefined && !isCheckoutLayout && (
                               <span className="block text-[10px] text-gray-400 line-through">
                                 {formatCurrency(product.originalPrice)}
                               </span>
@@ -2198,6 +3822,7 @@ const QuickPOSPage: React.FC = () => {
                               ? "Out"
                               : `${product.stock} left`}
                       </span>
+                    </div>
                     </div>
                   </button>
                 );
@@ -2242,6 +3867,7 @@ const QuickPOSPage: React.FC = () => {
             </button>
           </div>
         </div>
+        {!isCheckoutLayout && (
         <div className="px-3 pb-2 border-t-0 bg-gray-50 flex items-center justify-center gap-2">
           <span className="text-xs text-gray-500">Go to page</span>
           <input
@@ -2275,10 +3901,17 @@ const QuickPOSPage: React.FC = () => {
             Go
           </button>
         </div>
+        )}
       </div>
 
       {/* ═══ RIGHT: Checkout Panel ════════════════════════════════════════════ */}
-      <div className="w-full lg:w-96 lg:h-[80vh] lg:flex-shrink-0 flex flex-col min-h-[40vh] lg:min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div
+        className={
+          isCheckoutLayout
+            ? "flex flex-col min-h-[50vh] lg:min-h-0 lg:h-full overflow-hidden min-w-0 bg-white"
+            : "w-full lg:flex-1 lg:h-[80vh] lg:min-w-0 flex flex-col min-h-[40vh] lg:min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+        }
+      >
         {/* Step bar */}
         <div className="p-4 border-b border-gray-100">
           <StepBar current={step} />
@@ -2293,14 +3926,67 @@ const QuickPOSPage: React.FC = () => {
                 <span className="text-sm font-semibold text-gray-700">
                   Cart ({cart.length})
                 </span>
+                {editingSaleId && (
+                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                    Editing {editingSaleNumber || "sale"}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refreshHeldCarts();
+                    setShowHeldCarts(true);
+                  }}
+                  className="text-xs font-semibold text-[#1e3a8a] hover:underline"
+                >
+                  Parked ({heldCarts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refreshQuotations();
+                    setShowQuotations(true);
+                  }}
+                  className="text-xs font-semibold text-[#1e3a8a] hover:underline"
+                >
+                  Quotes ({quotations.length})
+                </button>
+                {openQuoteId && (
+                  <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded">
+                    Quote open
+                  </span>
+                )}
               </div>
               {cart.length > 0 && (
-                <button
-                  onClick={clearCart}
-                  className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"
-                >
-                  <Trash2 className="w-3 h-3" /> Clear
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void saveCurrentQuote()}
+                    disabled={savingQuote}
+                    title="Save quotation"
+                    className="text-xs text-violet-600 hover:text-violet-800 flex items-center gap-1 disabled:opacity-40"
+                  >
+                    <FileText className="w-3 h-3" />
+                    Quote
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void holdCurrentCart()}
+                    disabled={holdingCart}
+                    title="Hold cart   Shift+H"
+                    className="text-xs text-amber-600 hover:text-amber-800 flex items-center gap-1 disabled:opacity-40"
+                  >
+                    <Pause className="w-3 h-3" />
+                    Hold
+                  </button>
+                  <button
+                    type="button"
+                    onClick={requestClearCart}
+                    className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" /> Clear
+                  </button>
+                </div>
               )}
             </div>
 
@@ -2313,11 +3999,15 @@ const QuickPOSPage: React.FC = () => {
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-50">
-                  {cart.map((item) => (
+                  {cart.map((item) => {
+                    const itemDisc = lineDiscountLkr(item);
+                    const itemTotal = cartLineTotal(item);
+                    return (
                     <li
                       key={item.id}
-                      className="flex items-center gap-3 px-4 py-3"
+                      className="px-4 py-3 space-y-2"
                     >
+                      <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-gray-800 truncate">
                           {item.isReload
@@ -2336,6 +4026,11 @@ const QuickPOSPage: React.FC = () => {
                         ) : !item.isService ? (
                           <p className="text-xs text-[#1e3a8a] font-medium mt-0.5">
                             {formatCurrency(item.price)}
+                            {itemDisc > 0 ? (
+                              <span className="ml-1 text-green-600">
+                                · {formatCurrency(itemTotal)}
+                              </span>
+                            ) : null}
                           </p>
                         ) : (
                           <div className="mt-1 flex items-center gap-1.5">
@@ -2372,19 +4067,60 @@ const QuickPOSPage: React.FC = () => {
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
+                      ) : isWarrantyCartLine(item) ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-6 text-center text-sm font-bold text-gray-800">
+                            1
+                          </span>
+                          <button
+                            onClick={() => removeFromCart(item.id)}
+                            className="ml-1 text-red-300 hover:text-red-500"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       ) : (
                         <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => updateQty(item.id, item.quantity - 1)}
+                            onClick={() =>
+                              updateQty(
+                                item.id,
+                                roundQty(item.quantity - stepOf(item)),
+                              )
+                            }
                             className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
                           >
                             <Minus className="w-3 h-3 text-gray-600" />
                           </button>
-                          <span className="w-6 text-center text-sm font-bold text-gray-800">
-                            {item.quantity}
-                          </span>
+                          {/* Weighted lines show the amount with its unit and are
+                              tappable, since typing 0.375 kg with +/- would take
+                              dozens of presses. */}
+                          {isWeighted(item) ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const p = products.find((pr) => pr.id === item.id);
+                                if (p) setKeypadProduct(p);
+                              }}
+                              className="min-w-14 rounded px-1 text-center text-sm font-bold text-gray-800 underline decoration-dotted underline-offset-2 hover:text-orange-600"
+                              title="Tap to type an exact amount"
+                            >
+                              {formatQty(item.quantity, item)}
+                            </button>
+                          ) : (
+                            <span className="w-6 text-center text-sm font-bold text-gray-800">
+                              {item.quantity}
+                            </span>
+                          )}
                           <button
-                            onClick={() => updateQty(item.id, item.quantity + 1)}
+                            type="button"
+                            data-pos-qty-plus
+                            onClick={() =>
+                              updateQty(
+                                item.id,
+                                roundQty(item.quantity + stepOf(item)),
+                              )
+                            }
                             className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
                           >
                             <Plus className="w-3 h-3 text-gray-600" />
@@ -2397,14 +4133,167 @@ const QuickPOSPage: React.FC = () => {
                           </button>
                         </div>
                       )}
+                      </div>
+                      {!item.isReload && !staffDiscountHidden && (
+                        <div className="flex items-center gap-1.5 pl-0.5">
+                          <Tag className="w-3 h-3 text-gray-400 shrink-0" />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={
+                              item.lineDiscountValue
+                                ? item.lineDiscountValue
+                                : ""
+                            }
+                            onChange={(e) =>
+                              updateLineDiscount(
+                                item.id,
+                                item.lineDiscountType || "FIXED",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="0"
+                            className="w-16 rounded-md border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-800"
+                          />
+                          <select
+                            value={item.lineDiscountType || "FIXED"}
+                            onChange={(e) =>
+                              updateLineDiscount(
+                                item.id,
+                                e.target.value as LineDiscountType,
+                                item.lineDiscountValue
+                                  ? String(item.lineDiscountValue)
+                                  : "",
+                              )
+                            }
+                            className="rounded-md border border-gray-200 px-1 py-0.5 text-[11px] bg-white text-gray-600"
+                          >
+                            <option value="FIXED">LKR</option>
+                            <option value="PERCENTAGE">%</option>
+                          </select>
+                          {itemDisc > 0 && (
+                            <span className="text-[11px] font-medium text-green-600">
+                              −{formatCurrency(itemDisc)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {isWarrantyCartLine(item) && (
+                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          {item.issueWarranty === false ? (
+                            <>
+                              <span className="inline-flex items-center gap-0.5 rounded-full border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
+                                no warranty
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setLineWarranty(item.id, true)}
+                                className="text-[10px] font-medium text-emerald-700 underline underline-offset-2"
+                              >
+                                add warranty
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <WarrantyBadge months={item.warrantyMonths} />
+                              <span className="text-[10px] text-emerald-700">
+                                warranty card will be issued
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setLineWarranty(item.id, false)}
+                                className="text-[10px] font-medium text-gray-500 underline underline-offset-2"
+                              >
+                                skip
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {isWarrantyIssuingLine(item) && (
+                        <input
+                          value={item.serialNumber || ""}
+                          onChange={(e) =>
+                            updateSerialNumber(item.id, e.target.value)
+                          }
+                          placeholder="IMEI / serial required"
+                          className="w-full rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-mono text-gray-800"
+                        />
+                      )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </div>
 
             {/* Cart totals + proceed */}
             <div className="border-t border-gray-100 p-4 space-y-3">
+              {recentSales.length > 0 && (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-gray-500">
+                      Recent sales
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRecentSales(true)}
+                      className="text-[11px] font-semibold text-[#1e3a8a] hover:underline"
+                    >
+                      See all
+                    </button>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {recentSales.slice(0, 4).map((sale) => (
+                      <li
+                        key={sale.id}
+                        className="flex items-center justify-between gap-2 text-[11px] text-gray-700"
+                      >
+                        <span className="truncate">
+                          {sale.saleNumber}
+                          {sale.customerName ? ` · ${sale.customerName}` : ""}
+                        </span>
+                        <span className="shrink-0 font-semibold">
+                          {formatCurrency(sale.totalAmount)}
+                        </span>
+                        <button
+                          type="button"
+                          title="Edit"
+                          disabled={loadingEditSaleId === sale.id}
+                          onClick={() => void startEditRecentSale(sale)}
+                          className="shrink-0 text-gray-400 hover:text-amber-600 disabled:opacity-40"
+                        >
+                          {loadingEditSaleId === sale.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Pencil className="w-3 h-3" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          title="Reprint"
+                          disabled={reprintingSaleId === sale.id}
+                          onClick={() => void reprintRecentSale(sale)}
+                          className="shrink-0 text-gray-400 hover:text-[#1e3a8a] disabled:opacity-40"
+                        >
+                          {reprintingSaleId === sale.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Printer className="w-3 h-3" />
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {lineDiscountTotal > 0 && (
+                <div className="flex justify-between text-xs text-green-600">
+                  <span>Line discounts</span>
+                  <span>− {formatCurrency(lineDiscountTotal)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm font-semibold text-gray-800">
                 <span>Total</span>
                 <span className="text-[#1e3a8a]">
@@ -2412,11 +4301,12 @@ const QuickPOSPage: React.FC = () => {
                 </span>
               </div>
               <button
+                type="button"
                 onClick={goToCustomer}
-                disabled={cart.length === 0}
+                disabled={cart.length === 0 || isProcessing}
                 className="w-full py-3 rounded-xl bg-[#1e3a8a] text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-[#1e40af] transition-colors"
               >
-                Proceed to Checkout <ChevronRight className="w-4 h-4" />
+                Checkout <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </>
@@ -2441,7 +4331,7 @@ const QuickPOSPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className={`flex-1 overflow-y-auto p-4 ${isCheckoutLayout ? "lg:p-6" : ""} space-y-4`}>
               {/* Customer search */}
               <div className="relative">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -2481,6 +4371,7 @@ const QuickPOSPage: React.FC = () => {
                         setCustomerEmail("");
                         setRecipientAddress("");
                         setRecipientCity("");
+                        setLoyaltyRedeemInput("");
                       }}
                       className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
                     >
@@ -2521,6 +4412,9 @@ const QuickPOSPage: React.FC = () => {
                             </p>
                             <p className="text-[10px] text-gray-400">
                               {c.phone || c.contactNumber}
+                              {Number(c.loyaltyPoints) > 0
+                                ? ` · ${c.loyaltyPoints} pts`
+                                : ""}
                             </p>
                           </div>
                         </button>
@@ -2534,18 +4428,52 @@ const QuickPOSPage: React.FC = () => {
               {selectedCustomer && (
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
                   <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-green-800">
                       {selectedCustomer.name}
                     </p>
                     <p className="text-[10px] text-green-600">
                       {selectedCustomer.phone || selectedCustomer.contactNumber}
+                      {loyaltyAvailable > 0
+                        ? ` · ${loyaltyAvailable} loyalty pts (1 pt = Rs.1)`
+                        : ""}
                     </p>
                   </div>
                 </div>
               )}
+              {selectedCustomer && loyaltyAvailable > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Redeem loyalty points
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={loyaltyAvailable}
+                      value={loyaltyRedeemInput}
+                      onChange={(e) => setLoyaltyRedeemInput(e.target.value)}
+                      placeholder="0"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLoyaltyRedeemInput(String(loyaltyAvailable))}
+                      className="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                    >
+                      All
+                    </button>
+                  </div>
+                  {loyaltyRedeem > 0 && (
+                    <p className="text-[11px] text-green-700 mt-1">
+                      Redeeming {loyaltyRedeem} pts = {formatCurrency(loyaltyRedeem)} off
+                    </p>
+                  )}
+                </div>
+              )}
 
-              {/* ── Advance Payment (auto-creates a Job) ── */}
+              {/* ── Advance Payment + Courier (side by side in checkout layout) ── */}
+              <div className={isCheckoutLayout ? "grid grid-cols-1 xl:grid-cols-2 gap-4 items-start" : "space-y-4"}>
               <div className="rounded-xl border border-gray-200 p-3 space-y-3">
                 <button
                   type="button"
@@ -2597,11 +4525,11 @@ const QuickPOSPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Auto job summary — type & title from product, due date auto */}
+                    {/* Auto job summary   type & title from product, due date auto */}
                     <div className="rounded-lg bg-gray-50 border border-gray-100 p-2.5 space-y-2">
                       <div>
                         <label className="block text-[11px] text-gray-500 mb-1">
-                          Job type (auto — change if needed)
+                          Job type (auto   change if needed)
                         </label>
                         <select
                           value={saleJob.jobType}
@@ -2704,6 +4632,7 @@ const QuickPOSPage: React.FC = () => {
                         setIsAdvancePayment(false);
                         setAdvanceDueDate("");
                         setPartialAmountInput("");
+                        setSplitRows([]);
                       } else {
                         setShippingCharge(0);
                         setInsuranceCharge(0);
@@ -2802,7 +4731,7 @@ const QuickPOSPage: React.FC = () => {
                             </button>
                           </div>
                           <p className="mt-1 text-[11px] text-gray-400">
-                            Use a USB/barcode reader on this step — the tracking
+                            Use a USB/barcode reader on this step   the tracking
                             number fills automatically. It is saved as the
                             shipment and tracking number on the courier record.
                           </p>
@@ -2977,6 +4906,7 @@ const QuickPOSPage: React.FC = () => {
                   </div>
                 )}
               </div>
+              </div>
 
               <p className="text-xs text-gray-400 text-center">
                 {isCourierStockAdjustmentOnly
@@ -3021,16 +4951,16 @@ const QuickPOSPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${isCheckoutLayout ? "lg:p-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0 lg:content-start" : ""}`}>
               {/* Optional: turn this sale into a Job (auto-creates a Sale Job).
-                  Hidden for advance payments — those are always jobs and are
+                  Hidden for advance payments   those are always jobs and are
                   configured (type/title/due/priority) back on the customer step. */}
               {isAdvancePayment ? (
                 <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 flex items-center gap-2">
                   <Briefcase className="w-4 h-4 shrink-0" />
                   <span>
                     Advance job:{" "}
-                    <strong>{SALE_JOB_TYPE_LABELS[saleJob.jobType]}</strong> —{" "}
+                    <strong>{SALE_JOB_TYPE_LABELS[saleJob.jobType]}</strong>  {" "}
                     {saleJob.title || "untitled"}
                   </span>
                 </div>
@@ -3042,12 +4972,24 @@ const QuickPOSPage: React.FC = () => {
               <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 text-xs">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal ({cart.length} items)</span>
-                  <span>{formatCurrency(subtotal)}</span>
+                  <span>{formatCurrency(grossSubtotal)}</span>
                 </div>
-                {discountVal > 0 && (
+                {lineDiscountTotal > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>- {formatCurrency(discountVal)}</span>
+                    <span>Line discounts</span>
+                    <span>- {formatCurrency(lineDiscountTotal)}</span>
+                  </div>
+                )}
+                {billDiscount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Bill discount</span>
+                    <span>- {formatCurrency(billDiscount)}</span>
+                  </div>
+                )}
+                {loyaltyRedeem > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Loyalty ({loyaltyRedeem} pts)</span>
+                    <span>- {formatCurrency(loyaltyRedeem)}</span>
                   </div>
                 )}
                 {courierEnabled && (
@@ -3133,12 +5075,38 @@ const QuickPOSPage: React.FC = () => {
                 </div>
               ) : null}
 
+              {selectedCustomer && loyaltyAvailable > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    Redeem loyalty ({loyaltyAvailable} pts, 1 pt = Rs.1)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={loyaltyAvailable}
+                      value={loyaltyRedeemInput}
+                      onChange={(e) => setLoyaltyRedeemInput(e.target.value)}
+                      placeholder="0"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLoyaltyRedeemInput(String(loyaltyAvailable))}
+                      className="px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                    >
+                      All
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Payment method */}
-              <div>
+              <div className={isCheckoutLayout ? "lg:col-span-2" : undefined}>
                 <label className="text-xs font-medium text-gray-600 mb-1.5 block">
                   Payment Method
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                <div className={`grid gap-2 ${isCheckoutLayout ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"}`}>
                   {[
                     ...(!courierEnabled
                       ? [
@@ -3186,6 +5154,9 @@ const QuickPOSPage: React.FC = () => {
                       onClick={() => {
                         setPaymentMethod(val);
                         setPartialAmountInput("");
+                        if (["KOKO", "MINTPAY", "PAZY", "COD"].includes(val)) {
+                          setSplitRows([]);
+                        }
                         if (val !== "CASH") {
                           setIsAdvancePayment(false);
                           setAdvanceDueDate("");
@@ -3202,7 +5173,127 @@ const QuickPOSPage: React.FC = () => {
                     </button>
                   ))}
                 </div>
+                {canSplitPay && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        isSplitTender ? setSplitRows([]) : enableSplitTender()
+                      }
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${
+                        isSplitTender
+                          ? "bg-[#1e3a8a] text-white border-[#1e3a8a]"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <Split className="w-3.5 h-3.5" />
+                      {isSplitTender ? "Split on" : "Split tender"}
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {isSplitTender && (
+                <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+                  <p className="text-xs font-semibold text-gray-700">
+                    Split tender   amounts must equal {formatCurrency(total)}
+                  </p>
+                  {splitRows.map((row) => (
+                    <div key={row.id} className="flex items-center gap-2">
+                      <select
+                        value={row.method}
+                        onChange={(e) =>
+                          updateSplitRow(row.id, {
+                            method: e.target.value as SplitPayMethod,
+                          })
+                        }
+                        className="w-28 px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white"
+                      >
+                        {SPLIT_PAY_OPTIONS.map((opt) => (
+                          <option key={opt.val} value={opt.val}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.amount}
+                        onChange={(e) =>
+                          updateSplitRow(row.id, { amount: e.target.value })
+                        }
+                        placeholder="0.00"
+                        className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-lg"
+                      />
+                      {splitRemainder > 0.009 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateSplitRow(row.id, {
+                              amount: (
+                                (parseFloat(row.amount) || 0) + splitRemainder
+                              ).toFixed(2),
+                            })
+                          }
+                          className="text-[11px] font-semibold text-[#1e3a8a] shrink-0"
+                        >
+                          Fill
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeSplitRow(row.id)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {splitRows.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={addSplitRow}
+                      className="text-xs font-semibold text-[#1e3a8a] inline-flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Add payment
+                    </button>
+                  )}
+                  <p
+                    className={`text-xs font-medium ${
+                      splitOk ? "text-green-600" : "text-amber-700"
+                    }`}
+                  >
+                    {splitOk
+                      ? "Split covers the total"
+                      : `Allocated ${formatCurrency(splitAllocated)} · remaining ${formatCurrency(Math.abs(splitRemainder))}${
+                          splitRemainder < 0 ? " over" : ""
+                        }`}
+                  </p>
+                  {splitRows.some((row) => row.method === "CASH") && (
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 mb-1 block">
+                        Cash received{" "}
+                        <span className="text-gray-400">
+                          (optional, for change)
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={cashReceived}
+                        onChange={(e) => setCashReceived(e.target.value)}
+                        placeholder={String(
+                          splitRows.find((row) => row.method === "CASH")
+                            ?.amount || "",
+                        )}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Pending payment notice for BNPL methods */}
               {["KOKO", "MINTPAY", "PAZY"].includes(paymentMethod) && (
@@ -3220,10 +5311,10 @@ const QuickPOSPage: React.FC = () => {
               )}
 
               {/* Cash received */}
-              {paymentMethod === "CASH" && (
+              {paymentMethod === "CASH" && !isSplitTender && (
                 <div className="space-y-3">
                   {/* Advance is decided on the customer step (it makes the sale a
-                      job). A normal cash sale can't be switched to advance here —
+                      job). A normal cash sale can't be switched to advance here  
                       it must be paid in full. */}
                   {isAdvancePayment && (
                     <div className="w-full flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
@@ -3268,7 +5359,7 @@ const QuickPOSPage: React.FC = () => {
                       {isPartialPayment && (
                         <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
                           <Clock className="w-3.5 h-3.5 shrink-0" />
-                          Balance remaining:{" "}
+                          Credit / Due remaining:{" "}
                           <strong>{formatCurrency(remainingBalance)}</strong>
                         </div>
                       )}
@@ -3307,6 +5398,7 @@ const QuickPOSPage: React.FC = () => {
 
               {/* Amount being paid (non-cash methods – supports partial payments) */}
               {paymentMethod !== "CASH" &&
+                !isSplitTender &&
                 !["KOKO", "MINTPAY", "PAZY"].includes(paymentMethod) && (
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1.5 block">
@@ -3327,7 +5419,7 @@ const QuickPOSPage: React.FC = () => {
                     {isPartialPayment && (
                       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
                         <Clock className="w-3.5 h-3.5 shrink-0" />
-                        Partial payment – remaining balance:{" "}
+                        Credit / Due remaining:{" "}
                         <strong>{formatCurrency(remainingBalance)}</strong>
                       </div>
                     )}
@@ -3368,7 +5460,7 @@ const QuickPOSPage: React.FC = () => {
                   {isPartialPayment && (
                     <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
                       <Clock className="w-3.5 h-3.5 shrink-0" />
-                      Partial payment – remaining:{" "}
+                      Credit / Due remaining:{" "}
                       <strong>{formatCurrency(remainingBalance)}</strong>
                     </div>
                   )}
@@ -3392,11 +5484,13 @@ const QuickPOSPage: React.FC = () => {
 
             <div className="border-t border-gray-100 p-4 space-y-2">
               <button
-                onClick={handleProcessSale}
+                onClick={() => void handleProcessSale()}
                 disabled={
                   isProcessing ||
+                  (isSplitTender && !splitOk) ||
                   (paymentMethod === "CASH" &&
                     !isAdvancePayment &&
+                    !isSplitTender &&
                     cashReceived.trim() !== "" &&
                     (parseFloat(cashReceived) || 0) < total) ||
                   (paymentMethod === "CASH" &&
@@ -3432,10 +5526,20 @@ const QuickPOSPage: React.FC = () => {
                     <Clock className="w-4 h-4" /> Place Order –{" "}
                     {formatCurrency(total)}
                   </>
+                ) : isSplitTender ? (
+                  <>
+                    <Split className="w-4 h-4" /> Complete Split –{" "}
+                    {formatCurrency(total)}
+                  </>
                 ) : isPartialPayment ? (
                   <>
-                    <CheckCircle className="w-4 h-4" /> Record Partial –{" "}
+                    <CheckCircle className="w-4 h-4" /> Record Credit / Due –{" "}
                     {formatCurrency(paidAmount)}
+                  </>
+                ) : editingSaleId ? (
+                  <>
+                    <Pencil className="w-4 h-4" /> Update Sale –{" "}
+                    {formatCurrency(total)}
                   </>
                 ) : (
                   <>
@@ -3481,10 +5585,10 @@ const QuickPOSPage: React.FC = () => {
                     <Clock className="w-9 h-9 text-orange-500" />
                   </div>
                   <h2 className="text-lg font-bold text-gray-900">
-                    Partial Payment Recorded!
+                    Credit / Due recorded
                   </h2>
                   <p className="text-sm text-orange-600 mt-1 font-medium">
-                    Balance Outstanding
+                    Credit / Due outstanding
                   </p>
                   <p className="text-sm text-gray-500 mt-0.5">
                     Sale #{saleResult.saleNumber}
@@ -3535,7 +5639,7 @@ const QuickPOSPage: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex justify-between text-red-600 font-semibold">
-                        <span>Remaining Balance</span>
+                        <span>Credit / Due</span>
                         <span>
                           {formatCurrency(saleResult.remainingBalance)}
                         </span>
@@ -3683,6 +5787,609 @@ const QuickPOSPage: React.FC = () => {
           defaultPrinterId={posSettings.defaultPrinterId}
           defaultFormat={posSettings.defaultFormat}
         />
+      )}
+
+      <PosReturnDrawer
+        open={showPosReturn}
+        locationId={posLocationId}
+        userId={user?.id}
+        onClose={() => setShowPosReturn(false)}
+        onCompleted={() => {
+          void loadProducts();
+          void loadRecentSales();
+        }}
+      />
+
+      <PosExchangeDrawer
+        open={showPosExchange}
+        locationId={posLocationId}
+        userId={user?.id}
+        replacementItems={cart.map((item) => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: Number(item.price),
+          costPrice: item.costPrice,
+          discount: lineDiscountLkr(item),
+          warrantyMonths: isWarrantyIssuingLine(item) ? item.warrantyMonths : 0,
+          serialNumber: item.serialNumber?.trim() || undefined,
+          reloadPhone: item.reloadPhone,
+        }))}
+        replacementTotal={total}
+        customerId={selectedCustomer?.id}
+        customerName={customerName || selectedCustomer?.name}
+        customerPhone={customerPhone || selectedCustomer?.phone}
+        onClose={() => setShowPosExchange(false)}
+        onCompleted={() => {
+          clearCart();
+          void loadProducts();
+          void loadRecentSales();
+        }}
+      />
+
+      {showHeldCarts && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowHeldCarts(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white border border-gray-200 p-5 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Pause className="w-4 h-4" />
+                Parked carts
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowHeldCarts(false)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {heldCarts.length === 0 ? (
+              <p className="text-sm text-gray-500">No parked carts for this location.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {heldCarts.map((row) => (
+                  <li key={row.id} className="py-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">
+                        {row.note || "Held cart"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {row.itemCount} items · {formatCurrency(Number(row.totalAmount) || 0)}
+                        {row.heldBy?.name ? ` · ${row.heldBy.name}` : ""}
+                      </p>
+                      <p className="text-[11px] text-gray-400">
+                        {row.createdAt
+                          ? new Date(row.createdAt).toLocaleString()
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => void resumeHeldCart(row.id)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-md bg-[#1e3a8a] text-white"
+                      >
+                        Resume
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void discardHeld(row.id)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-md text-red-600 hover:bg-red-50"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-gray-400 mt-3">
+              Held carts are stored separately from sales. Stock is not reserved
+              until you complete the sale.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showQuotations && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowQuotations(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white border border-gray-200 p-5 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Open quotations
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowQuotations(false)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {quotations.length === 0 ? (
+              <p className="text-sm text-gray-500">No open quotes for this location.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {quotations.map((row) => (
+                  <li key={row.id} className="py-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">
+                        {row.quoteNumber}
+                        {row.note ? ` · ${row.note}` : ""}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {row.itemCount} items · {formatCurrency(Number(row.totalAmount) || 0)}
+                        {row.customerName ? ` · ${row.customerName}` : ""}
+                      </p>
+                      <p className="text-[11px] text-gray-400">
+                        {row.expiresAt
+                          ? `Expires ${new Date(row.expiresAt).toLocaleDateString()}`
+                          : row.createdAt
+                            ? new Date(row.createdAt).toLocaleString()
+                            : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => void resumeQuote(row.id)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-md bg-[#1e3a8a] text-white"
+                      >
+                        Load
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void voidQuote(row.id)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-md text-red-600 hover:bg-red-50"
+                      >
+                        Void
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-gray-400 mt-3">
+              Quotes do not reserve stock. Completing the sale converts the loaded quote.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showRecentSales && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowRecentSales(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white border border-gray-200 p-5 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <History className="w-4 h-4" />
+                Recent completed sales
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowRecentSales(false)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {recentSales.length === 0 ? (
+              <p className="text-sm text-gray-500 py-6 text-center">
+                No completed sales for this location yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {recentSales.map((sale) => (
+                  <li
+                    key={sale.id}
+                    className="py-2.5 flex items-center gap-3 text-sm"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900 truncate">
+                        {sale.saleNumber}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {sale.customerName || "Walk-in"}
+                        {sale.paymentMethod ? ` · ${sale.paymentMethod}` : ""}
+                        {sale.createdAt
+                          ? ` · ${new Date(sale.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`
+                          : ""}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold text-[#1e3a8a] shrink-0">
+                      {formatCurrency(sale.totalAmount)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={loadingEditSaleId === sale.id}
+                      onClick={() => void startEditRecentSale(sale)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 disabled:opacity-40"
+                    >
+                      {loadingEditSaleId === sale.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Pencil className="w-3 h-3" />
+                      )}
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      disabled={reprintingSaleId === sale.id}
+                      onClick={() => void reprintRecentSale(sale)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-40"
+                    >
+                      {reprintingSaleId === sale.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Printer className="w-3 h-3" />
+                      )}
+                      Reprint
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showRegister && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowRegister(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white border border-gray-200 p-5 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Banknote className="w-4 h-4" />
+                Register
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowRegister(false)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {registerBusy && !dayBalance ? (
+              <div className="py-8 flex justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-[#1e3a8a]" />
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Status</span>
+                  <span
+                    className={`font-semibold ${
+                      activeDrawerRecord ? "text-emerald-700" : "text-amber-700"
+                    }`}
+                  >
+                    {activeDrawerRecord ? "Open" : "Closed"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Opening cash</span>
+                  <span>
+                    {formatCurrency(
+                      dayBalance?.cashFlow.openingBalance ??
+                        activeDrawerRecord?.openingBalance ??
+                        0,
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cash sales</span>
+                  <span>
+                    {formatCurrency(dayBalance?.paymentBreakdown.cash ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Card</span>
+                  <span>
+                    {formatCurrency(dayBalance?.paymentBreakdown.card ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Bank</span>
+                  <span>
+                    {formatCurrency(
+                      dayBalance?.paymentBreakdown.bankTransfer ?? 0,
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cash refunds</span>
+                  <span>
+                    {formatCurrency(dayBalance?.cashFlow.cashRefunds ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Petty cash out</span>
+                  <span>
+                    {formatCurrency(dayBalance?.cashFlow.pettyCashOut ?? 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between font-semibold pt-1 border-t border-gray-100">
+                  <span>Expected cash</span>
+                  <span>
+                    {formatCurrency(
+                      dayBalance?.cashFlow.totalExpectedCash ??
+                        activeDrawerRecord?.expectedClosingBalance ??
+                        0,
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Today POS sales</span>
+                  <span>
+                    {dayBalance?.todaySales.totalPOSSalesCount ?? 0} ·{" "}
+                    {formatCurrency(dayBalance?.todaySales.totalPOSRevenue ?? 0)}
+                  </span>
+                </div>
+                {daySummary && (
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-2.5 space-y-1 text-xs">
+                    <div className="flex justify-between font-semibold text-emerald-900">
+                      <span>Today profit</span>
+                      <span>{formatCurrency(daySummary.netProfit)}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-800">
+                      <span>Revenue / cost</span>
+                      <span>
+                        {formatCurrency(daySummary.revenue)} / {formatCurrency(daySummary.cogs)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-emerald-800">
+                      <span>Refunds / petty</span>
+                      <span>
+                        {formatCurrency(daySummary.refunds)} / {formatCurrency(daySummary.pettyExpenses)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div className="rounded-lg border border-gray-100 p-2.5 space-y-2">
+                  <p className="text-xs font-semibold text-gray-800 flex items-center gap-1">
+                    <Wallet className="w-3.5 h-3.5" /> Petty cash out
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={pettyAmount}
+                      onChange={(e) => setPettyAmount(e.target.value)}
+                      placeholder="Amount"
+                      className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded-lg"
+                    />
+                    <select
+                      value={pettyCategory}
+                      onChange={(e) => setPettyCategory(e.target.value)}
+                      className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white"
+                    >
+                      <option value="TEA">Tea</option>
+                      <option value="TRANSPORT">Transport</option>
+                      <option value="PACKAGING">Packaging</option>
+                      <option value="UTILITIES">Utilities</option>
+                      <option value="MAINTENANCE">Maintenance</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  <input
+                    value={pettyNote}
+                    onChange={(e) => setPettyNote(e.target.value)}
+                    placeholder="Note (optional)"
+                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingPetty}
+                    onClick={() => void submitPettyExpense()}
+                    className="w-full py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold disabled:opacity-40"
+                  >
+                    {savingPetty ? "Saving…" : "Record petty out"}
+                  </button>
+                  {posExpenses.length > 0 && (
+                    <ul className="max-h-24 overflow-y-auto divide-y divide-gray-50">
+                      {posExpenses.map((row) => (
+                        <li key={row.id} className="py-1 flex justify-between gap-2 text-[11px]">
+                          <span className="truncate">
+                            {row.category} · {formatCurrency(Number(row.amount))}
+                            {row.note ? ` · ${row.note}` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await voidExpense(row.id);
+                              await openRegister();
+                            }}
+                            className="text-red-500 hover:underline shrink-0"
+                          >
+                            Void
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {activeDrawerRecord && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClosingCash(
+                        String(
+                          dayBalance?.cashFlow.totalExpectedCash ??
+                            activeDrawerRecord.expectedClosingBalance ??
+                            "",
+                        ),
+                      );
+                      setShowCloseRegister(true);
+                    }}
+                    className="mt-3 w-full py-2.5 rounded-xl bg-slate-800 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-slate-900"
+                  >
+                    <Lock className="w-4 h-4" /> Close register
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showCloseRegister && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowCloseRegister(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl bg-white border border-gray-200 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-bold text-gray-900 mb-3">
+              Counted cash
+            </h2>
+            <label className="text-xs font-medium text-gray-600 mb-1.5 block">
+              Closing cash in drawer
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={closingCash}
+              onChange={(e) => setClosingCash(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-3"
+            />
+            <label className="text-xs font-medium text-gray-600 mb-1.5 block">
+              Notes (optional)
+            </label>
+            <textarea
+              value={closingNotes}
+              onChange={(e) => setClosingNotes(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-3 resize-none"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCloseRegister(false)}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={registerBusy}
+                onClick={() => void submitCloseRegister()}
+                className="flex-1 py-2 rounded-lg bg-slate-800 text-white text-sm font-semibold disabled:opacity-40"
+              >
+                {registerBusy ? "Closing…" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showShortcutHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowShortcutHelp(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white border border-gray-200 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Keyboard className="w-4 h-4" />
+                Quick POS shortcuts
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowShortcutHelp(false)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <ul className="text-sm text-gray-700 space-y-2">
+              <li className="flex justify-between gap-4">
+                <span>Express cash (walk-in)</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">Shift+E</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Focus product search</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">F4</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Last line quantity +</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">F2</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Clear cart</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">Shift+C</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Hold / park cart</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">Shift+H</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>POS return</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">Shift+R</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Retail / wholesale prices</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">Shift+W</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Exchange</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">Shift+X</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Cash register</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">Shift+G</kbd>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Save / load quote</span>
+                <span className="text-xs text-gray-500">Quote button</span>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>Split tender</span>
+                <span className="text-xs text-gray-500">Checkout</span>
+              </li>
+              <li className="flex justify-between gap-4">
+                <span>This help</span>
+                <kbd className="text-xs font-semibold bg-gray-100 px-1.5 py-0.5 rounded">?</kbd>
+              </li>
+            </ul>
+            <p className="text-xs text-gray-400 mt-3">
+              Courier, advance, and BNPL still use Checkout. Enter is reserved
+              for the barcode scanner.
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, Search, Plus, Smartphone } from 'lucide-react';
+import { ClipboardList, Search, Plus, Smartphone, Car } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,8 @@ import AddDeviceModal from './AddDeviceModal';
 import AddCustomerModal from '../customers/AddCustomerModal';
 import LoadingSpinner from '../../common/LoadingSpinner';
 import { formatCurrency } from '../../../utils/currency';
+import { useBusinessContext } from '../../../context/BusinessContext';
+import { useGarage } from '../../../hooks/useGarage';
 
 interface AddJobSheetModalProps {
   isOpen: boolean;
@@ -53,6 +55,16 @@ export default function AddJobSheetModal({
   const { getCustomerDevices, createDevice } = useDevice();
   const { fetchData } = useFetch();
   const { getAllStaff } = useStaff();
+  // Garage orgs open job sheets for a customer VEHICLE instead of a device
+  const { isGarage } = useBusinessContext();
+  const garage = useGarage();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [showNewVehicle, setShowNewVehicle] = useState(false);
+  const [newVehicle, setNewVehicle] = useState({ registrationNo: '', make: '', model: '', currentMileage: '' });
 
   const [step, setStep] = useState(1); // 1: Customer, 2: Device, 3: Job Details
   const [loading, setLoading] = useState(false);
@@ -112,7 +124,8 @@ export default function AddJobSheetModal({
   // Load devices when customer selected
   useEffect(() => {
     if (selectedCustomer) {
-      loadCustomerDevices();
+      if (isGarage) loadCustomerVehicles();
+      else loadCustomerDevices();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer]);
@@ -233,6 +246,43 @@ export default function AddJobSheetModal({
     }
   };
 
+  const loadCustomerVehicles = async () => {
+    if (!selectedCustomer) return;
+    setLoadingVehicles(true);
+    try {
+      const res = await garage.getVehicles({ customerId: selectedCustomer.id, limit: 100 });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const list = (res?.data as any)?.vehicles ?? [];
+      setVehicles(Array.isArray(list) ? list : []);
+    } finally {
+      setLoadingVehicles(false);
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleVehicleSelect = (vehicle: any) => {
+    setSelectedVehicle(vehicle);
+  };
+
+  const handleCreateVehicle = async () => {
+    if (!selectedCustomer || !newVehicle.registrationNo || !newVehicle.make || !newVehicle.model) return;
+    const res = await garage.createVehicle({
+      customerId: selectedCustomer.id,
+      registrationNo: newVehicle.registrationNo.trim().toUpperCase(),
+      make: newVehicle.make.trim(),
+      model: newVehicle.model.trim(),
+      currentMileage: newVehicle.currentMileage ? Number(newVehicle.currentMileage) : null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const created = (res as any)?.data;
+    if (created?.id) {
+      await loadCustomerVehicles();
+      setSelectedVehicle(created);
+      setShowNewVehicle(false);
+      setNewVehicle({ registrationNo: '', make: '', model: '', currentMileage: '' });
+    }
+  };
+
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer);
     setFormData((prev) => ({ ...prev, customerId: customer.id }));
@@ -307,6 +357,9 @@ export default function AddJobSheetModal({
     setStep(1);
     setSelectedCustomer(null);
     setSelectedDevice(null);
+    setSelectedVehicle(null);
+    setVehicles([]);
+    setShowNewVehicle(false);
     setCustomerSearch('');
     setCustomers([]);
     setDevices([]);
@@ -336,10 +389,17 @@ export default function AddJobSheetModal({
 
     try {
       // Prepare data
-      const submitData = {
-        ...formData,
-        expectedCompletionDate: formData.expectedCompletionDate,
-      };
+      const submitData: CreateJobSheetData = isGarage
+        ? {
+            ...formData,
+            deviceId: undefined,
+            customerVehicleId: selectedVehicle?.id,
+            expectedCompletionDate: formData.expectedCompletionDate,
+          }
+        : {
+            ...formData,
+            expectedCompletionDate: formData.expectedCompletionDate,
+          };
      await onSubmit(submitData);
     // console.log(res)
     //   if(res){
@@ -354,7 +414,7 @@ export default function AddJobSheetModal({
   };
 
   const canProceedToStep2 = selectedCustomer !== null;
-  const canProceedToStep3 = selectedDevice !== null;
+  const canProceedToStep3 = isGarage ? selectedVehicle !== null : selectedDevice !== null;
   const canSubmit = formData.locationId && formData.issueDescription.length >= 10 && formData.expectedCompletionDate;
 
   if (!isOpen) return null;
@@ -375,7 +435,7 @@ export default function AddJobSheetModal({
                   </span>
                   <span className="text-gray-400">→</span>
                   <span className={`text-sm ${step >= 2 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>
-                    2. Device
+                    2. {isGarage ? 'Vehicle' : 'Device'}
                   </span>
                   <span className="text-gray-400">→</span>
                   <span className={`text-sm ${step >= 3 ? 'text-orange-600 font-medium' : 'text-gray-400'}`}>
@@ -477,7 +537,7 @@ export default function AddJobSheetModal({
                     disabled={!canProceedToStep2}
                     className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Next: Select Device
+                    {isGarage ? 'Next: Select Vehicle' : 'Next: Select Device'}
                   </button>
                 </div>
               </div>
@@ -501,6 +561,74 @@ export default function AddJobSheetModal({
                   </button>
                 </div>
 
+                {isGarage ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Select Vehicle <span className="text-red-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewVehicle((v) => !v)}
+                        className="inline-flex items-center text-sm text-orange-600 hover:text-orange-800 font-medium"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Register Vehicle
+                      </button>
+                    </div>
+
+                    {showNewVehicle && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-3 mb-3 border border-orange-200 bg-orange-50 rounded-lg">
+                        <input className="px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Reg No *" value={newVehicle.registrationNo}
+                          onChange={(e) => setNewVehicle({ ...newVehicle, registrationNo: e.target.value })} />
+                        <input className="px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Make *" value={newVehicle.make}
+                          onChange={(e) => setNewVehicle({ ...newVehicle, make: e.target.value })} />
+                        <input className="px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Model *" value={newVehicle.model}
+                          onChange={(e) => setNewVehicle({ ...newVehicle, model: e.target.value })} />
+                        <input className="px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Mileage (km)" type="number" value={newVehicle.currentMileage}
+                          onChange={(e) => setNewVehicle({ ...newVehicle, currentMileage: e.target.value })} />
+                        <div className="col-span-2 md:col-span-4 flex justify-end">
+                          <button type="button" onClick={handleCreateVehicle}
+                            disabled={!newVehicle.registrationNo || !newVehicle.make || !newVehicle.model}
+                            className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 disabled:opacity-50">
+                            Save Vehicle
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {loadingVehicles ? (
+                      <div className="p-8 border border-gray-200 rounded-lg text-center">
+                        <LoadingSpinner size="sm" />
+                      </div>
+                    ) : vehicles.length === 0 ? (
+                      <div className="p-8 border border-gray-200 rounded-lg text-center">
+                        <Car className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-600">No vehicles registered for this customer   use Register Vehicle</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {vehicles.map((v) => (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => handleVehicleSelect(v)}
+                            className={`p-4 border-2 rounded-lg text-left transition-all ${
+                              selectedVehicle?.id === v.id ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <p className="font-medium text-gray-900">{v.registrationNo}</p>
+                            <p className="text-sm text-gray-600 mt-1">{v.make} {v.model} {v.year ? `(${v.year})` : ''}</p>
+                            {v.currentMileage != null && (
+                              <p className="text-xs text-gray-500 mt-1">{Number(v.currentMileage).toLocaleString()} km</p>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                <>
                 {/* Devices List */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -587,6 +715,8 @@ export default function AddJobSheetModal({
                     </div>
                   )}
                 </div>
+                </>
+                )}
 
                 <div className="flex justify-between pt-4">
                   <button
@@ -621,9 +751,11 @@ export default function AddJobSheetModal({
                     <p className="text-sm font-medium text-gray-900">{selectedCustomer?.name}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600">Device</p>
+                    <p className="text-xs text-gray-600">{isGarage ? 'Vehicle' : 'Device'}</p>
                     <p className="text-sm font-medium text-gray-900">
-                      {selectedDevice?.brand} {selectedDevice?.model}
+                      {isGarage
+                        ? `${selectedVehicle?.registrationNo ?? ''}   ${selectedVehicle?.make ?? ''} ${selectedVehicle?.model ?? ''}`
+                        : `${selectedDevice?.brand ?? ''} ${selectedDevice?.model ?? ''}`}
                     </p>
                   </div>
                 </div>

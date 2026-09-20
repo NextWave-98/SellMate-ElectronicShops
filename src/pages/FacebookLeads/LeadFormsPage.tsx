@@ -65,7 +65,7 @@ const LeadFormsPage: React.FC = () => {
   const branchName = useMemo(() => {
     const map = new Map(branches.map((b) => [b.id, b.name]));
     return (id: string, form?: LeadForm) =>
-      form?.branch?.name || form?.Location?.name || map.get(id) || '—';
+      form?.branch?.name || form?.Location?.name || map.get(id) || ' ';
   }, [branches]);
 
   const handleCreate = async () => {
@@ -177,7 +177,7 @@ const LeadFormsPage: React.FC = () => {
               <Label>Form name</Label>
               <Input
                 className="mt-1.5"
-                placeholder="Colombo Branch — Website"
+                placeholder="Colombo Branch   Website"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />

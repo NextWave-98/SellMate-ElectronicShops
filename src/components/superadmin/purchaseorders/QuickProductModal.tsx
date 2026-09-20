@@ -253,7 +253,7 @@ export default function QuickProductModal({
             </div>
           </div>
 
-          {/* Initial stock — only when creating a new (non-variant) product */}
+          {/* Initial stock   only when creating a new (non-variant) product */}
           {!isEdit && (
             <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-3">
               <p className="text-sm font-semibold text-gray-800">Initial Stock (Optional)</p>
@@ -282,7 +282,7 @@ export default function QuickProductModal({
                       const label = type === 'WAREHOUSE' ? 'Warehouse' : type === 'BRANCH' ? 'Branch' : (l.locationType || 'Location');
                       return (
                         <option key={l.id} value={l.id}>
-                          {l.name}{l.locationCode ? ` (${l.locationCode})` : ''} — {label}
+                          {l.name}{l.locationCode ? ` (${l.locationCode})` : ''}   {label}
                         </option>
                       );
                     })}

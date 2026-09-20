@@ -9,7 +9,7 @@ export interface GlassModalProps {
   open: boolean
   onClose: () => void
   children: ReactNode
-  /** e.g. max-w-4xl — overrides default sm:max-w-lg */
+  /** e.g. max-w-4xl   overrides default sm:max-w-lg */
   maxWidth?: string
   className?: string
   panelClassName?: string

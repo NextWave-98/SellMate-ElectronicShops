@@ -14,7 +14,7 @@ import {
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://gadget-chain-manager-backend.vercel.app/api';
 
 /**
- * PUBLIC customer-facing rental fleet page — /rent/:businessId
+ * PUBLIC customer-facing rental fleet page   /rent/:businessId
  * Browse available vehicles for a date range and place a booking request.
  * No login required.
  */
@@ -94,7 +94,7 @@ export default function RentalFleetPage() {
           <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
             <Car className="w-8 h-8" /> {business?.name || 'Vehicle Rental'}
           </h1>
-          <p className="text-blue-100 text-sm mt-1">Choose your dates, pick a vehicle, and request a booking — we'll confirm by phone.</p>
+          <p className="text-blue-100 text-sm mt-1">Choose your dates, pick a vehicle, and request a booking   we'll confirm by phone.</p>
 
           {/* Date search */}
           <div className="bg-white rounded-2xl p-4 mt-5 shadow-lg flex flex-col sm:flex-row gap-3 items-end">
@@ -201,7 +201,7 @@ export default function RentalFleetPage() {
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Booking — {selected?.make} {selected?.model}</DialogTitle>
+            <DialogTitle>Request Booking   {selected?.make} {selected?.model}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
             <p className="text-sm text-muted-foreground">

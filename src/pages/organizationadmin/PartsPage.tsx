@@ -453,7 +453,7 @@ export default function PartsPage({ lockedLocationId }: PartsPageProps) {
       <Dialog open={showStock} onOpenChange={setShowStock}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Update Stock — {stockPart?.name}</DialogTitle>
+            <DialogTitle>Update Stock   {stockPart?.name}</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-3">
             {!lockedLocationId && (

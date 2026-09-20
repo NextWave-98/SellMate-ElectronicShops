@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SellMate System Quotation</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 10mm 11mm 11mm 11mm;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: #1f1630;
+      font-size: 9.2pt;
+      line-height: 1.35;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2.5px solid #ff6a00;
+    }
+
+    .logo {
+      height: 44px;
+      width: auto;
+      display: block;
+    }
+
+    .doc-meta { text-align: right; min-width: 200px; }
+
+    .doc-meta .label {
+      font-size: 8pt;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ff6a00;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .doc-meta h1 {
+      font-size: 15pt;
+      color: #3b1f6e;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 5px;
+    }
+
+    .meta-row { font-size: 8.5pt; color: #4a4060; }
+    .meta-row strong { color: #1f1630; }
+
+    .parties {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 10px 0 8px;
+    }
+
+    .party {
+      background: #faf7ff;
+      border: 1px solid #ebe4f7;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .party h3 {
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #ff6a00;
+      margin-bottom: 3px;
+    }
+
+    .party p { font-size: 8.5pt; color: #3a3150; }
+
+    .party .name {
+      font-weight: 700;
+      color: #3b1f6e;
+      font-size: 10pt;
+      margin-bottom: 1px;
+    }
+
+    .intro {
+      margin-bottom: 8px;
+      color: #3a3150;
+      font-size: 9pt;
+    }
+
+    .intro strong { color: #3b1f6e; }
+
+    .section-title {
+      background: linear-gradient(90deg, #3b1f6e 0%, #5a2f9e 100%);
+      color: #fff;
+      font-size: 9pt;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 5px;
+      margin: 8px 0 5px;
+    }
+
+    .modules {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 14px;
+    }
+
+    .module h4 {
+      font-size: 8.8pt;
+      color: #3b1f6e;
+      margin-bottom: 2px;
+      font-weight: 700;
+    }
+
+    .features {
+      columns: 2;
+      column-gap: 8px;
+    }
+
+    .features li {
+      list-style: none;
+      position: relative;
+      padding-left: 11px;
+      font-size: 8pt;
+      color: #2d2540;
+      margin: 1px 0;
+      break-inside: avoid;
+    }
+
+    .features li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 5px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #ff6a00;
+    }
+
+    .pricing {
+      margin-top: 10px;
+      border: 2px solid #3b1f6e;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .pricing-head {
+      background: #3b1f6e;
+      color: #fff;
+      padding: 6px 12px;
+      font-weight: 700;
+      font-size: 9.5pt;
+    }
+
+    table.price {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table.price th,
+    table.price td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid #ebe4f7;
+      font-size: 8.8pt;
+    }
+
+    table.price th {
+      background: #f7f3ff;
+      color: #3b1f6e;
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    table.price td.amt,
+    table.price th.amt {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    table.price tr.total td {
+      background: #fff7f0;
+      font-weight: 800;
+      font-size: 11pt;
+      color: #3b1f6e;
+      border-bottom: none;
+    }
+
+    table.price tr.total td.amt {
+      color: #ff6a00;
+      font-size: 13pt;
+    }
+
+    .validity {
+      display: inline-block;
+      margin-top: 8px;
+      background: #fff4eb;
+      color: #b34a00;
+      border: 1px solid #ffd2ad;
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 8pt;
+      font-weight: 600;
+    }
+
+    .terms { margin-top: 10px; }
+
+    .terms h4 {
+      font-size: 9pt;
+      color: #3b1f6e;
+      margin-bottom: 4px;
+    }
+
+    .terms ol {
+      padding-left: 16px;
+      color: #3a3150;
+      font-size: 8pt;
+    }
+
+    .terms li { margin: 2px 0; }
+
+    .signoff {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+      margin-top: 22px;
+    }
+
+    .sign-box {
+      border-top: 1.5px solid #cfc4e4;
+      padding-top: 6px;
+    }
+
+    .sign-box .role {
+      font-size: 7.5pt;
+      color: #7a6f90;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .sign-box .who {
+      font-weight: 700;
+      color: #3b1f6e;
+      margin-top: 22px;
+      font-size: 9pt;
+    }
+
+    .footer {
+      margin-top: 16px;
+      padding-top: 6px;
+      border-top: 1px solid #ebe4f7;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 7.5pt;
+      color: #7a6f90;
+    }
+
+    .footer .brand {
+      font-weight: 700;
+      color: #3b1f6e;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <img class="logo" src="sellmate-logo.png" alt="SellMate" />
+    <div class="doc-meta">
+      <div class="label">Commercial Quotation</div>
+      <h1>System Proposal</h1>
+      <div class="meta-row"><strong>Quote No:</strong> SM-QT-2026-0916</div>
+      <div class="meta-row"><strong>Date:</strong> 16 September 2026</div>
+      <div class="meta-row"><strong>Valid Until:</strong> 16 October 2026</div>
+    </div>
+  </header>
+
+  <div class="parties">
+    <div class="party">
+      <h3>From</h3>
+      <div class="name">SellMate</div>
+      <p>Sri Lanka</p>
+      <p>Tel: 078 751 4907 / 074 376 3907</p>
+      <p>Email: nextwavesoftwarehr@gmail.com</p>
+    </div>
+    <div class="party">
+      <h3>Prepared For</h3>
+      <div class="name">Valued Client</div>
+      <p>Customized SellMate deployment</p>
+      <p>Package: One-time customized system</p>
+    </div>
+  </div>
+
+  <p class="intro">
+    Thank you for considering <strong>SellMate</strong>. This quotation covers a
+    <strong>customized system</strong> for your business including POS, inventory,
+    finance, staff, reporting and more, at a fixed investment of
+    <strong>LKR 290,000.00</strong>.
+  </p>
+
+  <div class="section-title">1. Scope of Supply: Included Modules</div>
+
+  <div class="modules">
+    <div class="module">
+      <h4>A. Point of Sale &amp; Retail Sales</h4>
+      <ul class="features">
+        <li>Fast barcode / scanner POS</li>
+        <li>Cash, card, bank &amp; split payments</li>
+        <li>Hold / park &amp; resume sales</li>
+        <li>POS quotations to sale</li>
+        <li>Returns, exchanges &amp; discounts</li>
+        <li>Advance payments / deposits</li>
+        <li>Thermal &amp; A4 receipt printing</li>
+        <li>IMEI / serial capture</li>
+        <li>Loyalty points redemption</li>
+        <li>Mobile top-up / reload sales</li>
+        <li>Desktop offline POS</li>
+        <li>Mobile POS (Android / iOS)</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <h4>B. Inventory &amp; Multi-Location Stock</h4>
+      <ul class="features">
+        <li>Product catalogue &amp; variants</li>
+        <li>Categories, brands &amp; images</li>
+        <li>Multi-branch / warehouse stock</li>
+        <li>Low-stock &amp; reorder alerts</li>
+        <li>FIFO costing &amp; stock dashboard</li>
+        <li>Barcode / label generation</li>
+        <li>Stock transfers &amp; adjustments</li>
+        <li>Write-offs &amp; spare-parts stock</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <h4>C. Purchasing &amp; Suppliers</h4>
+      <ul class="features">
+        <li>Supplier management</li>
+        <li>Purchase orders</li>
+        <li>Goods receiving (partial)</li>
+        <li>Supplier payments tracking</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <h4>D. Customers, CRM &amp; Installments</h4>
+      <ul class="features">
+        <li>Customer database &amp; history</li>
+        <li>CRM tasks &amp; follow-ups</li>
+        <li>Hire-purchase / installments</li>
+        <li>Customer deposits</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <h4>E. Warranty &amp; Trade-In</h4>
+      <ul class="features">
+        <li>Warranty cards &amp; claims</li>
+        <li>Trade-in / buyback</li>
+        <li>Used stock conversion</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <h4>F. Staff, Roles &amp; Operations</h4>
+      <ul class="features">
+        <li>Multi-shop / branch management</li>
+        <li>Role-based access control</li>
+        <li>Staff &amp; attendance</li>
+        <li>Payroll module</li>
+        <li>Activity logs &amp; monitoring</li>
+        <li>Performance scorecard</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <h4>G. Finance, Reports &amp; Analytics</h4>
+      <ul class="features">
+        <li>Invoices &amp; public links</li>
+        <li>Payments management</li>
+        <li>Accounting &amp; journals</li>
+        <li>Sales, inventory &amp; P&amp;L</li>
+        <li>Staff / branch reports</li>
+        <li>PDF / Excel export</li>
+        <li>AI analytics dashboards</li>
+        <li>Live organization KPIs</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <h4>H. Website, Portal &amp; Alerts</h4>
+      <ul class="features">
+        <li>Website CMS</li>
+        <li>Public shop storefront</li>
+        <li>Customer portal</li>
+        <li>SMS &amp; email notifications</li>
+        <li>In-app notifications</li>
+        <li>Cloud setup guidance</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section-title">2. Investment Summary</div>
+
+  <div class="pricing">
+    <div class="pricing-head">Customized SellMate System: One-Time Package</div>
+    <table class="price">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="amt">Amount (LKR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            SellMate customized system<br />
+            <span style="font-size:7.5pt;color:#6a6080;">
+              Includes all modules listed in Section 1
+            </span>
+          </td>
+          <td class="amt">290,000.00</td>
+        </tr>
+        <tr class="total">
+          <td>Total Payable</td>
+          <td class="amt">LKR 290,000.00</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="validity">Quotation validity: 30 days from issue date</div>
+
+  <div class="terms">
+    <h4>3. Commercial Terms</h4>
+    <ol>
+      <li>Total package value is a fixed <strong>LKR 290,000.00</strong> for the customized system scope above.</li>
+      <li>Payment schedule (suggested): <strong>50% advance</strong> on confirmation, <strong>50% on delivery / go-live</strong>.</li>
+      <li>Training for key staff and basic go-live support are included within this package.</li>
+      <li>Ongoing hosting, SMS gateway charges, and third-party fees (if any) are billed separately at actual cost.</li>
+      <li>Customization beyond the listed scope will be estimated and quoted separately.</li>
+    </ol>
+  </div>
+
+  <div class="signoff">
+    <div class="sign-box">
+      <div class="role">Prepared by</div>
+      <div class="who">SellMate</div>
+      <div class="role" style="margin-top:3px;">Authorized Signature</div>
+    </div>
+    <div class="sign-box">
+      <div class="role">Accepted by (Client)</div>
+      <div class="who">Name / Company</div>
+      <div class="role" style="margin-top:3px;">Signature &amp; Date</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><span class="brand">SellMate</span></div>
+    <div>Quote SM-QT-2026-0916 | Confidential</div>
+  </div>
+</body>
+</html>

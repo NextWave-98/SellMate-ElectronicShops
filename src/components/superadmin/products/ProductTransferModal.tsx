@@ -59,7 +59,7 @@ export default function ProductTransferModal({ isOpen, onClose, onSuccess, wareh
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Debounced SERVER-side product search (top 20 matches) — replaces the old
+  // Debounced SERVER-side product search (top 20 matches)   replaces the old
   // 1000-product prefetch + client-side filtering.
   useEffect(() => {
     if (!searchQuery.trim()) {

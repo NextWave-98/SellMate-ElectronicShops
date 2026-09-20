@@ -34,7 +34,7 @@ export function PinFallbackModal({ open, onClose, action, onSubmit }: PinFallbac
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>PIN fallback — manager approval required</DialogTitle>
+          <DialogTitle>PIN fallback   manager approval required</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-gray-500">
           Face verification failed. Enter your attendance PIN. Your {action === 'check_in' ? 'check-in' : 'check-out'}

@@ -1,4 +1,4 @@
-# Car Wash — Full Guide
+# Car Wash   Full Guide
 
 **Industry:** `CAR_WASH` (or `GENERAL`)  
 **Permission:** `carwash.*`  
@@ -34,8 +34,8 @@ Related: `/superadmin/appointments` (industry feature `appointment`).
 
 ## Setup
 
-1. **Services** — create packages (name, duration minutes, price, vehicle size / class if used).
-2. **Memberships** — define packs (e.g. 8 or 10 washes / month, validity, price).
+1. **Services**   create packages (name, duration minutes, price, vehicle size / class if used).
+2. **Memberships**   define packs (e.g. 8 or 10 washes / month, validity, price).
 3. Ensure **staff** exist so queue assignment and performance work.
 4. Optional: enable **Appointments** for online slot booking.
 
@@ -65,10 +65,10 @@ Queued → In progress → Completed
 
 ## Connections
 
-- **Customers** — memberships and queue intake.
-- **Appointments** — online booking feeds the day’s queue.
-- **Staff / skills** — assignment and performance.
-- **Accounting** — wash income can be journalled at day end.
+- **Customers**   memberships and queue intake.
+- **Appointments**   online booking feeds the day’s queue.
+- **Staff / skills**   assignment and performance.
+- **Accounting**   wash income can be journalled at day end.
 - Not the same as rental fleet; wash is ticket-based.
 
 ### Public APIs (appointments)
@@ -82,11 +82,11 @@ SellMate public page: `/book/:businessId`
 
 ---
 
-## Full example — Sparkle Auto Spa (Nugegoda)
+## Full example   Sparkle Auto Spa (Nugegoda)
 
-**Service:** Exterior + Interior — **LKR 3,500**, 45 minutes.
+**Service:** Exterior + Interior   **LKR 3,500**, 45 minutes.
 
-**Member:** Dilani Fernando — 10-wash pack (7 left).
+**Member:** Dilani Fernando   10-wash pack (7 left).
 
 1. Dilani books Saturday **11:00** via Appointments.
 2. Ticket appears on **Queue**; assigned to washer **Ruwan**, bay 2.

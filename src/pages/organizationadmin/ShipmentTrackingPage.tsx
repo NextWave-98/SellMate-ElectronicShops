@@ -75,7 +75,7 @@ type DatePeriod = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 const getColomboDateString = () => todayColombo();
 
 const formatColomboDateTime = (value?: string | Date | null) => {
-  if (!value) return '—';
+  if (!value) return ' ';
   return new Date(value).toLocaleString('en-LK', {
     timeZone: 'Asia/Colombo',
     year: 'numeric',
@@ -86,7 +86,7 @@ const formatColomboDateTime = (value?: string | Date | null) => {
   });
 };
 
-/** Stable identity — must not be recreated each render. */
+/** Stable identity   must not be recreated each render. */
 const ORG_SHIPMENT_SCOPE = { scope: 'org' as const };
 
 const ShipmentTrackingPage = () => {
@@ -1183,7 +1183,7 @@ const ShipmentTrackingPage = () => {
             </button>
             <p className="text-xs text-gray-500">Click here to get actual result</p>
             {hasUnappliedSearch && (
-              <p className="text-xs text-orange-600 font-medium">Filters changed — click Search to apply</p>
+              <p className="text-xs text-orange-600 font-medium">Filters changed   click Search to apply</p>
             )}
           </div>
 
@@ -2107,7 +2107,7 @@ const CsvImportModal = ({
                 )}
                 {result.errors.length > 0 && (
                   <p className="text-sm text-red-700 mt-0.5">
-                    {result.errors.length} row{result.errors.length !== 1 ? 's' : ''} failed — see details below
+                    {result.errors.length} row{result.errors.length !== 1 ? 's' : ''} failed   see details below
                   </p>
                 )}
               </div>
@@ -2252,7 +2252,7 @@ const ShipmentsTable = ({
                         <span className="font-medium">{shipment.branchName}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-gray-400"> </span>
                     )}
                     {shipment.staffName && (
                       <div className="flex items-center gap-1.5 text-gray-600">
@@ -2267,7 +2267,7 @@ const ShipmentsTable = ({
                     const tracking = shipment.trackingNumber?.trim();
                     const awb = shipment.awb_number?.trim();
                     if (!tracking && !awb) {
-                      return <span className="text-xs text-gray-400">—</span>;
+                      return <span className="text-xs text-gray-400"> </span>;
                     }
                     const showBoth = !!(tracking && awb && tracking !== awb);
                     return (

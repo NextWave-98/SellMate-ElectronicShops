@@ -252,6 +252,23 @@ const useCustomer = () => {
     [baseFetchData]
   );
 
+  /**
+   * Bulk upload customers from CSV / Excel
+   * POST /customers/bulk-upload
+   */
+  const bulkUploadCustomers = useCallback(
+    async (file: File) => {
+      return await baseFetchData({
+        endpoint: '/customers/bulk-upload',
+        method: 'POST',
+        file,
+        silent: true,
+        successMessage: 'Customers uploaded successfully',
+      });
+    },
+    [baseFetchData]
+  );
+
   return {
     createCustomer,
     getCustomers,
@@ -262,6 +279,7 @@ const useCustomer = () => {
     addLoyaltyPoints,
     getCustomerStats,
     searchCustomers,
+    bulkUploadCustomers,
   };
 };
 

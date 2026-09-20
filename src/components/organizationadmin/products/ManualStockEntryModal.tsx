@@ -445,7 +445,7 @@ export default function ManualStockEntryModal({
                             </div>
                           </div>
 
-                          {/* Quantity input — only for simple (non-variant) products */}
+                          {/* Quantity input   only for simple (non-variant) products */}
                           {!product.hasVariants && (
                             <div className="flex items-center gap-3">
                               <div>

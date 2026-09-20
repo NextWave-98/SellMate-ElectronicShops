@@ -46,7 +46,7 @@ function money(n: number | string | null | undefined): string {
 function paymentLabel(method: string | null): string {
   if (method === 'COD') return 'Cash on Delivery';
   if (method === 'BANK_TRANSFER') return 'Bank Transfer';
-  return method || '—';
+  return method || ' ';
 }
 
 const StatusBadge: React.FC<{ status: WhatsAppOrderStatus }> = ({ status }) => (
@@ -115,7 +115,7 @@ const OrderCard: React.FC<{
 
           {open && (
             <div className="mt-3 space-y-2 rounded-md bg-muted/50 p-3 text-sm">
-              <div className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><span>{order.shippingAddress || '—'}</span></div>
+              <div className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /><span>{order.shippingAddress || ' '}</span></div>
               <div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-muted-foreground" /><span>{paymentLabel(order.paymentMethod)}</span></div>
               <div className="border-t border-border pt-2">
                 {order.items?.map((it, i) => (

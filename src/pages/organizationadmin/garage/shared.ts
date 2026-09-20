@@ -18,6 +18,8 @@ export const statusColor: Record<string, string> = {
 export interface EstItem {
   itemType: 'PART' | 'LABOR' | 'OUTWORK' | 'OTHER';
   description: string;
+  /** PART lines: stocked product issued from inventory when the estimate becomes a job */
+  productId?: string | null;
   quantity: number;
   laborHours?: number;
   unitPrice: number;

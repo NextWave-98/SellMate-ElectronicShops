@@ -1,4 +1,4 @@
-# Vehicle Rental — Full Guide
+# Vehicle Rental   Full Guide
 
 **Industry:** `VEHICLE_RENTAL` (or `GENERAL`)  
 **Permission:** `rental.*`  
@@ -66,7 +66,7 @@ PENDING → CONFIRMED → CHECKED_OUT → RETURNED → COMPLETED
    - Set start / end dates and times.
    - Optional: rate plan, with-driver, loan/replacement vehicle (for garage customers).
    - Capture **NIC**, **driving licence**, identity photos (`DriverLicensePicker`).
-2. **Get Quote** — days × day rate + pricing rules + extras − coupon → total + deposit.
+2. **Get Quote**   days × day rate + pricing rules + extras − coupon → total + deposit.
 3. **Create** → status `PENDING`.
 4. **Confirm** → `CONFIRMED`.
 5. **Check-Out (Handover)**
@@ -74,9 +74,9 @@ PENDING → CONFIRMED → CHECKED_OUT → RETURNED → COMPLETED
    - Condition photos, damage diagram (TOP / FRONT / REAR / LEFT / RIGHT; severity MINOR → MODERATE → SEVERE).
    - Customer signature, optional payment collected.
    - Status → `CHECKED_OUT`.
-6. **Check-In (Return)** — same condition payload; system can apply excess-km / late fees from rate plan → `RETURNED`.
+6. **Check-In (Return)**   same condition payload; system can apply excess-km / late fees from rate plan → `RETURNED`.
 7. **Complete** → `COMPLETED`.
-8. **Agreement** — view text, send SMS / WhatsApp, download PDF, print.
+8. **Agreement**   view text, send SMS / WhatsApp, download PDF, print.
 
 Cancel from pending/confirmed when needed → `CANCELLED`.
 
@@ -117,23 +117,23 @@ Cancel from pending/confirmed when needed → `CANCELLED`.
 
 ## Connections to other modules
 
-- **Customers** — required on desk bookings; public creates/links by phone.
-- **Garage** — `isLoanVehicle` for replacement cars while a workshop job is open.
-- **Towing** — roadside jobs may feed rental roadside assist.
-- **Accounting** — post rental income manually as journals.
-- **Website CMS** — publish gate for public fleet/booking.
+- **Customers**   required on desk bookings; public creates/links by phone.
+- **Garage**   `isLoanVehicle` for replacement cars while a workshop job is open.
+- **Towing**   roadside jobs may feed rental roadside assist.
+- **Accounting**   post rental income manually as journals.
+- **Website CMS**   publish gate for public fleet/booking.
 
 Rental vehicles are **not** POS stock products; they live in the rental fleet ledger.
 
 ---
 
-## Full example — Ceylon Drive Rentals (Colombo)
+## Full example   Ceylon Drive Rentals (Colombo)
 
 **Fleet:** Toyota Aqua `CAB-4521` (2021, auto, petrol), class Compact.
 
 **Rate:** LKR **8,500**/day, 100 km included, deposit LKR **25,000**.
 
-**Customer:** Kasun Perera — 077-1234567, NIC `199512345678`, licence `B2345678`.
+**Customer:** Kasun Perera   077-1234567, NIC `199512345678`, licence `B2345678`.
 
 **Trip:** Friday 10:00 → Sunday 10:00 (2 days).
 

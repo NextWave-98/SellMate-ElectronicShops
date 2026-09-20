@@ -344,7 +344,7 @@ const WooCommerceOrdersPage = () => {
         )
       );
       if (data.alreadyImported) {
-        toast.success(`Order #${data.wooOrderNumber}: already imported — stock not deducted again`);
+        toast.success(`Order #${data.wooOrderNumber}: already imported   stock not deducted again`);
       } else {
         toast.success(`Order #${data.wooOrderNumber}: ${data.deducted.length} item(s) deducted from inventory`);
       }
@@ -380,7 +380,7 @@ const WooCommerceOrdersPage = () => {
       const unresolved = readyOrder.line_items.filter((li) => !li.localProductId);
       if (unresolved.length > 0) {
         toast.error(
-          `Order #${readyOrder.number}: ${unresolved.length} product(s) not mapped to local inventory — sync WooCommerce products first`
+          `Order #${readyOrder.number}: ${unresolved.length} product(s) not mapped to local inventory   sync WooCommerce products first`
         );
         return;
       }
@@ -409,7 +409,7 @@ const WooCommerceOrdersPage = () => {
       const unresolved = readyOrder.line_items.filter((li) => !li.localProductId);
       if (unresolved.length > 0) {
         toast.error(
-          `Order #${readyOrder.number}: ${unresolved.length} product(s) not mapped to local inventory — sync WooCommerce products first`
+          `Order #${readyOrder.number}: ${unresolved.length} product(s) not mapped to local inventory   sync WooCommerce products first`
         );
         return;
       }
@@ -706,7 +706,7 @@ const WooCommerceOrdersPage = () => {
                                       <p className="text-xs text-green-600 font-medium mb-1">✓ Deducted</p>
                                       {impResult.deducted.map((d, i) => (
                                         <div key={i} className="text-xs text-gray-600">
-                                          {d.name} — qty {d.quantity}
+                                          {d.name}   qty {d.quantity}
                                         </div>
                                       ))}
                                     </div>
@@ -716,7 +716,7 @@ const WooCommerceOrdersPage = () => {
                                       <p className="text-xs text-red-500 font-medium mb-1">✗ Skipped</p>
                                       {impResult.skipped.map((s, i) => (
                                         <div key={i} className="text-xs text-gray-500">
-                                          {s.name} — {s.reason}
+                                          {s.name}   {s.reason}
                                         </div>
                                       ))}
                                     </div>
@@ -777,7 +777,7 @@ const WooCommerceOrdersPage = () => {
         )}
       </Card>
 
-      {/* Full Courier Modal — pre-filled from WooCommerce order */}
+      {/* Full Courier Modal   pre-filled from WooCommerce order */}
       {shipOrder && (() => {
         const recipient = getWooRecipient(shipOrder);
         const paymentMethod = mapWooPaymentMethod(shipOrder);

@@ -268,7 +268,7 @@ export const ScanBulkStatusModal = ({
                           #{s.shipment_number || s.tracking_number}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
-                          {s.recipient_name || '—'}
+                          {s.recipient_name || ' '}
                           {s.status ? ` · ${String(s.status).replace(/_/g, ' ')}` : ''}
                         </div>
                       </div>

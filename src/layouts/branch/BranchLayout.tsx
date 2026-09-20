@@ -4,6 +4,7 @@ import BranchSidebar from './BranchSidebar';
 import { useEffect, useRef, useState } from 'react';
 import { ShieldX, Loader2 } from 'lucide-react';
 import useBranchScope from '../../hooks/useBranchScope';
+import SubscriptionDueBanner from '../../components/billing/SubscriptionDueBanner';
 import { useActivityHeartbeat } from '../../hooks/useActivityHeartbeat';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
@@ -122,7 +123,14 @@ const BranchLayout = () => {
                 </div>
               </div>
             ) : (
-              <Outlet />
+              <>
+                {/* Subscription warning   staff see this too, not just the
+                    owner. Hidden in POS fullscreen, where the layout drops all
+                    its chrome deliberately. Renders nothing unless a payment
+                    is actually due. */}
+                {!hideChrome && <SubscriptionDueBanner />}
+                <Outlet />
+              </>
             )}
           </div>
         </main>

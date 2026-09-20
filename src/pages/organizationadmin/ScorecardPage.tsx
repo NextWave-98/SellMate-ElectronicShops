@@ -137,7 +137,7 @@ const ScorecardPage: React.FC = () => {
             Performance Scorecard
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Confirmation, delivery, billing, and discipline — live scores and monthly ranking.
+            Confirmation, delivery, billing, and discipline   live scores and monthly ranking.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -177,7 +177,7 @@ const ScorecardPage: React.FC = () => {
               </Button>
             )}
             {settings && !settings.enabled && (
-              <Badge variant="secondary">Feature off — scores not visible to staff</Badge>
+              <Badge variant="secondary">Feature off   scores not visible to staff</Badge>
             )}
           </CardContent>
         </Card>
@@ -274,7 +274,7 @@ const ScorecardPage: React.FC = () => {
                       <td className="px-3 py-2">{Number(row.billingPoints).toFixed(0)}</td>
                       <td className="px-3 py-2">{Number(row.disciplinePoints).toFixed(0)}</td>
                       <td className="px-3 py-2 font-semibold">{Number(row.totalScore).toFixed(0)}</td>
-                      <td className="px-3 py-2">{row.tier || '—'}</td>
+                      <td className="px-3 py-2">{row.tier || ' '}</td>
                     </tr>
                   ))
                 )}

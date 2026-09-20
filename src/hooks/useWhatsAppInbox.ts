@@ -90,7 +90,7 @@ export default function useWhatsAppInbox(businessId: string | undefined) {
       const list = await whatsappInboxService.getConversations(orgId);
       setConversations(list);
     } catch {
-      // silent — inbox shows empty state
+      // silent   inbox shows empty state
     } finally {
       setLoadingConversations(false);
     }
@@ -149,7 +149,7 @@ export default function useWhatsAppInbox(businessId: string | undefined) {
     }
   }, []);
 
-  // Initial load — runs once per businessId change only
+  // Initial load   runs once per businessId change only
   useEffect(() => {
     if (!businessId) return;
 
@@ -179,7 +179,7 @@ export default function useWhatsAppInbox(businessId: string | undefined) {
     };
   }, [businessId]);
 
-  // Socket — runs once per businessId change only
+  // Socket   runs once per businessId change only
   useEffect(() => {
     if (!businessId) return;
 

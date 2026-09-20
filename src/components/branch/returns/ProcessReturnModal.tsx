@@ -333,7 +333,7 @@ export default function ProcessReturnModal({
                       </option>
                       {purchaseOrderOptions.map(order => (
                         <option key={order.id} value={order.id}>
-                          {order.orderNumber} — {order.status}
+                          {order.orderNumber}   {order.status}
                         </option>
                       ))}
                     </select>

@@ -1,4 +1,4 @@
-# Accounting — Full Guide
+# Accounting   Full Guide
 
 **Industry:** All industries  
 **Permission:** `accounting.*`  
@@ -8,7 +8,7 @@
 
 ## Purpose
 
-Lightweight organisation ledger: chart of **accounts**, **journal** entries, and basic **reports**. Complements POS / vertical ops — it does not replace them.
+Lightweight organisation ledger: chart of **accounts**, **journal** entries, and basic **reports**. Complements POS / vertical ops   it does not replace them.
 
 ## Who uses it
 
@@ -31,7 +31,7 @@ Always visible by industry flag; still requires accounting permissions.
 
 ## Setup
 
-1. Open **Accounts** — create or review chart:
+1. Open **Accounts**   create or review chart:
    - Assets (cash, bank, receivables)
    - Liabilities (payables, deposits)
    - Equity
@@ -76,15 +76,15 @@ Accounts (chart) → Journals (daily postings) → Reports (period close)
 | Fuel / maintenance | Expense journals |
 | Bank | Cash / bank asset accounts |
 
-Automation from verticals into journals may be limited — treat accounting as the finance layer you post into.
+Automation from verticals into journals may be limited   treat accounting as the finance layer you post into.
 
 **No public APIs.**
 
 ---
 
-## Full example — Ceylon Drive month-end
+## Full example   Ceylon Drive month-end
 
-**18 Jul — three completed rentals, cash banked LKR 25,500**
+**18 Jul   three completed rentals, cash banked LKR 25,500**
 
 | Account | Debit | Credit |
 |---------|-------|--------|

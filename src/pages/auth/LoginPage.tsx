@@ -4,7 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Eye, EyeOff, CircleCheckBig, QrCode, ScanLine } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppSelector } from '../../store/hooks';
-import { selectIsAuthenticated, selectUser, selectAuthInitialized, selectRequiresBranchSelection } from '../../store/selectors';
+import { selectIsAuthenticated, selectUser, selectAuthInitialized, selectRequiresBranchSelection, selectBillingBlock } from '../../store/selectors';
+import SubscriptionBlockedNotice from '../../components/billing/SubscriptionBlockedNotice';
 import BarcodeScannerModal from '../../components/common/BarcodeScannerModal';
 import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
 import { glassInput } from '@/lib/glass';
@@ -26,6 +27,8 @@ const LoginPage = () => {
   const userRedux = useAppSelector(selectUser);
   const authInitialized = useAppSelector(selectAuthInitialized);
   const requiresBranchSelection = useAppSelector(selectRequiresBranchSelection);
+  // Set only when the login was refused because the subscription is unpaid.
+  const billingBlock = useAppSelector(selectBillingBlock);
 
   useEffect(() => {
     if (shouldNavigate && authInitialized && isAuthenticatedRedux && userRedux) {
@@ -152,10 +155,14 @@ const LoginPage = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-xl border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm text-red-600 backdrop-blur-sm">
-          {error}
-        </div>
+      {billingBlock ? (
+        <SubscriptionBlockedNotice block={billingBlock} message={error} />
+      ) : (
+        error && (
+          <div className="mb-5 rounded-xl border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm text-red-600 backdrop-blur-sm">
+            {error}
+          </div>
+        )
       )}
 
       {authMethod === 'password' ? (

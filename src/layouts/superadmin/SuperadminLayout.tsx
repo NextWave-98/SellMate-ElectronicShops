@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopNavbar from './TopNavbar';
 import { usePermissions } from '@/hooks/usePermissions';
+import SubscriptionDueBanner from '../../components/billing/SubscriptionDueBanner';
 import { useActivityHeartbeat } from '@/hooks/useActivityHeartbeat';
 import { PERMISSIONS } from '@/store/types';
 
@@ -126,6 +127,10 @@ export default function SuperadminLayout() {
           }`}
         >
           <div className="w-full max-w-full">
+            {/* Subscription warning on every screen, not only the dashboard.
+                Hidden in POS fullscreen. Renders nothing unless a payment is
+                actually due. */}
+            {!hideChrome && <SubscriptionDueBanner />}
             <Outlet />
           </div>
         </main>

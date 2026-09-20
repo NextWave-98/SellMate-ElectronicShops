@@ -10,7 +10,53 @@ export type UsageType =
   | 'DEMO'
   | 'DAMAGED'
   | 'MANUAL'
-  | 'OTHER';
+  | 'OTHER'
+  | 'EXPIRED'
+  | 'LOST'
+  | 'THEFT'
+  | 'SAMPLE'
+  | 'WRITE_OFF';
+
+/** Which side of the P&L a loss lands on. */
+export type LossBucket = 'COGS' | 'OPEX';
+
+/**
+ * Goods gone with no revenue   charged to cost of goods sold, so gross profit
+ * drops. These are the entries an owner should be chasing.
+ */
+export const COGS_LOSS_TYPES: UsageType[] = [
+  'DAMAGED',
+  'EXPIRED',
+  'LOST',
+  'THEFT',
+  'WRITE_OFF',
+];
+
+/** Stock the business consumed itself   an operating expense, not COGS. */
+export const INTERNAL_USE_TYPES: UsageType[] = ['INTERNAL', 'DEMO', 'SAMPLE'];
+
+/**
+ * Already priced into a job sheet or a sale. Logged for traceability, never
+ * counted as a loss   doing so would charge the same cost twice.
+ */
+export const ALREADY_COUNTED_TYPES: UsageType[] = ['JOB_SHEET', 'SALE', 'REPAIR'];
+
+/** Types a user may pick when logging a usage by hand. */
+export const MANUAL_USAGE_TYPES: UsageType[] = [
+  'DAMAGED',
+  'EXPIRED',
+  'LOST',
+  'THEFT',
+  'WRITE_OFF',
+  'INTERNAL',
+  'DEMO',
+  'SAMPLE',
+  'MANUAL',
+  'OTHER',
+];
+
+export const defaultLossBucket = (t: UsageType): LossBucket | null =>
+  COGS_LOSS_TYPES.includes(t) ? 'COGS' : INTERNAL_USE_TYPES.includes(t) ? 'OPEX' : null;
 
 export const USAGE_TYPE_LABELS: Record<UsageType, string> = {
   JOB_SHEET: 'Job Sheet',
@@ -18,9 +64,14 @@ export const USAGE_TYPE_LABELS: Record<UsageType, string> = {
   REPAIR: 'Repair',
   INTERNAL: 'Internal Use',
   DEMO: 'Demo / Display',
-  DAMAGED: 'Damaged / Write-off',
+  DAMAGED: 'Damaged',
   MANUAL: 'Manual Usage',
   OTHER: 'Other',
+  EXPIRED: 'Expired',
+  LOST: 'Lost',
+  THEFT: 'Theft',
+  SAMPLE: 'Sample / Giveaway',
+  WRITE_OFF: 'Write-off',
 };
 
 export const USAGE_TYPE_COLORS: Record<UsageType, string> = {
@@ -32,6 +83,11 @@ export const USAGE_TYPE_COLORS: Record<UsageType, string> = {
   DAMAGED: 'bg-red-100 text-red-800',
   MANUAL: 'bg-gray-100 text-gray-800',
   OTHER: 'bg-slate-100 text-slate-800',
+  EXPIRED: 'bg-orange-100 text-orange-800',
+  LOST: 'bg-rose-100 text-rose-800',
+  THEFT: 'bg-red-200 text-red-900',
+  SAMPLE: 'bg-teal-100 text-teal-800',
+  WRITE_OFF: 'bg-red-100 text-red-800',
 };
 
 export interface ProductUsageRecord {
@@ -68,6 +124,12 @@ export interface ProductUsageRecord {
     name: string;
     email: string;
   };
+  // Stock-loss accounting
+  isLoss?: boolean;
+  lossBucket?: LossBucket | null;
+  occurredAt?: string;
+  recoveredAmount?: number;
+  attachmentUrl?: string;
   createdAt: string;
 }
 
@@ -81,6 +143,14 @@ export interface CreateProductUsagePayload {
   referenceType?: string;
   referenceNumber?: string;
   notes?: string;
+  /** Omit and the backend classifies by usage type. Send for MANUAL / OTHER. */
+  isLoss?: boolean;
+  lossBucket?: LossBucket | null;
+  /** Back-date the entry so it lands in the month it actually happened. */
+  occurredAt?: string;
+  /** Value recovered   scrap sale, supplier credit. Net loss = cost − this. */
+  recoveredAmount?: number;
+  attachmentUrl?: string;
 }
 
 interface UsageFilters {
@@ -92,8 +162,19 @@ interface UsageFilters {
   usageType?: UsageType | '';
   startDate?: string;
   endDate?: string;
+  isLoss?: 'true' | 'false' | '';
+  lossBucket?: LossBucket | '';
   sortBy?: 'createdAt' | 'quantity' | 'totalCost';
   sortOrder?: 'asc' | 'desc';
+}
+
+export interface LossTotals {
+  /** Cost of the goods lost, before recovery. */
+  gross: number;
+  /** Value clawed back   scrap sale, supplier credit. */
+  recovered: number;
+  /** gross − recovered: what actually comes off the profit. */
+  net: number;
 }
 
 export interface UsageStats {
@@ -102,6 +183,17 @@ export interface UsageStats {
   totalThisWeek: number;
   totalThisMonth: number;
   byType: { usageType: string; count: string; totalQuantity: string; totalCost: string }[];
+  /**
+   * Rupee value of stock lost, net of anything recovered. Counts alone are
+   * misleading   ten damaged screen guards and one damaged laptop are both
+   * "1 entry"   so the value figures are what the page leads with.
+   */
+  loss?: {
+    allTime: LossTotals;
+    thisMonth: LossTotals;
+    thisMonthCogs: LossTotals;
+    thisMonthOpex: LossTotals;
+  };
 }
 
 export const useProductUsage = () => {

@@ -80,8 +80,22 @@ export const useTradeIn = () => {
   );
 
   const relistTradeIn = useCallback(
-    async (id: string, data: { unitPrice: number; name?: string; categoryId?: string }) =>
-      fetchData({ endpoint: `/trade-ins/${id}/relist`, method: 'POST', data, successMessage: 'Relisted as sellable product' }),
+    async (id: string, data: { unitPrice: number; locationId: string; name?: string; categoryId?: string }) =>
+      fetchData({ endpoint: `/trade-ins/${id}/relist`, method: 'POST', data, successMessage: 'Relisted and added to stock' }),
+    [fetchData]
+  );
+
+  /** How the customer was paid for a bought-in device (CASH also posts to that branch's drawer). */
+  const payoutTradeIn = useCallback(
+    async (id: string, data: { method: string; locationId?: string | null; reference?: string | null }) =>
+      fetchData({ endpoint: `/trade-ins/${id}/payout`, method: 'POST', data, successMessage: 'Payout recorded' }),
+    [fetchData]
+  );
+
+  /** Puts a device that was relisted with no branch (0 stock) into a branch's stock. */
+  const stockInTradeIn = useCallback(
+    async (id: string, data: { locationId: string }) =>
+      fetchData({ endpoint: `/trade-ins/${id}/stock-in`, method: 'POST', data, successMessage: 'Device added to stock' }),
     [fetchData]
   );
 
@@ -113,12 +127,12 @@ export const useTradeIn = () => {
   return useMemo(
     () => ({
       getStats, getQuote,
-      getTradeIns, getTradeInById, createTradeIn, updateTradeIn, relistTradeIn,
+      getTradeIns, getTradeInById, createTradeIn, updateTradeIn, relistTradeIn, stockInTradeIn, payoutTradeIn,
       getRules, createRule, updateRule, deleteRule,
     }),
     [
       getStats, getQuote,
-      getTradeIns, getTradeInById, createTradeIn, updateTradeIn, relistTradeIn,
+      getTradeIns, getTradeInById, createTradeIn, updateTradeIn, relistTradeIn, stockInTradeIn, payoutTradeIn,
       getRules, createRule, updateRule, deleteRule,
     ]
   );

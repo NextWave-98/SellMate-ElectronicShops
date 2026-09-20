@@ -1,7 +1,7 @@
 export type CourierImportRowError = { row: number; message: string };
 
 const DEFAULT_ROW_ERROR =
-  'Failed to create shipment — check product code, stock at the selected branch, city, phone number, and COD amount';
+  'Failed to create shipment   check product code, stock at the selected branch, city, phone number, and COD amount';
 
 /** Normalize backend / API error rows into a consistent { row, message } shape. */
 export function normalizeCourierImportRowErrors(raw: unknown): CourierImportRowError[] {
@@ -35,5 +35,5 @@ export function formatCourierImportErrorToast(errors: CourierImportRowError[]): 
     .map((e) => `Row ${e.row}: ${e.message}`)
     .join(' | ');
 
-  return `${errors.length} rows failed — ${preview}${errors.length > 3 ? ' …' : ''}`;
+  return `${errors.length} rows failed   ${preview}${errors.length > 3 ? ' …' : ''}`;
 }

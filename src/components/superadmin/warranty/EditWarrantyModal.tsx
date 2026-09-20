@@ -110,6 +110,7 @@ export default function EditWarrantyModal({ isOpen, onClose, warranty, onSuccess
                 <option value="EXTENDED">Extended</option>
                 <option value="LIMITED">Limited</option>
                 <option value="LIFETIME">Lifetime</option>
+                <option value="SERVICE">Service Warranty</option>
                 <option value="NO_WARRANTY">No Warranty</option>
               </select>
               {formik.touched.warrantyType && formik.errors.warrantyType && (

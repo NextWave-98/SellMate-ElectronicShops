@@ -1,4 +1,4 @@
-# Contabo production — SellMate Electronic Shops frontend only.
+# Contabo production   SellMate Electronic Shops frontend only.
 # Host nginx on :4173 proxies to this container (:4174).
 # API calls go to https://api2.sellmate.lk (VITE_BASE_URL).
 # Does NOT touch gadgetchain-api / shipex containers.

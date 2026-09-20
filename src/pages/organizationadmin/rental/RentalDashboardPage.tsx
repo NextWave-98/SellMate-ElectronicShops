@@ -96,7 +96,7 @@ export default function RentalDashboardPage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2"><CardContent className="p-4">
-          <p className="font-semibold text-sm mb-3">Bookings & Revenue — last 6 months</p>
+          <p className="font-semibold text-sm mb-3">Bookings & Revenue   last 6 months</p>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={monthly} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -143,14 +143,14 @@ export default function RentalDashboardPage() {
               {recentBookings.map((b) => (
                 <tr key={b.id} className="border-t">
                   <td className="py-2 font-medium">{b.bookingNumber}</td>
-                  <td className="py-2">{b.vehicle?.registrationNo || '—'}</td>
-                  <td className="py-2">{b.customer?.name || '—'}</td>
+                  <td className="py-2">{b.vehicle?.registrationNo || ' '}</td>
+                  <td className="py-2">{b.customer?.name || ' '}</td>
                   <td className="py-2"><Badge className={statusColor[b.status] || ''}>{b.status}</Badge></td>
                 </tr>
               ))}
               {recentBookings.length === 0 && (
                 <tr><td className="py-6 text-center text-muted-foreground">
-                  No bookings yet — <Link to="bookings" className="underline">create the first one</Link>
+                  No bookings yet   <Link to="bookings" className="underline">create the first one</Link>
                 </td></tr>
               )}
             </tbody>
@@ -167,15 +167,15 @@ export default function RentalDashboardPage() {
             <tbody>
               {upcomingMaintenance.map((m) => (
                 <tr key={m.id} className="border-t">
-                  <td className="py-2 font-medium">{m.vehicle?.registrationNo || '—'}</td>
+                  <td className="py-2 font-medium">{m.vehicle?.registrationNo || ' '}</td>
                   <td className="py-2">{m.title}</td>
-                  <td className="py-2">{m.scheduledDate || '—'}</td>
+                  <td className="py-2">{m.scheduledDate || ' '}</td>
                   <td className="py-2"><Badge className={statusColor[m.status] || ''}>{m.status}</Badge></td>
                 </tr>
               ))}
               {upcomingMaintenance.length === 0 && (
                 <tr><td className="py-6 text-center text-muted-foreground">
-                  No open maintenance — <Link to="maintenance" className="underline"><Plus className="w-3 h-3 inline" /> schedule one</Link>
+                  No open maintenance   <Link to="maintenance" className="underline"><Plus className="w-3 h-3 inline" /> schedule one</Link>
                 </td></tr>
               )}
             </tbody>

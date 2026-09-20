@@ -43,7 +43,7 @@ const INSTRUCTION_TEMPLATES: Record<string, Partial<OrgKnowledgeProfile>> = {
   General: {
     about: 'We are a local retail business focused on quality products and friendly service.',
     servicesOffered: 'In-store sales, customer support, product advice.',
-    productsOverview: 'See our live product catalog — prices and stock are always from our system.',
+    productsOverview: 'See our live product catalog   prices and stock are always from our system.',
   },
 };
 

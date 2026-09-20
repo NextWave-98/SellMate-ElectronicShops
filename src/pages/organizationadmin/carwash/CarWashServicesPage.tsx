@@ -80,7 +80,7 @@ export default function CarWashServicesPage() {
               <tr key={s.id} className="border-t">
                 <td className="p-3 font-medium">{s.name} {s.isAddon && <Badge variant="outline">Add-on</Badge>}</td>
                 {VEHICLE_SIZE_CLASSES.map((c) => (
-                  <td key={c} className="p-3">{s.priceMatrix?.[c] != null ? `Rs ${Number(s.priceMatrix[c]).toLocaleString()}` : '—'}</td>
+                  <td key={c} className="p-3">{s.priceMatrix?.[c] != null ? `Rs ${Number(s.priceMatrix[c]).toLocaleString()}` : ' '}</td>
                 ))}
                 <td className="p-3">
                   <Badge className={s.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'}>

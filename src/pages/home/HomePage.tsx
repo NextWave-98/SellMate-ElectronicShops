@@ -91,7 +91,7 @@ const SLIDES = [
     badge: 'All-in-One Business Platform',
     title: 'Grow Your',
     highlight: 'Business Smarter',
-    sub: 'Retail, fashion, food, services & more — manage POS, inventory, staff & multi-branch operations in one place.',
+    sub: 'Retail, fashion, food, services & more   manage POS, inventory, staff & multi-branch operations in one place.',
     cta: 'Start Free Trial',
     ctaAction: 'login',
   },
@@ -118,7 +118,7 @@ const SLIDES = [
     badge: 'Multi-Location Ready',
     title: 'Scale Across',
     highlight: 'Every Branch',
-    sub: 'One unified platform, unlimited branches, real-time sync — grow without limits.',
+    sub: 'One unified platform, unlimited branches, real-time sync   grow without limits.',
     cta: 'View Plans',
     ctaAction: 'packages',
   },
@@ -398,7 +398,7 @@ const HomePage = () => {
 
 
       {/* ════════════════════════════════════════
-          HERO — SPLIT GLASS LAYOUT
+          HERO   SPLIT GLASS LAYOUT
       ════════════════════════════════════════ */}
       <section className="landing-hero-glow relative min-h-screen overflow-hidden pt-28 pb-16 sm:pt-32 lg:pt-36">
         <div className="pointer-events-none absolute -right-32 top-20 h-96 w-96 rounded-full bg-orange-200/30 blur-3xl" />
@@ -406,7 +406,7 @@ const HomePage = () => {
 
         <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
-            {/* Left — copy */}
+            {/* Left   copy */}
             <div className="relative z-10">
               {SLIDES.map((slide, idx) => (
                 <div
@@ -499,7 +499,7 @@ const HomePage = () => {
               </div>
             </div>
 
-            {/* Right — human hero image */}
+            {/* Right   human hero image */}
             <div className="relative">
               <div className="absolute -inset-4 rounded-[2rem] bg-orange-400/15 blur-2xl" />
               <div className="landing-glass-hero-panel relative overflow-hidden p-2">
@@ -614,14 +614,14 @@ const HomePage = () => {
                 <br />& Sales Channel
               </h2>
               <p className="text-lg text-gray-300 mb-8 leading-relaxed">
-                Whether you sell clothing, groceries, electronics, or services — run online shops, physical stores, and deliveries from one powerful dashboard.
+                Whether you sell clothing, groceries, electronics, or services   run online shops, physical stores, and deliveries from one powerful dashboard.
               </p>
               <ul className="space-y-4 mb-10">
                 {[
                   'Multi-courier integration for fast deliveries',
                   'Staff management with role-based permissions',
                   'Unified inventory for online & offline channels',
-                  'Works for any product or service — retail, fashion, food & more!',
+                  'Works for any product or service   retail, fashion, food & more!',
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-gray-200">
                     <GlassCheck size="md" />
@@ -711,7 +711,7 @@ const HomePage = () => {
             badge="VERSATILE FOR ALL INDUSTRIES"
             title="Perfect For"
             highlight="Every Business"
-            subtitle="From boutiques to supermarkets to repair shops — one platform adapts to your industry"
+            subtitle="From boutiques to supermarkets to repair shops   one platform adapts to your industry"
           />
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
@@ -926,7 +926,7 @@ const HomePage = () => {
                 name: 'Emily Rodriguez', role: 'CEO', company: 'TechFix Services',
                 avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=80&q=80',
                 rating: 5, tag: 'Data-Driven',
-                text: 'Perfect for our repair business — jobsheets, parts inventory, and customer updates in one place. Support team is exceptional too!',
+                text: 'Perfect for our repair business   jobsheets, parts inventory, and customer updates in one place. Support team is exceptional too!',
               },
             ].map((t, idx) => (
               <div key={idx} className="landing-glass-pill-dark group p-7 transition-all duration-300 hover:-translate-y-1.5 hover:bg-gray-900/55 sm:p-8">
@@ -971,7 +971,7 @@ const HomePage = () => {
                 { icon: Zap, title: 'Who We Are',
                   text: "SellMate is the leading enterprise SaaS platform for all types of businesses. With 10+ years of experience, we've empowered 50,000+ businesses worldwide to streamline operations and maximize profits." },
                 { icon: Target, title: 'Our Mission',
-                  text: 'To revolutionize business operations through innovative technology — providing complete cloud-based solutions integrating sales, inventory, repairs, and analytics into one powerful platform.' },
+                  text: 'To revolutionize business operations through innovative technology   providing complete cloud-based solutions integrating sales, inventory, repairs, and analytics into one powerful platform.' },
                 { icon: Lock, title: 'Why Choose Us',
                   text: "Enterprise-grade security, 99.9% uptime SLA, and 24/7 expert support. We're committed to building lasting partnerships where your success is our success." },
               ].map((item, i) => {
@@ -1161,7 +1161,7 @@ const HomePage = () => {
                 </span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed max-w-xs mb-5">
-                The all-in-one business management platform for retail, fashion, food, services, and every industry — online and offline.
+                The all-in-one business management platform for retail, fashion, food, services, and every industry   online and offline.
               </p>
               <div className="flex gap-3">
                 {['FB', 'TW', 'LI', 'IG'].map((s, i) => (

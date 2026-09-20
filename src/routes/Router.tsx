@@ -47,6 +47,7 @@ const RentalFuelPage = lazy(() => import('../pages/organizationadmin/rental/Rent
 const RentalClaimsPage = lazy(() => import('../pages/organizationadmin/rental/RentalClaimsPage'));
 const RentalPricingPage = lazy(() => import('../pages/organizationadmin/rental/RentalPricingPage'));
 const RentalDriverLicensesPage = lazy(() => import('../pages/organizationadmin/rental/RentalDriverLicensesPage'));
+const RentalEquipmentPage = lazy(() => import('../pages/organizationadmin/rental/RentalEquipmentPage'));
 const CarWashLayout = lazy(() => import('../pages/organizationadmin/carwash/CarWashLayout'));
 const CarWashQueuePage = lazy(() => import('../pages/organizationadmin/carwash/CarWashQueuePage'));
 const CarWashServicesPage = lazy(() => import('../pages/organizationadmin/carwash/CarWashServicesPage'));
@@ -144,6 +145,7 @@ import HomePage from '../pages/home/HomePage';
 import ProtectedRoute from './ProtectedRouteRedux';
 import { PermissionRoute } from './PermissionRoute';
 import IndustryFeatureRoute from './IndustryFeatureRoute';
+import OrgFeatureRoute from './OrgFeatureRoute';
 import LoginPage from '../pages/auth/LoginPage';
 import { ROLES } from '../constants/roles';
 import { PERMISSIONS } from '../store/types';
@@ -265,12 +267,12 @@ const AppRouter = () => (
           </PermissionRoute>
         } />
         <Route path="stock/management/add" element={
-          <PermissionRoute module="products">
+          <PermissionRoute permission={PERMISSIONS.PRODUCTS_CREATE}>
             <AddProductPage />
           </PermissionRoute>
         } />
         <Route path="stock/management/edit/:productId" element={
-          <PermissionRoute module="products">
+          <PermissionRoute permission={PERMISSIONS.PRODUCTS_UPDATE}>
             <EditProductPage />
           </PermissionRoute>
         } />
@@ -348,14 +350,19 @@ const AppRouter = () => (
             <CustomersPage />
           </PermissionRoute>
         } />
+        {/* Warranty is now an organization CHOICE, not a consequence of the
+            organization's industry type   so the industry guard is gone and the
+            org-feature guard takes its place. A clothing shop that sells
+            warrantied goods can switch it on; an electronics shop that does not
+            want it can leave it off. */}
         <Route path="warranty/management" element={
           <PermissionRoute module="warranty">
-            <IndustryFeatureRoute feature="warranty">
+            <OrgFeatureRoute feature="warranty">
               <WarrantyPage />
-            </IndustryFeatureRoute>
+            </OrgFeatureRoute>
           </PermissionRoute>
         } />
-        {/* New verticals — industry-gated */}
+        {/* New verticals   industry-gated */}
         <Route path="rental" element={
           <PermissionRoute module="rental">
             <IndustryFeatureRoute feature="rental">
@@ -373,6 +380,7 @@ const AppRouter = () => (
           <Route path="claims" element={<RentalClaimsPage />} />
           <Route path="pricing" element={<RentalPricingPage />} />
           <Route path="licenses" element={<RentalDriverLicensesPage />} />
+          <Route path="equipment" element={<RentalEquipmentPage />} />
         </Route>
         <Route path="carwash" element={
           <PermissionRoute module="carwash">
@@ -676,6 +684,16 @@ const AppRouter = () => (
             <ProductsPage />
           </PermissionRoute>
         } />
+        <Route path="products/add" element={
+          <PermissionRoute permission={PERMISSIONS.PRODUCTS_CREATE}>
+            <AddProductPage />
+          </PermissionRoute>
+        } />
+        <Route path="products/edit/:productId" element={
+          <PermissionRoute permission={PERMISSIONS.PRODUCTS_UPDATE}>
+            <EditProductPage />
+          </PermissionRoute>
+        } />
         <Route path="addon-requests" element={
           <PermissionRoute permission={PERMISSIONS.PRODUCTS_READ}>
             <BranchAddonRequestsPage />
@@ -743,12 +761,12 @@ const AppRouter = () => (
         } />
         <Route path="warranty" element={
           <PermissionRoute module="warranty">
-            <IndustryFeatureRoute feature="warranty">
+            <OrgFeatureRoute feature="warranty">
               <BranchWarrantyPage />
-            </IndustryFeatureRoute>
+            </OrgFeatureRoute>
           </PermissionRoute>
         } />
-        {/* New verticals — branch level (same pages, businessId-scoped APIs) */}
+        {/* New verticals   branch level (same pages, businessId-scoped APIs) */}
         <Route path="rental" element={
           <PermissionRoute module="rental">
             <IndustryFeatureRoute feature="rental">
@@ -766,6 +784,7 @@ const AppRouter = () => (
           <Route path="claims" element={<RentalClaimsPage />} />
           <Route path="pricing" element={<RentalPricingPage />} />
           <Route path="licenses" element={<RentalDriverLicensesPage />} />
+          <Route path="equipment" element={<RentalEquipmentPage />} />
         </Route>
         <Route path="carwash" element={
           <PermissionRoute module="carwash">

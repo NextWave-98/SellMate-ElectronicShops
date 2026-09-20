@@ -129,7 +129,7 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
         supplierHook.getSupplierById(initialSupplierId).then((res: any) => {
           const s = res?.data;
           if (s?.id) setSelectedSupplier({ id: s.id, name: s.name, supplierCode: s.supplierCode || '' });
-        }).catch(() => {/* non-fatal — user can still search manually */});
+        }).catch(() => {/* non-fatal   user can still search manually */});
       } else {
         setSelectedSupplier(null);
       }
@@ -144,7 +144,7 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Server-backed supplier search — top 20 matches instead of a 1000-row prefetch
+  // Server-backed supplier search   top 20 matches instead of a 1000-row prefetch
   const searchSuppliers = async (search: string) => {
     const response = await supplierHook.getAllSuppliers({
       search: search || undefined,
@@ -154,7 +154,7 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
     return (response?.data && Array.isArray(response.data) ? response.data : []) as Array<{id: string; name: string; supplierCode: string}>;
   };
 
-  // Server-backed product search — top 20 matches instead of a 1000-row prefetch
+  // Server-backed product search   top 20 matches instead of a 1000-row prefetch
   const loadProducts = async (search: string) => {
     try {
       const response = await productHook.getAllProducts({
@@ -171,7 +171,7 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
   };
 
   // Debounced server search while the product dropdown is open.
-  // Skipped when the box shows the picked product's label ("Name — CODE").
+  // Skipped when the box shows the picked product's label ("Name   CODE").
   const productSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!isOpen || !showProductDropdown) return;
@@ -227,7 +227,7 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
         productName: product.name,
         unitPrice: Number(product.costPrice ?? product.unitPrice ?? 0),
       });
-      setProductSearch(product.name + ' — ' + product.productCode);
+      setProductSearch(product.name + '   ' + product.productCode);
       setShowProductDropdown(false);
     }
   };
@@ -274,7 +274,7 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
       productName: p.name,
       unitPrice: Number(p.costPrice ?? p.unitPrice ?? 0),
     }));
-    setProductSearch(`${p.name} — ${p.productCode}`);
+    setProductSearch(`${p.name}   ${p.productCode}`);
     setShowProductDropdown(false);
   };
 
@@ -498,7 +498,7 @@ export default function AddPurchaseOrderModal({ isOpen, onClose, onSuccess, init
                             </button>
                           ))
                         )}
-                        {/* Create-new-product action — always available */}
+                        {/* Create-new-product action   always available */}
                         <button
                           type="button"
                           onMouseDown={(e) => { e.preventDefault(); openCreateProduct(); }}

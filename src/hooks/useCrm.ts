@@ -20,15 +20,25 @@ const toParams = (filters?: Record<string, any>) => {
 export const useCrm = () => {
   const { fetchData } = useFetch();
 
-  const getStats = useCallback(async () => fetchData({ endpoint: '/crm/tasks/stats', method: 'GET', silent: true }), [fetchData]);
+  const getStats = useCallback(async (filters?: Record<string, any>) => fetchData({ endpoint: `/crm/tasks/stats${toParams(filters)}`, method: 'GET', silent: true }), [fetchData]);
   const list = useCallback(async (filters?: Record<string, any>) => fetchData({ endpoint: `/crm/tasks${toParams(filters)}`, method: 'GET', silent: true }), [fetchData]);
   const create = useCallback(async (data: any) => fetchData({ endpoint: '/crm/tasks', method: 'POST', data, successMessage: 'Task created' }), [fetchData]);
   const update = useCallback(async (id: string, data: any) => fetchData({ endpoint: `/crm/tasks/${id}`, method: 'PUT', data, successMessage: 'Task updated' }), [fetchData]);
   const remove = useCallback(async (id: string) => fetchData({ endpoint: `/crm/tasks/${id}`, method: 'DELETE', successMessage: 'Task deleted' }), [fetchData]);
+  // Deleting is a soft delete now, so putting one back is a real operation.
+  const restore = useCallback(async (id: string) => fetchData({ endpoint: `/crm/tasks/${id}/restore`, method: 'POST', data: {}, successMessage: 'Task restored' }), [fetchData]);
+
+  // The link between the leads inbox and the task inbox.
+  const createFromLead = useCallback(async (data: any) => fetchData({ endpoint: '/crm/tasks/from-lead', method: 'POST', data }), [fetchData]);
+  const listForRelated = useCallback(
+    async (relatedType: string, relatedId: string) =>
+      fetchData({ endpoint: `/crm/tasks-for${toParams({ relatedType, relatedId })}`, method: 'GET', silent: true }),
+    [fetchData],
+  );
 
   return useMemo(
-    () => ({ getStats, list, create, update, remove }),
-    [getStats, list, create, update, remove]
+    () => ({ getStats, list, create, update, remove, restore, createFromLead, listForRelated }),
+    [getStats, list, create, update, remove, restore, createFromLead, listForRelated]
   );
 };
 
