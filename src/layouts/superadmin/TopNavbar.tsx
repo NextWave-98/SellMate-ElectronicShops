@@ -1,14 +1,15 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Bell, Search, User, ChevronDown, Menu, X, LogOut, Settings, ShoppingCart, Truck, Maximize, Minimize } from 'lucide-react';
+import { Search, User, ChevronDown, Menu, X, LogOut, Settings, ShoppingCart, Truck, Maximize, Minimize } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import useNotification, { type Notification as NotificationItem } from '../../hooks/useNotification';
 import useCourier from '../../hooks/useCourier';
 import { CourierShipmentModal } from '../../components/courier/modals';
 import toast from 'react-hot-toast';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
+import HeaderNotifications from '../../components/common/HeaderNotifications';
+import BranchSwitcher from '../../components/common/BranchSwitcher';
 
 interface TopNavbarProps {
   title: string;
@@ -29,37 +30,16 @@ export default function TopNavbar({
 }: TopNavbarProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCourierModal, setShowCourierModal] = useState(false);
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
   const { logout, user } = useAuth();
   const navigate = useNavigate();
-  const { getMyNotifications } = useNotification();
   const { courierServices, fetchCourierServices, createCourierShipment } = useCourier();
   const { hasPermission, hasCourierAccess, isSuperAdmin } = usePermissions();
   const canQuickPos = isSuperAdmin || hasPermission(PERMISSIONS.SALES_CREATE);
   const canQuickCourier = hasCourierAccess();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
-
-  useEffect(() => {
-    const loadNotifications = async () => {
-      if (!isNotificationOpen) return;
-      setLoadingNotifications(true);
-      try {
-        const response = await getMyNotifications({ limit: 10 });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = (response as any)?.data ?? (Array.isArray(response) ? response : []);
-        setNotifications(data.filter((n: NotificationItem) => n.status === 'PENDING' || n.status === 'SENT'));
-      } catch {
-        setNotifications([]);
-      } finally {
-        setLoadingNotifications(false);
-      }
-    };
-    loadNotifications();
-  }, [isNotificationOpen]);
 
   useEffect(() => {
     const syncBrowserFullscreen = () => setIsBrowserFullscreen(!!document.fullscreenElement);
@@ -95,44 +75,23 @@ export default function TopNavbar({
   };
 
   const isFullscreenActive = isPosRoute ? isPosFullscreen : isBrowserFullscreen;
-  const unreadCount = notifications.length;
   const userInitial = user?.name?.charAt(0).toUpperCase() ?? 'A';
-
-  const getNotifRoute = (n: NotificationItem) => {
-    if (n.saleId) return '/superadmin/sales';
-    if (n.productReturnId) return '/superadmin/returns';
-    if (n.jobSheetId) return '/superadmin/jobsheets';
-    return '/superadmin/notifications/dashboard';
-  };
-
-  const getNotifColor = (type: string) => {
-    if (type.includes('SALE')) return { bg: 'bg-green-50', text: 'text-green-600', dot: 'bg-green-500' };
-    if (type.includes('RETURN')) return { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-500' };
-    return { bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-500' };
-  };
-
-  const formatTimeAgo = (date: string) => {
-    const d = new Date(date);
-    const now = new Date();
-    const isToday = d.toDateString() === now.toDateString();
-    return isToday
-      ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
 
   return (
   <>
     <div
-      className={`fixed top-0 right-0 left-0  transition-all duration-300
+      className={`fixed top-0 right-0 left-0 transition-all duration-300
         bg-white/70 backdrop-blur-2xl backdrop-saturate-150
-        border-b border-white/40 ${isProfileOpen ? 'z-100' : 'z-10'} ${
+        border-b border-white/40 ${
+          isProfileOpen || isBranchMenuOpen ? 'z-[200]' : 'z-50'
+        } ${
         isPosFullscreen ? 'lg:ml-0' : isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       }`}
       style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}
     >
       <div className="h-14 px-4 lg:px-6 flex items-center justify-between gap-4">
 
-        {/* ── Left: hamburger + title ── */}
+        {/* ── Left: hamburger + title + branch switcher ── */}
         <div className="flex items-center gap-3 min-w-0">
           {!isPosFullscreen && (
             <button
@@ -149,6 +108,12 @@ export default function TopNavbar({
               {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
+
+          <BranchSwitcher
+            variant="admin"
+            fallbackLabel="Admin Dashboard"
+            onOpenChange={setIsBranchMenuOpen}
+          />
         </div>
 
         {/* ── Right: search + notifs + profile ── */}
@@ -239,80 +204,10 @@ export default function TopNavbar({
             <Search className="w-4 h-4" />
           </button>
 
-          {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => { setIsNotificationOpen(!isNotificationOpen); setIsProfileOpen(false); }}
-              className="relative w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-white/60 transition-colors"
-            >
-              <Bell className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-              )}
-            </button>
-
-            {isNotificationOpen && (
-              <div
-                className="absolute right-0 mt-1.5 w-[min(360px,calc(100vw-2rem))] bg-white/90 backdrop-blur-xl backdrop-saturate-150 rounded-2xl border border-white/40 z-50 overflow-hidden"
-                style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.14)' }}
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/40">
-                  <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
-                  {unreadCount > 0 && (
-                    <span className="px-2 py-0.5 bg-red-50 text-red-600 text-[11px] font-semibold rounded-full">
-                      {unreadCount} new
-                    </span>
-                  )}
-                </div>
-
-                {/* List */}
-                <div className="max-h-80 overflow-y-auto divide-y divide-white/30">
-                  {loadingNotifications ? (
-                    <div className="py-10 text-center text-sm text-gray-400">Loading…</div>
-                  ) : notifications.length === 0 ? (
-                    <div className="py-10 text-center">
-                      <Bell className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                      <p className="text-sm text-gray-400">All caught up</p>
-                    </div>
-                  ) : notifications.map((n) => {
-                    const color = getNotifColor(n.type);
-                    return (
-                      <Link
-                        key={n.id}
-                        to={getNotifRoute(n)}
-                        onClick={() => setIsNotificationOpen(false)}
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-white/50 transition-colors"
-                      >
-                        <div className={`w-8 h-8 rounded-lg ${color.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                          <Bell className={`w-4 h-4 ${color.text}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-800 truncate">
-                            {n.type.replace(/_/g, ' ')}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-                          <p className="text-[10px] text-gray-400 mt-1">{formatTimeAgo(n.createdAt)}</p>
-                        </div>
-                        <div className={`w-1.5 h-1.5 rounded-full ${color.dot} flex-shrink-0 mt-2`} />
-                      </Link>
-                    );
-                  })}
-                </div>
-
-                {/* Footer */}
-                <div className="border-t border-white/40 px-4 py-2.5">
-                  <Link
-                    to="/superadmin/notifications/dashboard"
-                    onClick={() => setIsNotificationOpen(false)}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-                  >
-                    View all notifications →
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
+          <HeaderNotifications
+            mode="admin"
+            viewAllPath="/superadmin/notifications/dashboard"
+          />
 
           {/* Divider */}
           <div className="w-px h-5 bg-gray-200 mx-1" />
@@ -320,10 +215,10 @@ export default function TopNavbar({
           {/* Profile */}
           <div className="relative">
             <button
-              onClick={() => { setIsProfileOpen(!isProfileOpen); setIsNotificationOpen(false); }}
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
               className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-xl hover:bg-white/60 border border-transparent hover:border-white/50 transition-all"
             >
-              <div className="w-7 h-7 rounded-full bg-blue-950 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+              <div className="w-7 h-7 rounded-full bg-orange-950 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                 {userInitial}
               </div>
               <div className="hidden sm:flex flex-col leading-tight text-left">
@@ -340,7 +235,7 @@ export default function TopNavbar({
               >
                 {/* Header */}
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-white/40 mb-1">
-                  <div className="w-9 h-9 rounded-full bg-blue-950 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-orange-950 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                     {userInitial}
                   </div>
                   <div className="min-w-0">
@@ -404,21 +299,19 @@ export default function TopNavbar({
           </div>
         </div>
       )}
-
     </div>
 
-    {/* Quick Courier Modal   rendered outside the fixed navbar div to avoid stacking-context clipping */}
     {showCourierModal && (
       <CourierShipmentModal
-        courierServices={courierServices}
         onClose={() => setShowCourierModal(false)}
-        onSave={async (data: any) => {
+        onSave={async (data) => {
           const response = await createCourierShipment(data);
           if (!response?.success) {
             toast.error(response?.message || 'Failed to create shipment');
           }
           return response;
         }}
+        courierServices={courierServices}
         variant="orange"
       />
     )}

@@ -26,7 +26,12 @@ const QUALITY_FLOOR = 0.30;
  * @param file - The original image File object.
  * @returns A new File with type "image/webp".
  */
-export async function compressImageToWebP(file: File): Promise<File> {
+export async function compressImageToWebP(
+  file: File,
+  options: { maxDim?: number; maxBytes?: number } = {},
+): Promise<File> {
+  const maxDim = options.maxDim ?? MAX_DIM;
+  const maxBytes = options.maxBytes ?? MAX_BYTES;
   // Decode to ImageBitmap (respects EXIF orientation automatically in most browsers)
   let bitmap: ImageBitmap;
   try {
@@ -38,9 +43,9 @@ export async function compressImageToWebP(file: File): Promise<File> {
 
   let { width, height } = bitmap;
 
-  // Scale down if larger than MAX_DIM on either axis
-  if (width > MAX_DIM || height > MAX_DIM) {
-    const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+  // Scale down if larger than maxDim on either axis
+  if (width > maxDim || height > maxDim) {
+    const ratio = Math.min(maxDim / width, maxDim / height);
     width = Math.round(width * ratio);
     height = Math.round(height * ratio);
   }
@@ -55,10 +60,10 @@ export async function compressImageToWebP(file: File): Promise<File> {
   bitmap.close();
 
   // If the source is already small, skip the iterative quality loop
-  const needsCompression = file.size > MAX_BYTES;
+  const needsCompression = file.size > maxBytes;
   const startQuality = needsCompression ? INITIAL_QUALITY : 0.92;
 
-  const blob = await toWebPBlob(canvas, startQuality, needsCompression ? MAX_BYTES : Infinity);
+  const blob = await toWebPBlob(canvas, startQuality, needsCompression ? maxBytes : Infinity);
 
   const baseName = file.name.replace(/\.[^.]+$/, '');
   return new File([blob], `${baseName}.webp`, { type: 'image/webp', lastModified: Date.now() });
@@ -72,7 +77,7 @@ export async function compressImages(files: File[]): Promise<File[]> {
   if (files.length > 5) {
     throw new Error('Maximum 5 images allowed');
   }
-  return Promise.all(files.map(compressImageToWebP));
+  return Promise.all(files.map((f) => compressImageToWebP(f)));
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────

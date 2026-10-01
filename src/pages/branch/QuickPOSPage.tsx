@@ -1,8 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { usePermissions } from "../../hooks/usePermissions";
 import { useInventory } from "../../hooks/useInventory";
 import useSales from "../../hooks/useSales";
+import useFreeOffer, { type FreeOfferItem } from "../../hooks/useFreeOffer";
+import { computeFreeEntitlement } from "../../utils/freeOffer.util";
+import SelectFreeItemsModal, { type FreePickRow } from "../../components/branch/pos/SelectFreeItemsModal";
 import useCustomer from "../../hooks/useCustomer";
 import SaleJobFields, { type SaleJobFormValue } from "../../components/sales/SaleJobFields";
 import {
@@ -52,6 +56,9 @@ import {
   ArrowLeftRight,
   Pencil,
   ShieldCheck,
+  Gift,
+  Camera,
+  Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatCurrency } from "../../utils/currency";
@@ -61,12 +68,15 @@ import BarcodeScannerModal from "../../components/common/BarcodeScannerModal";
 import BarcodeProductSelectModal from "../../components/common/BarcodeProductSelectModal";
 import { useLocation } from "../../hooks/useLocation";
 import PrintOptionsModal from "../../components/branch/pos/PrintOptionsModal";
+import ShareBillModal from "../../components/branch/pos/ShareBillModal";
 import CashDrawerOpenOverlay from "../../components/branch/pos/CashDrawerOpenOverlay";
 import CashDrawerBlocker from "../../components/branch/pos/CashDrawerBlocker";
 import POSSettingsBlocker from "../../components/branch/pos/POSSettingsBlocker";
 import { usePOSSettings } from "../../hooks/usePOSSettings";
 import { getPrinterConfig, resolveThermalPaperFormat, createDefaultPrinterConfig } from "../../lib/printerConfig";
 import { usesStarNativePrint } from "../../lib/starPrint";
+import { openCashDrawer } from "../../lib/cashDrawerKick";
+import { usePrinter } from "../../hooks/usePrinter";
 import useCashDrawer, {
   type CashDrawerRecord,
   type DayBalanceSummary,
@@ -78,6 +88,8 @@ import usePosHeldCart, {
 import usePosQuotation, {
   type PosQuotationRecord,
 } from "../../hooks/usePosQuotation";
+import AiListScanModal from "../../components/common/AiListScanModal";
+import { AI_POS_PREFILL_KEY } from "../../hooks/useAiVision";
 import usePosExpense, {
   type PosDaySummary,
   type PosExpenseRecord,
@@ -116,6 +128,8 @@ interface Product {
   productId: string;
   name: string;
   price: number;
+  /** Each unit has its own serial / IMEI   one serial per unit sold */
+  trackSerials?: boolean;
   originalPrice?: number;
   costPrice?: number;
   wholesalePrice?: number;
@@ -135,8 +149,6 @@ interface Product {
   productCode?: string;
   isService?: boolean;
   isReload?: boolean;
-  // Unit of measure. Absent / 'UNIT' means the product is counted in pieces,
-  // which is how everything behaved before weight pricing existed.
   sellBy?: SellBy;
   unitOfMeasure?: UnitOfMeasure;
   qtyStep?: number;
@@ -151,6 +163,7 @@ interface CartItem {
   productId: string;
   name: string;
   price: number;
+  trackSerials?: boolean;
   costPrice?: number;
   quantity: number;
   stock: number;
@@ -179,6 +192,17 @@ interface CartItem {
    * should not be blocked over it.
    */
   issueWarranty?: boolean;
+  /**
+   * The product's own warranty months, remembered the first time the cashier
+   * changes `warrantyMonths` on this line (for the "product 12m" hint).
+   */
+  defaultWarrantyMonths?: number;
+  /** Buy-get-free giveaway line */
+  isFreeItem?: boolean;
+  freeOfferId?: string;
+  freeOfferName?: string;
+  freeOfferBuyQty?: number;
+  freeOfferFreeQty?: number;
 }
 
 /**
@@ -207,6 +231,55 @@ function WarrantyBadge({
     >
       <ShieldCheck className={compact ? "w-2.5 h-2.5" : "w-3 h-3"} />
       {m}m
+    </span>
+  );
+}
+
+/** Warranty lengths offered in the cart line picker (months). */
+const WARRANTY_MONTH_CHOICES = [1, 3, 6, 9, 12, 18, 24, 36];
+
+/**
+ * Warranty months for ONE sale line. Starts at the product's warranty; the
+ * cashier can give this customer a shorter (or longer) warranty without
+ * touching the product. The sale line, the warranty card and the bill all use
+ * the months chosen here.
+ */
+function WarrantyMonthsPicker({
+  months,
+  defaultMonths,
+  onChange,
+}: {
+  months?: number;
+  defaultMonths?: number;
+  onChange: (months: number) => void;
+}) {
+  const m = Number(months || 0);
+  if (!(m > 0)) return null;
+  const choices = Array.from(
+    new Set([...WARRANTY_MONTH_CHOICES, m, Number(defaultMonths || 0)].filter((x) => x > 0)),
+  ).sort((a, b) => a - b);
+  const changed = defaultMonths != null && Number(defaultMonths) > 0 && Number(defaultMonths) !== m;
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold px-1.5 py-0.5 text-[10px]"
+      title="Warranty for this sale only   the product keeps its own warranty"
+    >
+      <ShieldCheck className="w-3 h-3" />
+      <select
+        aria-label="Warranty months for this item"
+        value={m}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="bg-transparent outline-none cursor-pointer font-semibold text-[10px]"
+      >
+        {choices.map((c) => (
+          <option key={c} value={c}>
+            {c} {c === 1 ? "month" : "months"}
+          </option>
+        ))}
+      </select>
+      {changed && (
+        <span className="font-normal text-emerald-600">(product {defaultMonths}m)</span>
+      )}
     </span>
   );
 }
@@ -254,6 +327,14 @@ function isWarrantyCartLine(item: {
  * second   opting out must not leave the sale stuck behind a field nobody
  * needs to fill.
  */
+/** How many serials the cashier typed ("SN1, SN2" or one per line). */
+function serialCount(value?: string): number {
+  return String(value || "")
+    .split(/[\n,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean).length;
+}
+
 function isWarrantyIssuingLine(item: {
   warrantyMonths?: number;
   isService?: boolean;
@@ -288,6 +369,7 @@ interface InventoryItem {
     productCode?: string;
     isService?: boolean;
     isReload?: boolean;
+    trackSerials?: boolean;
     discountInfo?: {
       discountName: string;
       discountType: "PERCENTAGE" | "FIXED";
@@ -484,6 +566,8 @@ const StepBar: React.FC<{ current: CheckoutStep }> = ({ current }) => {
 
 const QuickPOSPage: React.FC = () => {
   const { user } = useAuth();
+  const { hasCourierAccess } = usePermissions();
+  const canUseCourier = hasCourierAccess();
   const { getAllInventory } = useInventory();
   const {
     createSale,
@@ -494,7 +578,9 @@ const QuickPOSPage: React.FC = () => {
     printAcknowledgement,
     silentPrintInvoice,
     getSales,
+    getESCPOSData,
   } = useSales();
+  const { tryPrintESCPOS } = usePrinter();
   const { searchCustomers, createCustomer } = useCustomer();
   const { getBranches, getLocationById } = useLocation();
   const {
@@ -541,8 +627,6 @@ const QuickPOSPage: React.FC = () => {
   const [totalProducts, setTotalProducts] = useState(0);
   const [jumpPageInput, setJumpPageInput] = useState("1");
   const [reloadProviderId, setReloadProviderId] = useState<string | null>(null);
-  /** Product awaiting a weight / volume entry, or null when the keypad is closed. */
-  const [keypadProduct, setKeypadProduct] = useState<Product | null>(null);
   const [reloadPhone, setReloadPhone] = useState("");
   const [reloadAmount, setReloadAmount] = useState("");
 
@@ -570,6 +654,13 @@ const QuickPOSPage: React.FC = () => {
     [resolvePrinterConf, posSettings.defaultFormat],
   );
 
+  // Only for the drawer overlay — memoised so the POS screen's frequent
+  // re-renders do not re-parse localStorage each time.
+  const drawerPrinterConf = useMemo(
+    () => resolvePrinterConf(),
+    [resolvePrinterConf],
+  );
+
   // ── Scanner
   const [showScanner, setShowScanner] = useState(false);
   const [barcodeMatches, setBarcodeMatches] = useState<ScannedProduct[]>([]);
@@ -587,6 +678,123 @@ const QuickPOSPage: React.FC = () => {
 
   // ── Cart
   const [cart, setCart] = useState<CartItem[]>([]);
+  const { getActiveFreeOffers } = useFreeOffer();
+  const [activeFreeOffers, setActiveFreeOffers] = useState<FreeOfferItem[]>([]);
+  const [freePickerOffer, setFreePickerOffer] = useState<FreeOfferItem | null>(null);
+  const [freePickerEntitlement, setFreePickerEntitlement] = useState(0);
+  const [freePickerRows, setFreePickerRows] = useState<FreePickRow[]>([]);
+  const [skippedFreeOfferIds, setSkippedFreeOfferIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getActiveFreeOffers();
+        const list = res?.data || res || [];
+        if (!cancelled) setActiveFreeOffers(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setActiveFreeOffers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Mount once — avoid fetchData identity loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openFreePickerForOffer = useCallback(
+    (offer: FreeOfferItem, entitlement: number) => {
+      setSkippedFreeOfferIds((prev) => {
+        if (!prev.has(offer.id)) return prev;
+        const next = new Set(prev);
+        next.delete(offer.id);
+        return next;
+      });
+      const existingFree = cart.filter(
+        (l) => l.isFreeItem && l.freeOfferId === offer.id,
+      );
+      const rows: FreePickRow[] = (offer.eligibleItems || []).map((ei) => {
+        const productId = ei.productId;
+        const name = ei.product?.name || productId;
+        const catalog = products.find(
+          (p) => p.id === productId || p.productId === productId,
+        );
+        const stock = Number(catalog?.stock ?? 0);
+        const prev = existingFree.find((l) => l.productId === productId);
+        return {
+          productId,
+          name,
+          stock,
+          quantity: prev ? Number(prev.quantity) : 0,
+        };
+      });
+      setFreePickerOffer(offer);
+      setFreePickerEntitlement(entitlement);
+      setFreePickerRows(rows);
+    },
+    [cart, products],
+  );
+
+  const skipFreeOffer = useCallback((offerId: string) => {
+    setSkippedFreeOfferIds((prev) => {
+      const next = new Set(prev);
+      next.add(offerId);
+      return next;
+    });
+    setCart((prev) =>
+      prev.filter((l) => !(l.isFreeItem && l.freeOfferId === offerId)),
+    );
+    setFreePickerOffer((cur) => (cur?.id === offerId ? null : cur));
+    toast.success("Free offer skipped");
+  }, []);
+
+  const applyFreePicker = useCallback(
+    (rows: FreePickRow[]) => {
+      if (!freePickerOffer) return;
+      const offerId = freePickerOffer.id;
+      setSkippedFreeOfferIds((prev) => {
+        if (!prev.has(offerId)) return prev;
+        const next = new Set(prev);
+        next.delete(offerId);
+        return next;
+      });
+      setCart((prev) => {
+        const without = prev.filter(
+          (l) => !(l.isFreeItem && l.freeOfferId === offerId),
+        );
+        const freeLines: CartItem[] = rows
+          .filter((r) => r.quantity > 0)
+          .map((r) => ({
+            id: `free:${offerId}:${r.productId}`,
+            productId: r.productId,
+            name: r.name,
+            price: 0,
+            costPrice: 0,
+            quantity: r.quantity,
+            stock: r.stock,
+            category: "FREE",
+            warrantyMonths: 0,
+            isService: false,
+            isReload: false,
+            lineDiscountType: "FIXED" as const,
+            lineDiscountValue: 0,
+            isFreeItem: true,
+            freeOfferId: offerId,
+            freeOfferName: freePickerOffer.name,
+            freeOfferBuyQty: Number(freePickerOffer.buyQuantity),
+            freeOfferFreeQty: Number(freePickerOffer.freeQuantity),
+            issueWarranty: false,
+          }));
+        return [...without, ...freeLines];
+      });
+      toast.success("Free items applied");
+    },
+    [freePickerOffer],
+  );
+  const [keypadProduct, setKeypadProduct] = useState<Product | null>(null);
   const customerDisplaySessionRef = useRef<string | null>(null);
   const customerDisplayWindowRef = useRef<Window | null>(null);
   const lastDisplayItemIdRef = useRef<string | null>(null);
@@ -684,6 +892,7 @@ const QuickPOSPage: React.FC = () => {
   const [showPosExchange, setShowPosExchange] = useState(false);
   const [quotations, setQuotations] = useState<PosQuotationRecord[]>([]);
   const [showQuotations, setShowQuotations] = useState(false);
+  const [showAiListScan, setShowAiListScan] = useState(false);
   const [savingQuote, setSavingQuote] = useState(false);
   const [openQuoteId, setOpenQuoteId] = useState<string | null>(null);
   const [loyaltyRedeemInput, setLoyaltyRedeemInput] = useState("");
@@ -698,6 +907,7 @@ const QuickPOSPage: React.FC = () => {
   // ── Success step
   const [saleResult, setSaleResult] = useState<SaleResult | null>(null);
   const [isPrintOptionsOpen, setIsPrintOptionsOpen] = useState(false);
+  const [isShareBillOpen, setIsShareBillOpen] = useState(false);
   const [showCashDrawer, setShowCashDrawer] = useState(false);
 
   const playScanSuccessBeep = useCallback(() => {
@@ -851,7 +1061,6 @@ const QuickPOSPage: React.FC = () => {
   const mapInventoryItemToProduct = useCallback((i: InventoryItem): Product => {
     const unitPrice = Number(i.product?.unitPrice) || 0;
     const discountInfo = i.product?.discountInfo ?? null;
-    // Unit-of-measure columns are newer than the inventory hook's row type.
     const uom = i.product as
       | {
           sellBy?: string;
@@ -882,6 +1091,7 @@ const QuickPOSPage: React.FC = () => {
       productCode: i.product?.productCode,
       isService: i.product?.isService ?? false,
       isReload: i.product?.isReload ?? false,
+      trackSerials: i.product?.trackSerials ?? false,
       sellBy: (uom?.sellBy ?? "UNIT") as SellBy,
       unitOfMeasure: (uom?.unitOfMeasure ?? "PCS") as UnitOfMeasure,
       qtyStep: Number(uom?.qtyStep ?? 1),
@@ -1734,13 +1944,6 @@ const QuickPOSPage: React.FC = () => {
     toast.success(next ? "Wholesale prices on" : "Retail prices on");
   };
 
-  /**
-   * Add a product to the cart.
-   *
-   * Products sold by weight, volume or length cannot just get "1" added: one
-   * kilo of rice is rarely what was asked for. Those open the quantity keypad
-   * first, and land here through addWeighedToCart once an amount is entered.
-   */
   const addToCart = (product: Product) => {
     if (product.isReload) {
       setSelectedItemType("reload");
@@ -1797,6 +2000,7 @@ const QuickPOSPage: React.FC = () => {
           warrantyMonths: product.warrantyMonths || 0,
           isService: product.isService ?? false,
           isReload: false,
+          trackSerials: product.trackSerials ?? false,
           sellBy: product.sellBy,
           unitOfMeasure: product.unitOfMeasure,
           qtyStep: product.qtyStep,
@@ -1810,13 +2014,6 @@ const QuickPOSPage: React.FC = () => {
     });
   };
 
-  /**
-   * Commit a quantity chosen on the keypad.
-   *
-   * Adds to any existing line for the same product rather than creating a second
-   * one   weighing the same item twice at the counter is normal, and two lines
-   * for 250 g and 250 g reads worse on the bill than one for 500 g.
-   */
   const addWeighedToCart = (product: Product, quantity: number) => {
     const qty = snapQty(quantity, product);
     if (qty <= 0) return;
@@ -1858,6 +2055,7 @@ const QuickPOSPage: React.FC = () => {
           warrantyMonths: product.warrantyMonths || 0,
           isService: product.isService ?? false,
           isReload: false,
+          trackSerials: product.trackSerials ?? false,
           sellBy: product.sellBy,
           unitOfMeasure: product.unitOfMeasure,
           qtyStep: product.qtyStep,
@@ -1953,6 +2151,23 @@ const QuickPOSPage: React.FC = () => {
    * a serial captured for a card that will not exist is just a stale value
    * waiting to be sent somewhere it does not belong.
    */
+  /** Change the warranty months for one cart line only (e.g. product 12 → 6 for this customer). */
+  const setLineWarrantyMonths = (id: string, months: number) => {
+    const m = Math.max(1, Math.min(120, Math.round(Number(months) || 0)));
+    lastDisplayItemIdRef.current = id;
+    setCart((prev) =>
+      prev.map((i) =>
+        i.id === id
+          ? {
+              ...i,
+              defaultWarrantyMonths: i.defaultWarrantyMonths ?? i.warrantyMonths,
+              warrantyMonths: m,
+            }
+          : i,
+      ),
+    );
+  };
+
   const setLineWarranty = (id: string, issue: boolean) => {
     lastDisplayItemIdRef.current = id;
     setCart((prev) =>
@@ -1972,7 +2187,8 @@ const QuickPOSPage: React.FC = () => {
     lastDisplayItemIdRef.current = id;
     setCart((prev) =>
       prev.map((i) =>
-        i.id === id ? { ...i, serialNumber: value.slice(0, 64) } : i,
+        // several units on a tracked line: "SN1, SN2"
+        i.id === id ? { ...i, serialNumber: value.slice(0, i.trackSerials ? 2000 : 64) } : i,
       ),
     );
   };
@@ -1980,9 +2196,6 @@ const QuickPOSPage: React.FC = () => {
   const updateQty = (id: string, qty: number) => {
     const line = cart.find((i) => i.id === id);
 
-    // Weighted lines step by the product's own increment (10 g, 100 ml) and drop
-    // out of the cart below their minimum rather than at zero, so tapping "-" on
-    // a 100 g minimum item removes it instead of leaving an unsellable 50 g.
     if (line && isWeighted(line)) {
       const snapped = roundQty(qty);
       if (snapped < minQtyOf(line)) {
@@ -2090,9 +2303,30 @@ const QuickPOSPage: React.FC = () => {
     });
   };
 
+  /**
+   * Organization admin switching the working branch.
+   *
+   * Stock, and therefore what can legally be sold, is per location. A cart built
+   * against one branch's stock must not be checked out against another's, so a
+   * switch with items in the cart asks first and then starts clean.
+   */
+  const handleBranchChange = (nextLocationId: string) => {
+    if (nextLocationId === selectedLocationId) return;
+    if (cart.length > 0) {
+      const ok = window.confirm(
+        "Switching branch clears the current cart, because stock is counted per branch. Continue?",
+      );
+      if (!ok) return;
+      clearCart();
+    }
+    setSelectedLocationId(nextLocationId);
+  };
+
   const clearCart = () => {
     lastDisplayItemIdRef.current = null;
     setCart([]);
+    setSkippedFreeOfferIds(new Set());
+    setFreePickerOffer(null);
     setStep("cart");
     setSelectedCustomer(null);
     setCustomerSearch("");
@@ -2160,10 +2394,12 @@ const QuickPOSPage: React.FC = () => {
   useEffect(() => {
     if (!user?.businessId) return;
     loadBusinessProfile();
-    fetchCourierServices({ isActive: true });
-    fetchCourierSettings(user.businessId);
+    if (canUseCourier) {
+      fetchCourierServices({ isActive: true });
+      fetchCourierSettings(user.businessId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.businessId]);
+  }, [user?.businessId, canUseCourier]);
 
   useEffect(() => {
     if (!courierEnabled || selectedCourierId || courierServices.length === 0)
@@ -2369,6 +2605,11 @@ const QuickPOSPage: React.FC = () => {
       toast.error(`Enter IMEI / serial for ${missingImei.name}`);
       return;
     }
+    const serialShort = cart.find((item) => item.trackSerials && serialCount(item.serialNumber) !== Number(item.quantity));
+    if (serialShort) {
+      toast.error(`${serialShort.name}: enter ${serialShort.quantity} serial number(s), separated by commas`);
+      return;
+    }
     if (!validateCourierDetails()) return;
 
     if (editingSaleId && courierEnabled) {
@@ -2497,21 +2738,49 @@ const QuickPOSPage: React.FC = () => {
         productId: item.productId,
         name: item.name,
         quantity: item.quantity,
-        unitPrice: Number(item.price),
+        unitPrice: item.isFreeItem ? 0 : Number(item.price),
         costPrice: item.costPrice || 0,
-        discount: lineDiscountLkr(item),
+        discount: item.isFreeItem ? 0 : lineDiscountLkr(item),
         discountType: "FIXED" as const,
         tax: 0,
-        warrantyMonths: isWarrantyIssuingLine(item)
-          ? item.warrantyMonths || 0
-          : 0,
+        warrantyMonths: item.isFreeItem
+          ? 0
+          : isWarrantyIssuingLine(item)
+            ? item.warrantyMonths || 0
+            : 0,
         ...(item.isReload && item.reloadPhone
           ? { reloadPhone: item.reloadPhone }
           : {}),
         ...(item.serialNumber?.trim()
           ? { serialNumber: item.serialNumber.trim() }
           : {}),
+        ...(item.isFreeItem
+          ? { isFreeItem: true, freeOfferId: item.freeOfferId }
+          : {}),
       }));
+
+      // Paid + free of same SKU must fit available stock (no silent clamp).
+      {
+        const neededByProduct = new Map<string, { name: string; qty: number; stock: number }>();
+        for (const item of cart) {
+          if (item.isService || item.isReload) continue;
+          const cur = neededByProduct.get(item.productId) || {
+            name: item.name,
+            qty: 0,
+            stock: Number(item.stock) || 0,
+          };
+          cur.qty += Number(item.quantity) || 0;
+          cur.stock = Math.max(cur.stock, Number(item.stock) || 0);
+          neededByProduct.set(item.productId, cur);
+        }
+        for (const [, row] of neededByProduct) {
+          if (row.qty > row.stock + 1e-9) {
+            throw new Error(
+              `Insufficient stock for ${row.name}. Need ${row.qty}, available ${row.stock}`,
+            );
+          }
+        }
+      }
 
       const shipmentSaleItems = saleItems.map((item) => ({
         productId: item.productId,
@@ -2532,8 +2801,6 @@ const QuickPOSPage: React.FC = () => {
           .map((item) =>
             item.isReload
               ? `${item.name}${item.reloadPhone ? ` · ${item.reloadPhone}` : ""} · Rs.${item.quantity}`
-              // Weighted lines carry their unit: "Rice x0.5" on a courier manifest
-              // is ambiguous, "Rice 500 g" is not.
               : `${item.name} ${isWeighted(item) ? formatQty(item.quantity, item) : `x${item.quantity}`}`,
           )
           .join(", ");
@@ -2825,12 +3092,41 @@ const QuickPOSPage: React.FC = () => {
         if (isPartialPayment) {
           await printAcknowledgement(saleId, resolveThermalFormat());
         } else {
-          await silentPrintInvoice(saleId, {
-            format: resolveThermalFormat(),
-            cashReceived: cashAmt > 0 ? cashAmt : undefined,
-            printerConf,
-            openDrawer: usedCash,
-          });
+          // Opt-in raw ESC/POS path: prints through QZ Tray with no Chrome
+          // print window at all, and the drawer kick rides in the same job.
+          // Only runs when the location explicitly enabled it AND QZ Tray is
+          // actually reachable — otherwise it falls straight through to the
+          // existing browser print below, byte for byte unchanged.
+          let qzPrinted = false;
+          if (printerConf?.useRawEscposPrint && printerConf.printerName) {
+            try {
+              const escposRes = await getESCPOSData(
+                saleId,
+                printerConf.paperWidth,
+              );
+              const commands = (escposRes as any)?.data?.commands;
+              if (commands?.length) {
+                qzPrinted = await tryPrintESCPOS(
+                  commands,
+                  printerConf.printerName,
+                );
+              }
+            } catch {
+              console.error(
+                "[AutoPrint] ESC/POS fetch failed – falling back to browser print",
+              );
+            }
+          }
+          if (qzPrinted) {
+            if (usedCash) await openCashDrawer({ printerConf });
+          } else {
+            await silentPrintInvoice(saleId, {
+              format: resolveThermalFormat(),
+              cashReceived: cashAmt > 0 ? cashAmt : undefined,
+              printerConf,
+              openDrawer: usedCash,
+            });
+          }
         }
       }
       await loadProducts();
@@ -2874,6 +3170,12 @@ const QuickPOSPage: React.FC = () => {
   const goToCustomer = () => {
     if (cart.length === 0) {
       toast.error("Add at least one item to cart first");
+      return;
+    }
+    // Caught here as well as on the pay button so an admin browsing "All
+    // branches" is told at the start of checkout, not at the last click.
+    if (isOrgAdmin && !selectedLocationId) {
+      toast.error("Select a branch in the header before checking out");
       return;
     }
     setStep("customer");
@@ -3194,6 +3496,32 @@ const QuickPOSPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posLocationId]);
 
+  // AI list scan → cart prefill (from Invoices/elsewhere or same-page modal)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(AI_POS_PREFILL_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        savedAt?: number;
+        snapshot?: HeldCartSnapshot;
+      };
+      if (!parsed.savedAt || Date.now() - parsed.savedAt > 30 * 60 * 1000) {
+        sessionStorage.removeItem(AI_POS_PREFILL_KEY);
+        return;
+      }
+      if (!parsed.snapshot?.cart?.length) {
+        sessionStorage.removeItem(AI_POS_PREFILL_KEY);
+        return;
+      }
+      applyHeldSnapshot(parsed.snapshot);
+      sessionStorage.removeItem(AI_POS_PREFILL_KEY);
+      toast.success(`Loaded ${parsed.snapshot.cart.length} item(s) from AI scan`);
+    } catch {
+      sessionStorage.removeItem(AI_POS_PREFILL_KEY);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const holdCurrentCartRef = useRef(holdCurrentCart);
   holdCurrentCartRef.current = holdCurrentCart;
 
@@ -3340,8 +3668,6 @@ const QuickPOSPage: React.FC = () => {
     >
       <PoleDisplayModal open={poleDisplay.setupOpen} onClose={poleDisplay.closeSetup} />
 
-      {/* Weight / volume / length products ask for an amount before joining the
-          cart   see components/branch/pos/QuantityKeypadModal. */}
       {keypadProduct && (
         <QuantityKeypadModal
           product={keypadProduct}
@@ -3351,8 +3677,6 @@ const QuickPOSPage: React.FC = () => {
           onConfirm={(qty) => {
             const existing = cart.find((i) => i.id === keypadProduct.id);
             if (existing) {
-              // Re-opening the keypad on a cart line replaces its amount rather
-              // than adding to it   the cashier is correcting a weight.
               updateQty(keypadProduct.id, qty);
               setKeypadProduct(null);
             } else {
@@ -3374,6 +3698,47 @@ const QuickPOSPage: React.FC = () => {
         <div className={`border-b border-gray-100 flex items-center gap-3 ${isCheckoutLayout ? "p-2.5 flex-wrap" : "p-4"}`}>
           <Zap className="w-5 h-5 text-[#1e3a8a]" />
           <h1 className={`font-bold text-gray-900 ${isCheckoutLayout ? "text-sm" : "text-lg"}`}>Quick POS</h1>
+
+          {/* Working branch.
+              Org admin picks it here   "All branches" shows every branch's
+              stock for browsing, but a sale must name one branch, so checkout
+              stays blocked until one is chosen. A branch user is locked to the
+              branch assigned to their account and just sees which one it is. */}
+          {isOrgAdmin ? (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <MapPin
+                className={`w-4 h-4 ${selectedLocationId ? "text-[#1e3a8a]" : "text-amber-500"}`}
+              />
+              <select
+                value={selectedLocationId}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                title="Branch to browse stock and record the sale against"
+                className={`px-2 py-1.5 text-xs font-semibold rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 max-w-[11rem] ${
+                  selectedLocationId
+                    ? "border-gray-200 text-gray-800"
+                    : "border-amber-300 text-amber-700 bg-amber-50"
+                }`}
+              >
+                <option value="">All branches</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            selectedLocationDetails?.name && (
+              <span
+                title="Your assigned branch"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#1e3a8a] bg-[#1e3a8a]/10 border border-[#1e3a8a]/20 shrink-0 max-w-[11rem] truncate"
+              >
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{selectedLocationDetails.name}</span>
+              </span>
+            )
+          )}
+
           <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50 shrink-0">
             <button
               type="button"
@@ -3786,8 +4151,6 @@ const QuickPOSPage: React.FC = () => {
                           </span>
                         ) : (
                           <>
-                            {/* A weighted product's price is meaningless without
-                                its unit: "Rs. 1,250.00" vs "Rs. 1,250.00 / kg". */}
                             <span
                               className={`text-xs font-bold ${product.discountInfo ? "text-red-600" : "text-[#1e3a8a]"}`}
                             >
@@ -3951,6 +4314,15 @@ const QuickPOSPage: React.FC = () => {
                 >
                   Quotes ({quotations.length})
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAiListScan(true)}
+                  className="text-xs font-semibold text-violet-700 hover:underline inline-flex items-center gap-1"
+                  title="Scan bill / product list with AI"
+                >
+                  <Camera className="w-3 h-3" />
+                  AI list
+                </button>
                 {openQuoteId && (
                   <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded">
                     Quote open
@@ -3990,6 +4362,113 @@ const QuickPOSPage: React.FC = () => {
               )}
             </div>
 
+            {activeFreeOffers.length > 0 && cart.some((l) => !l.isFreeItem) && (
+              <div className="px-3 py-2 border-b border-emerald-100 bg-emerald-50/70 space-y-2">
+                {activeFreeOffers.map((offer) => {
+                  const paid = cart
+                    .filter(
+                      (l) =>
+                        !l.isFreeItem && l.productId === offer.triggerProductId,
+                    )
+                    .reduce((s, l) => s + Number(l.quantity), 0);
+                  const ent = computeFreeEntitlement(
+                    paid,
+                    Number(offer.buyQuantity),
+                    Number(offer.freeQuantity),
+                  );
+                  if (ent <= 0) return null;
+                  const freeSel = cart
+                    .filter((l) => l.isFreeItem && l.freeOfferId === offer.id)
+                    .reduce((s, l) => s + Number(l.quantity), 0);
+                  const skipped = skippedFreeOfferIds.has(offer.id);
+                  const fullySelected = freeSel >= ent;
+
+                  if (skipped) {
+                    return (
+                      <div
+                        key={offer.id}
+                        className="rounded-md border border-gray-200 bg-white px-2.5 py-2 flex items-center justify-between gap-2"
+                      >
+                        <p className="text-[11px] text-gray-500 min-w-0 truncate">
+                          Free offer skipped · {offer.name}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => openFreePickerForOffer(offer, ent)}
+                          className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 shrink-0"
+                        >
+                          Select free
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (fullySelected) {
+                    return (
+                      <div
+                        key={offer.id}
+                        className="rounded-md border border-emerald-200 bg-white px-2.5 py-2 flex items-center justify-between gap-2"
+                      >
+                        <span className="flex items-center gap-1.5 min-w-0 text-[11px] text-emerald-800">
+                          <Gift className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate font-medium">
+                            {offer.name}: free applied ({freeSel}/{ent})
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openFreePickerForOffer(offer, ent)}
+                          className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 shrink-0"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={offer.id}
+                      className="rounded-md border border-amber-200 bg-amber-50/80 px-2.5 py-2 space-y-2"
+                    >
+                      <div className="flex items-start gap-1.5">
+                        <Gift className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold text-amber-900">
+                            This product has a free offer
+                          </p>
+                          <p className="text-[10px] text-amber-800/90 mt-0.5">
+                            {offer.name} · Buy {offer.buyQuantity} Get{" "}
+                            {offer.freeQuantity} · free {freeSel}/{ent}
+                          </p>
+                          <p className="text-[10px] text-amber-700 mt-0.5">
+                            Select free products, or skip if you don&apos;t want
+                            them.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => skipFreeOffer(offer.id)}
+                          className="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          Skip
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openFreePickerForOffer(offer, ent)}
+                          className="flex-1 rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                        >
+                          Select free products
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 p-8">
@@ -4010,12 +4489,26 @@ const QuickPOSPage: React.FC = () => {
                       <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-gray-800 truncate">
+                          {item.isFreeItem ? (
+                            <span className="mr-1 inline-flex items-center rounded bg-emerald-100 text-emerald-800 px-1 py-0.5 text-[10px] font-bold">
+                              FREE
+                            </span>
+                          ) : null}
                           {item.isReload
                             ? item.reloadPhone
                               ? `${item.name} · ${item.reloadPhone}`
                               : item.name
                             : item.name}
                         </p>
+                        {item.isFreeItem && item.freeOfferName ? (
+                          <p className="text-[10px] text-emerald-700 mt-0.5 truncate">
+                            {item.freeOfferName}
+                            {item.freeOfferBuyQty != null &&
+                            item.freeOfferFreeQty != null
+                              ? ` · Buy ${item.freeOfferBuyQty} Get ${item.freeOfferFreeQty}`
+                              : ""}
+                          </p>
+                        ) : null}
                         {item.isReload ? (
                           <p className="text-xs text-emerald-700 font-medium mt-0.5">
                             Reload Rs.{item.quantity.toLocaleString()}
@@ -4092,9 +4585,6 @@ const QuickPOSPage: React.FC = () => {
                           >
                             <Minus className="w-3 h-3 text-gray-600" />
                           </button>
-                          {/* Weighted lines show the amount with its unit and are
-                              tappable, since typing 0.375 kg with +/- would take
-                              dozens of presses. */}
                           {isWeighted(item) ? (
                             <button
                               type="button"
@@ -4196,7 +4686,11 @@ const QuickPOSPage: React.FC = () => {
                             </>
                           ) : (
                             <>
-                              <WarrantyBadge months={item.warrantyMonths} />
+                              <WarrantyMonthsPicker
+                                months={item.warrantyMonths}
+                                defaultMonths={item.defaultWarrantyMonths}
+                                onChange={(m) => setLineWarrantyMonths(item.id, m)}
+                              />
                               <span className="text-[10px] text-emerald-700">
                                 warranty card will be issued
                               </span>
@@ -4211,16 +4705,81 @@ const QuickPOSPage: React.FC = () => {
                           )}
                         </div>
                       )}
-                      {isWarrantyIssuingLine(item) && (
+                      {(isWarrantyIssuingLine(item) || item.trackSerials) && (
                         <input
                           value={item.serialNumber || ""}
                           onChange={(e) =>
                             updateSerialNumber(item.id, e.target.value)
                           }
-                          placeholder="IMEI / serial required"
+                          placeholder={
+                            item.trackSerials && Number(item.quantity) > 1
+                              ? `${item.quantity} serials, comma separated`
+                              : "IMEI / serial required"
+                          }
                           className="w-full rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-mono text-gray-800"
                         />
                       )}
+                      {!item.isFreeItem &&
+                        (() => {
+                          const offer = activeFreeOffers.find(
+                            (o) => o.triggerProductId === item.productId,
+                          );
+                          if (!offer) return null;
+                          const paid = cart
+                            .filter(
+                              (l) =>
+                                !l.isFreeItem &&
+                                l.productId === offer.triggerProductId,
+                            )
+                            .reduce((s, l) => s + Number(l.quantity), 0);
+                          const ent = computeFreeEntitlement(
+                            paid,
+                            Number(offer.buyQuantity),
+                            Number(offer.freeQuantity),
+                          );
+                          if (ent <= 0) return null;
+                          const freeSel = cart
+                            .filter(
+                              (l) =>
+                                l.isFreeItem && l.freeOfferId === offer.id,
+                            )
+                            .reduce((s, l) => s + Number(l.quantity), 0);
+                          if (
+                            freeSel >= ent ||
+                            skippedFreeOfferIds.has(offer.id)
+                          ) {
+                            return null;
+                          }
+                          return (
+                            <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 space-y-1.5">
+                              <p className="text-[10px] text-amber-900">
+                                <span className="font-semibold">
+                                  This product has a free offer.
+                                </span>{" "}
+                                Select free products, or skip if you don&apos;t
+                                want them.
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => skipFreeOffer(offer.id)}
+                                  className="flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-[10px] font-medium text-gray-700"
+                                >
+                                  Skip
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openFreePickerForOffer(offer, ent)
+                                  }
+                                  className="flex-1 rounded bg-emerald-600 px-2 py-1 text-[10px] font-semibold text-white"
+                                >
+                                  Select free products
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                     </li>
                     );
                   })}
@@ -4615,6 +5174,7 @@ const QuickPOSPage: React.FC = () => {
                 )}
               </div>
 
+              {canUseCourier && (
               <div className="rounded-xl border border-gray-200 p-3 space-y-3">
                 <button
                   type="button"
@@ -4906,6 +5466,7 @@ const QuickPOSPage: React.FC = () => {
                   </div>
                 )}
               </div>
+              )}
               </div>
 
               <p className="text-xs text-gray-400 text-center">
@@ -5012,29 +5573,26 @@ const QuickPOSPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Branch selector for org admin */}
+              {/* Which branch this sale is recorded against.
+                  Read-only here on purpose   the branch is chosen once in the
+                  header, because changing it mid-cart has to clear the cart. */}
               {isOrgAdmin && (
                 <div>
                   <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1.5">
                     <MapPin className="w-3 h-3" /> Branch / Location{" "}
                     <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={selectedLocationId}
-                    onChange={(e) => setSelectedLocationId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 bg-white"
-                  >
-                    <option value="">Select branch/location…</option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                  {!selectedLocationId && (
-                    <p className="text-xs text-amber-600 mt-1">
-                      Select a branch to process the sale
-                    </p>
+                  {selectedLocationId ? (
+                    <div className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 border border-gray-200 text-gray-800 font-medium truncate">
+                      {selectedLocationDetails?.name ||
+                        locations.find((l) => l.id === selectedLocationId)?.name ||
+                        "Selected branch"}
+                    </div>
+                  ) : (
+                    <div className="w-full px-3 py-2 text-sm rounded-lg bg-amber-50 border border-amber-300 text-amber-800">
+                      Choose a branch in the header above   a sale must be
+                      recorded against one branch.
+                    </div>
                   )}
                 </div>
               )}
@@ -5629,19 +6187,18 @@ const QuickPOSPage: React.FC = () => {
                   </span>
                 </div>
                 {saleResult.paymentStatus === "PARTIAL" &&
-                  saleResult.remainingBalance &&
-                  saleResult.remainingBalance > 0 && (
+                  Number(saleResult.remainingBalance || 0) > 0 && (
                     <>
                       <div className="flex justify-between text-orange-600">
                         <span>Amount Paid</span>
                         <span className="font-medium">
-                          {formatCurrency(total - saleResult.remainingBalance)}
+                          {formatCurrency(total - Number(saleResult.remainingBalance || 0))}
                         </span>
                       </div>
                       <div className="flex justify-between text-red-600 font-semibold">
                         <span>Credit / Due</span>
                         <span>
-                          {formatCurrency(saleResult.remainingBalance)}
+                          {formatCurrency(Number(saleResult.remainingBalance || 0))}
                         </span>
                       </div>
                     </>
@@ -5680,11 +6237,11 @@ const QuickPOSPage: React.FC = () => {
                     <span>{formatCurrency(change)}</span>
                   </div>
                 )}
-                {saleResult.nonCashChange &&
-                  saleResult.nonCashChange > 0.001 && (
+                {/* `x && x > 0` rendered a stray "0" under Total when x was 0. */}
+                {Number(saleResult.nonCashChange || 0) > 0.001 && (
                     <div className="flex justify-between text-green-600 font-semibold">
                       <span>Change to Return</span>
-                      <span>{formatCurrency(saleResult.nonCashChange)}</span>
+                      <span>{formatCurrency(Number(saleResult.nonCashChange || 0))}</span>
                     </div>
                   )}
                 {selectedCustomer && (
@@ -5727,6 +6284,16 @@ const QuickPOSPage: React.FC = () => {
                 >
                   <Download className="w-4 h-4" /> Download A4 Invoice
                 </button>
+                {/* Bill share link   hidden entirely unless the organization
+                    turned the feature on in POS Settings. */}
+                {posSettings.billShareEnabled && (
+                  <button
+                    onClick={() => setIsShareBillOpen(true)}
+                    className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+                  >
+                    <Send className="w-4 h-4" /> Send Bill Link
+                  </button>
+                )}
               </div>
             </div>
 
@@ -5776,7 +6343,31 @@ const QuickPOSPage: React.FC = () => {
       <CashDrawerOpenOverlay
         visible={showCashDrawer}
         onDone={() => setShowCashDrawer(false)}
+        printerConf={drawerPrinterConf}
       />
+
+      <SelectFreeItemsModal
+        open={!!freePickerOffer}
+        onOpenChange={(open) => {
+          if (!open) setFreePickerOffer(null);
+        }}
+        offerName={freePickerOffer?.name || "Free offer"}
+        entitlement={freePickerEntitlement}
+        rows={freePickerRows}
+        onApply={applyFreePicker}
+      />
+
+      {/* Bill Share Modal */}
+      {saleResult && (
+        <ShareBillModal
+          isOpen={isShareBillOpen}
+          onClose={() => setIsShareBillOpen(false)}
+          saleId={saleResult.saleId}
+          saleNumber={saleResult.saleNumber}
+          customerEmail={customerEmail}
+          customerPhone={customerPhone}
+        />
+      )}
 
       {/* Print Options Modal */}
       {saleResult && (
@@ -5895,6 +6486,75 @@ const QuickPOSPage: React.FC = () => {
             </p>
           </div>
         </div>
+      )}
+
+      {showAiListScan && (
+        <AiListScanModal
+          open={showAiListScan}
+          onClose={() => setShowAiListScan(false)}
+          mode="pos"
+          onConfirmLines={() => {
+            /* cart applied via sessionStorage + effect, or below onSendToPos */
+          }}
+          onSendToPos={() => {
+            try {
+              const raw = sessionStorage.getItem(AI_POS_PREFILL_KEY);
+              if (!raw) return;
+              const parsed = JSON.parse(raw) as { snapshot?: HeldCartSnapshot };
+              if (parsed.snapshot?.cart?.length) {
+                applyHeldSnapshot(parsed.snapshot);
+                sessionStorage.removeItem(AI_POS_PREFILL_KEY);
+                toast.success(`Loaded ${parsed.snapshot.cart.length} item(s) from AI scan`);
+              }
+            } catch {
+              /* ignore */
+            }
+          }}
+          onCreatePosQuote={async (_lines, snapshot) => {
+            if (!posLocationId) {
+              toast.error("Select a branch/location before saving a quote");
+              return;
+            }
+            const note =
+              window.prompt(
+                "Quote note (customer name or phone)?",
+                customerName || customerPhone || "",
+              ) ?? "";
+            setSavingQuote(true);
+            try {
+              const itemCount = snapshot.cart.reduce(
+                (sum, item) => sum + Number((item as { quantity?: number }).quantity || 0),
+                0,
+              );
+              const totalAmount = snapshot.cart.reduce((sum, item) => {
+                const line = item as { price?: number; quantity?: number };
+                return sum + Number(line.price || 0) * Number(line.quantity || 0);
+              }, 0);
+              const res = await createQuotation({
+                locationId: posLocationId,
+                note: note.trim() || undefined,
+                cartJson: snapshot,
+                itemCount,
+                totalAmount,
+                customerId: selectedCustomer?.id,
+                customerName: customerName || selectedCustomer?.name,
+                customerPhone: customerPhone || selectedCustomer?.phone,
+              });
+              const row = res?.data as PosQuotationRecord | undefined;
+              if (!res?.success && !row) {
+                throw new Error(res?.message || "Failed to save quote");
+              }
+              if (row?.id) setOpenQuoteId(row.id);
+              applyHeldSnapshot(snapshot);
+              toast.success(row?.quoteNumber ? `Quote ${row.quoteNumber} saved` : "Quote saved");
+              await refreshQuotations();
+            } catch (err: unknown) {
+              toast.error(err instanceof Error ? err.message : "Could not save quote");
+            } finally {
+              setSavingQuote(false);
+            }
+          }}
+        />
       )}
 
       {showQuotations && (

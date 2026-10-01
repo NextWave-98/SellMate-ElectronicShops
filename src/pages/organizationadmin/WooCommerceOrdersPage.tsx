@@ -4,6 +4,7 @@ import { RefreshCw, ShoppingBag, Download, CheckCircle, XCircle, Clock, AlertCir
 import toast from 'react-hot-toast';
 import useFetch from '../../hooks/useFetch';
 import useCourier from '../../hooks/useCourier';
+import { usePermissions } from '../../hooks/usePermissions';
 import { CourierShipmentModal } from '../../components/courier/modals';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -256,12 +257,14 @@ const WooCommerceOrdersPage = () => {
   const [shipOrder, setShipOrder] = useState<WooOrder | null>(null);
 
   const { fetchData } = useFetch();
+  const { hasCourierAccess } = usePermissions();
+  const canUseCourier = hasCourierAccess();
   const { courierServices, fetchCourierServices, createCourierShipment } = useCourier();
 
   useEffect(() => {
-    fetchCourierServices();
+    if (canUseCourier) fetchCourierServices();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canUseCourier]);
 
   const loadOrders = useCallback(async (pg = page, st = statusFilter, q = search) => {
     setLoading(true);
@@ -607,7 +610,7 @@ const WooCommerceOrdersPage = () => {
                                   <Truck className="w-3 h-3" />
                                   {order.shipmentNumber ? `#${order.shipmentNumber}` : 'Shipment Created'}
                                 </span>
-                              ) : (
+                              ) : canUseCourier ? (
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <Button
@@ -648,7 +651,7 @@ const WooCommerceOrdersPage = () => {
                                     </button>
                                   </PopoverContent>
                                 </Popover>
-                              )}
+                              ) : null}
                             </div>
                           ) : impStatus === 'loading' ? (
                             <span className="inline-flex items-center gap-1 text-blue-600 text-xs">
@@ -778,7 +781,7 @@ const WooCommerceOrdersPage = () => {
       </Card>
 
       {/* Full Courier Modal   pre-filled from WooCommerce order */}
-      {shipOrder && (() => {
+      {canUseCourier && shipOrder && (() => {
         const recipient = getWooRecipient(shipOrder);
         const paymentMethod = mapWooPaymentMethod(shipOrder);
         const shippingTotal = getWooShippingTotal(shipOrder);

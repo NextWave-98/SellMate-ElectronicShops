@@ -238,6 +238,12 @@ export const PERMISSIONS = {
   PRODUCTS_UPDATE: 'products.update',
   PRODUCTS_DELETE: 'products.delete',
 
+  // Free offers (Buy N Get M Free)
+  FREEOFFERS_CREATE: 'freeoffers.create',
+  FREEOFFERS_READ: 'freeoffers.read',
+  FREEOFFERS_UPDATE: 'freeoffers.update',
+  FREEOFFERS_DELETE: 'freeoffers.delete',
+
   // Category management
   CATEGORIES_CREATE: 'categories.create',
   CATEGORIES_READ: 'categories.read',

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, DollarSign, Calendar, CreditCard } from 'lucide-react';
+import { ArrowLeft, Loader2, DollarSign, Calendar, CreditCard, Pencil } from 'lucide-react';
+import PlanDocuments, { type PlanDocument } from '../../components/installments/PlanDocuments';
 import toast from 'react-hot-toast';
 import useFetch from '../../hooks/useFetch';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ interface Payment {
     amountDue: number;
     amountPaid: number;
     lateFee: number;
+    totalAmountPaid: number;
     status: 'PENDING' | 'PAID' | 'LATE' | 'DEFAULTED';
     daysOverdue: number;
     paymentDate?: string;
@@ -36,7 +38,22 @@ interface InstallmentPlanDetail {
         id: string;
         saleNumber: string;
         totalAmount: number;
+        paidAmount?: number;
+        status?: string;
     };
+    cancellationReason?: string;
+    transactions?: Array<{
+        id: string;
+        amount: number;
+        principalAmount: number;
+        interestAmount: number;
+        lateFeeAmount: number;
+        paymentMethod?: string;
+        paymentReference?: string;
+        paidAt: string;
+        allocations?: Array<{ installmentNumber: number; applied: number; paid: boolean }>;
+        receivedBy?: { id: string; name: string };
+    }>;
     productDescription?: string;
     totalAmount: number;
     downPayment: number;
@@ -49,16 +66,24 @@ interface InstallmentPlanDetail {
     lateFeeFixed: number;
     status: 'ACTIVE' | 'COMPLETED' | 'DEFAULTED' | 'CANCELLED';
     totalPaid: number;
+    /** Down payment + installment receipts (backend). */
+    amountPaidTotal?: number;
     totalOutstanding: number;
     paymentsCompleted: number;
     paymentsMissed: number;
     startDate: string;
     endDate: string;
     firstPaymentDate: string;
+    documents?: PlanDocument[];
     notes?: string;
     payments?: Payment[];
     createdAt: string;
 }
+
+const n = (v: unknown) => Number(v) || 0;
+const rs = (v: unknown) => `Rs. ${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** What an installment still owes: the installment plus any late fee, less what was paid. */
+const owedOn = (p: Payment) => Math.max(0, Math.round((n(p.amountDue) + n(p.lateFee) - n(p.totalAmountPaid ?? p.amountPaid)) * 100) / 100);
 
 export default function InstallmentDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -70,9 +95,14 @@ export default function InstallmentDetailPage() {
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('CASH');
     const [paymentReference, setPaymentReference] = useState('');
+    const [showCancel, setShowCancel] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [returnStock, setReturnStock] = useState(true);
+    const [cancelling, setCancelling] = useState(false);
 
     const { fetchData: getPlan } = useFetch(`/installments/plans/${id}`);
     const { fetchData: recordPayment } = useFetch('/installments/payments');
+    const { fetchData: cancelPlan } = useFetch(`/installments/plans/${id}/cancel`);
 
     useEffect(() => {
         loadPlan();
@@ -108,6 +138,11 @@ export default function InstallmentDetailPage() {
             toast.error('Please enter a valid amount');
             return;
         }
+        const planBalance = n(plan?.totalOutstanding);
+        if (amount > planBalance + 0.005) {
+            toast.error(`Amount is more than the plan's remaining balance (${rs(planBalance)})`);
+            return;
+        }
 
         try {
             setRecordingPayment(true);
@@ -123,7 +158,10 @@ export default function InstallmentDetailPage() {
             });
 
             if (response?.success) {
-                toast.success('Payment recorded successfully');
+                const allocs: any[] = (response.data as any)?.allocations || [];
+                toast.success(allocs.length > 1
+                    ? `Payment recorded — applied to installments #${allocs.map(a => a.installmentNumber).join(', #')}`
+                    : 'Payment recorded successfully');
                 setSelectedPayment(null);
                 setPaymentAmount('');
                 setPaymentReference('');
@@ -134,6 +172,30 @@ export default function InstallmentDetailPage() {
             console.error(error);
         } finally {
             setRecordingPayment(false);
+        }
+    };
+
+    const handleCancelPlan = async () => {
+        if (!cancelReason.trim()) {
+            toast.error('Please enter a reason');
+            return;
+        }
+        try {
+            setCancelling(true);
+            const response = await cancelPlan({
+                method: 'POST',
+                data: { reason: cancelReason.trim(), cancelSale: !!plan?.sale && returnStock },
+            });
+            if (response?.success) {
+                toast.success('Plan cancelled');
+                setShowCancel(false);
+                setCancelReason('');
+                await loadPlan();
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setCancelling(false);
         }
     };
 
@@ -197,10 +259,29 @@ export default function InstallmentDetailPage() {
                         <p className="text-gray-600 mt-1">Installment plan details and payment history</p>
                     </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(plan.status)}`}>
-                    {plan.status}
-                </span>
+                <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(plan.status)}`}>
+                        {plan.status}
+                    </span>
+                    {(plan.status === 'ACTIVE' || plan.status === 'DEFAULTED') && (
+                        <Button variant="outline" onClick={() => navigate(`../installments/${plan.id}/edit`)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit Plan
+                        </Button>
+                    )}
+                    {(plan.status === 'ACTIVE' || plan.status === 'DEFAULTED') && (
+                        <Button variant="outline" onClick={() => setShowCancel(true)} className="text-red-600 border-red-200 hover:bg-red-50">
+                            Cancel Plan
+                        </Button>
+                    )}
+                </div>
             </div>
+
+            {plan.status === 'CANCELLED' && plan.cancellationReason && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
+                    <span className="font-medium">Cancelled:</span> {plan.cancellationReason}
+                </div>
+            )}
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -209,7 +290,7 @@ export default function InstallmentDetailPage() {
                         <div>
                             <p className="text-sm font-medium text-gray-600">Total Amount</p>
                             <p className="text-2xl font-bold text-gray-900 mt-1">
-                                Rs. {plan.totalAmount.toLocaleString()}
+                                {rs(plan.totalAmount)}
                             </p>
                         </div>
                         <DollarSign className="w-8 h-8 text-gray-400" />
@@ -221,8 +302,13 @@ export default function InstallmentDetailPage() {
                         <div>
                             <p className="text-sm font-medium text-gray-600">Total Paid</p>
                             <p className="text-2xl font-bold text-green-600 mt-1">
-                                Rs. {plan.totalPaid.toLocaleString()}
+                                {rs(plan.amountPaidTotal ?? n(plan.downPayment) + n(plan.totalPaid))}
                             </p>
+                            {n(plan.downPayment) > 0 && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Down payment {rs(plan.downPayment)} + installments {rs(plan.totalPaid)}
+                                </p>
+                            )}
                         </div>
                         <DollarSign className="w-8 h-8 text-green-400" />
                     </div>
@@ -233,7 +319,7 @@ export default function InstallmentDetailPage() {
                         <div>
                             <p className="text-sm font-medium text-gray-600">Outstanding</p>
                             <p className="text-2xl font-bold text-red-600 mt-1">
-                                Rs. {plan.totalOutstanding.toLocaleString()}
+                                {rs(plan.totalOutstanding)}
                             </p>
                         </div>
                         <DollarSign className="w-8 h-8 text-red-400" />
@@ -271,17 +357,34 @@ export default function InstallmentDetailPage() {
                     <div>
                         <h3 className="text-sm font-medium text-gray-600 mb-2">Payment Terms</h3>
                         <div className="space-y-2">
-                            <p className="text-sm"><span className="font-medium">Down Payment:</span> Rs. {plan.downPayment.toLocaleString()}</p>
-                            <p className="text-sm"><span className="font-medium">Financed Amount:</span> Rs. {plan.financedAmount.toLocaleString()}</p>
-                            <p className="text-sm"><span className="font-medium">Installment Amount:</span> Rs. {plan.installmentAmount.toLocaleString()}</p>
+                            <p className="text-sm"><span className="font-medium">Down Payment:</span> {rs(plan.downPayment)}</p>
+                            <p className="text-sm"><span className="font-medium">Financed Amount:</span> {rs(plan.financedAmount)}</p>
+                            <p className="text-sm"><span className="font-medium">Installment Amount:</span> {rs(plan.installmentAmount)}</p>
                             <p className="text-sm"><span className="font-medium">Frequency:</span> {plan.frequency}</p>
-                            {plan.interestRate > 0 && (
-                                <p className="text-sm"><span className="font-medium">Interest Rate:</span> {plan.interestRate}%</p>
+                            {n(plan.interestRate) > 0 && (
+                                <p className="text-sm"><span className="font-medium">Interest Rate:</span> {n(plan.interestRate)}% per year (flat)</p>
+                            )}
+                            {(n(plan.lateFeeFixed) > 0 || n(plan.lateFeePercentage) > 0) && (
+                                <p className="text-sm"><span className="font-medium">Late Fee:</span> {n(plan.lateFeeFixed) > 0 ? rs(plan.lateFeeFixed) : `${n(plan.lateFeePercentage)}%`} per overdue installment</p>
+                            )}
+                            {plan.sale && (
+                                <p className="text-sm"><span className="font-medium">Sale:</span> {plan.sale.saleNumber}{plan.sale.status === 'CANCELLED' ? ' (cancelled)' : ''}</p>
+                            )}
+                            {plan.productDescription && (
+                                <p className="text-sm"><span className="font-medium">Products:</span> {plan.productDescription}</p>
                             )}
                         </div>
                     </div>
                 </div>
             </Card>
+
+            {/* Documents (max 5 images) */}
+            <PlanDocuments
+                planId={plan.id}
+                documents={plan.documents || []}
+                editable={plan.status !== 'CANCELLED'}
+                onChange={(docs) => setPlan((p) => (p ? { ...p, documents: docs } : p))}
+            />
 
             {/* Payment Schedule */}
             <Card className="overflow-hidden">
@@ -311,13 +414,13 @@ export default function InstallmentDetailPage() {
                                         {new Date(payment.dueDate).toLocaleDateString()}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        Rs. {payment.amountDue.toLocaleString()}
+                                        {rs(payment.amountDue)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                                        Rs. {payment.amountPaid.toLocaleString()}
+                                        {rs(payment.totalAmountPaid ?? payment.amountPaid)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                                        {payment.lateFee > 0 ? `Rs. ${payment.lateFee.toLocaleString()}` : '-'}
+                                        {n(payment.lateFee) > 0 ? rs(payment.lateFee) : '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}>
@@ -326,11 +429,11 @@ export default function InstallmentDetailPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        {payment.status !== 'PAID' && (
+                                        {payment.status !== 'PAID' && (plan.status === 'ACTIVE' || plan.status === 'DEFAULTED') && (
                                             <button
                                                 onClick={() => {
                                                     setSelectedPayment(payment);
-                                                    setPaymentAmount((payment.amountDue - payment.amountPaid + payment.lateFee).toString());
+                                                    setPaymentAmount(owedOn(payment).toFixed(2));
                                                 }}
                                                 className="text-orange-600 hover:text-orange-900 font-medium"
                                             >
@@ -345,6 +448,53 @@ export default function InstallmentDetailPage() {
                     </table>
                 </div>
             </Card>
+
+            {/* Payment History (one row per receipt, with the income split) */}
+            {plan.transactions && plan.transactions.length > 0 && (
+                <Card className="overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-xl font-bold text-gray-900">Payment History</h2>
+                        <p className="text-sm text-gray-600">
+                            Interest earned: <span className="font-semibold">{rs(plan.transactions.reduce((s, t) => s + n(t.interestAmount), 0))}</span>
+                            {' '}· Late fees: <span className="font-semibold">{rs(plan.transactions.reduce((s, t) => s + n(t.lateFeeAmount), 0))}</span>
+                        </p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-white/20">
+                            <thead className="bg-white/30 backdrop-blur-sm">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Principal</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Interest</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Late Fee</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Installments</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Received By</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white/20 backdrop-blur-sm divide-y divide-white/20">
+                                {plan.transactions.map((t) => (
+                                    <tr key={t.id} className="hover:bg-white/30">
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">{new Date(t.paidAt).toLocaleDateString()}</td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{rs(t.amount)}</td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">{rs(t.principalAmount)}</td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-teal-700">{rs(t.interestAmount)}</td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-red-600">{n(t.lateFeeAmount) > 0 ? rs(t.lateFeeAmount) : '-'}</td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            {t.paymentMethod || '-'}{t.paymentReference ? ` (${t.paymentReference})` : ''}
+                                        </td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            {(t.allocations || []).map(a => `#${a.installmentNumber}`).join(', ') || '-'}
+                                        </td>
+                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-700">{t.receivedBy?.name || '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
 
             {/* Record Payment Modal */}
             {selectedPayment && (
@@ -368,7 +518,10 @@ export default function InstallmentDetailPage() {
                                     Amount Due
                                 </label>
                                 <p className="text-lg font-bold text-gray-900">
-                                    Rs. {(selectedPayment.amountDue - selectedPayment.amountPaid + selectedPayment.lateFee).toLocaleString()}
+                                    {rs(owedOn(selectedPayment))}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Paying more than this moves the extra to the next installments. Plan balance: {rs(plan.totalOutstanding)}
                                 </p>
                             </div>
 
@@ -378,6 +531,8 @@ export default function InstallmentDetailPage() {
                                 </Label>
                                 <Input
                                     type="number"
+                                    min="0"
+                                    step="0.01"
                                     value={paymentAmount}
                                     onChange={(e) => setPaymentAmount(e.target.value)}
                                     placeholder="Enter amount"
@@ -397,7 +552,7 @@ export default function InstallmentDetailPage() {
                                     <option value="CARD">Card</option>
                                     <option value="BANK_TRANSFER">Bank Transfer</option>
                                     <option value="MOBILE_PAYMENT">Mobile Payment</option>
-                                    <option value="CHECK">Check</option>
+                                    <option value="CHECK">Cheque</option>
                                 </select>
                             </div>
 
@@ -439,6 +594,52 @@ export default function InstallmentDetailPage() {
                                     ) : (
                                         'Record Payment'
                                     )}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Cancel Plan Modal */}
+            {showCancel && (
+                <div
+                    className="glass-modal-overlay"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowCancel(false);
+                    }}
+                >
+                    <div className="glass-modal-panel w-full max-w-md mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Cancel Plan {plan.planNumber}</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <Label className="mb-1">Reason *</Label>
+                                <Input
+                                    type="text"
+                                    value={cancelReason}
+                                    onChange={(e) => setCancelReason(e.target.value)}
+                                    placeholder="e.g. Customer returned the item"
+                                />
+                            </div>
+                            {plan.sale && plan.sale.status !== 'CANCELLED' && (
+                                <label className="flex items-start gap-2 text-sm text-gray-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={returnStock}
+                                        onChange={(e) => setReturnStock(e.target.checked)}
+                                        className="mt-1"
+                                    />
+                                    <span>
+                                        Item returned — also cancel sale {plan.sale.saleNumber} and put the stock back.
+                                        <span className="block text-xs text-gray-500">Leave unticked if the customer keeps the item (e.g. written off).</span>
+                                    </span>
+                                </label>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                                <Button variant="outline" onClick={() => setShowCancel(false)} className="flex-1" disabled={cancelling}>
+                                    Back
+                                </Button>
+                                <Button onClick={handleCancelPlan} disabled={cancelling} className="flex-1 bg-red-600 hover:bg-red-700">
+                                    {cancelling ? <Loader2 className="w-4 h-4 inline animate-spin" /> : 'Cancel Plan'}
                                 </Button>
                             </div>
                         </div>

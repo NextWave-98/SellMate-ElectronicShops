@@ -12,11 +12,13 @@ import {
   Minimize,
   User,
   Settings,
-  Store,
   LogOut,
   ChevronDown,
   Menu,
 } from 'lucide-react';
+import HeaderNotifications from '@/components/common/HeaderNotifications';
+import BranchSwitcher from '@/components/common/BranchSwitcher';
+import { usePermissions } from '../../hooks/usePermissions';
 
 interface BranchNavbarProps {
   onMobileMenuClick?: () => void;
@@ -33,6 +35,8 @@ const BranchNavbar = ({
   onTogglePosFullscreen,
 }: BranchNavbarProps) => {
   const { user, logout } = useAuth();
+  const { hasCourierAccess } = usePermissions();
+  const canQuickCourier = hasCourierAccess();
   const { branchCode } = useParams();
   const { businessData, loadBusinessProfile } = useBusinessProfile();
   const { courierServices, fetchCourierServices, createCourierShipment } = useCourier();
@@ -40,6 +44,7 @@ const BranchNavbar = ({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false);
   const [showCourierModal, setShowCourierModal] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -120,7 +125,12 @@ const BranchNavbar = ({
 
   return (
     <>
-    <nav className={`sticky top-0 isolate  bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/40 ${isProfileOpen ? 'z-[100]' : ''}`} style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+    <nav
+      className={`sticky top-0 z-[100] bg-white/70 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/40 ${
+        isProfileOpen || isBranchMenuOpen ? 'z-[200]' : ''
+      }`}
+      style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}
+    >
       <div className="px-3 sm:px-4 md:px-5 h-14 flex items-center justify-between gap-2 sm:gap-4 min-w-0">
 
         {/* ── Left: menu + brand + branch pill + clock ── */}
@@ -143,14 +153,8 @@ const BranchNavbar = ({
             </div>
           )}
 
-          {/* Branch pill */}
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-blue-500/10 border border-blue-300/40 backdrop-blur-sm rounded-xl px-2 sm:px-3 py-1.5 min-w-0">
-            <Store className="w-4 h-4 text-[#1e3a8a] flex-shrink-0" />
-            <div className="leading-tight min-w-0">
-              <p className="text-[10px] text-blue-400 font-medium uppercase tracking-wide hidden sm:block">Branch</p>
-              <p className="text-xs font-bold text-[#1e3a8a] truncate">{branchCode || user?.branchId}</p>
-            </div>
-          </div>
+          {/* Branch switcher (multi-branch / admin ↔ branch without logout) */}
+          <BranchSwitcher variant="branch" onOpenChange={setIsBranchMenuOpen} />
 
           {/* Clock */}
           <div className="hidden lg:flex flex-col leading-tight pl-1 flex-shrink-0">
@@ -159,12 +163,12 @@ const BranchNavbar = ({
           </div>
         </div>
 
-        {/* ── Right: actions ── */}
+  
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
 
           {/* Quick POS */}
           <Link
-            to={`/${branchCode}/pos`}
+            to={`/${branchCode}/quick-pos`}
             className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3.5 py-2 bg-[#1e3a8a]/90 hover:bg-[#162d6e] text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(30,58,138,0.35)]"
             title="Quick POS"
           >
@@ -172,15 +176,17 @@ const BranchNavbar = ({
             <span className="hidden md:inline">Quick PoS</span>
           </Link>
 
-          {/* Quick Courier */}
-          <button
-            onClick={() => setShowCourierModal(true)}
-            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3.5 py-2 bg-emerald-600/90 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(5,150,105,0.30)]"
-            title="Quick Courier"
-          >
-            <Truck className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Quick Courier</span>
-          </button>
+          {/* Quick Courier — only when org has courier module */}
+          {canQuickCourier && (
+            <button
+              onClick={() => setShowCourierModal(true)}
+              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3.5 py-2 bg-emerald-600/90 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-[0_2px_10px_rgba(5,150,105,0.30)]"
+              title="Quick Courier"
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Quick Courier</span>
+            </button>
+          )}
 
           {/* POS Fullscreen   only on POS routes; labeled so exit is obvious */}
           {isPosRoute ? (
@@ -207,6 +213,12 @@ const BranchNavbar = ({
               {isFullscreenActive ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
           )}
+
+          <HeaderNotifications
+            mode="branch"
+            branchCode={branchCode}
+            viewAllPath={`/${branchCode}/notifications`}
+          />
 
           {/* Profile */}
           <div className="relative" ref={profileRef}>
@@ -279,7 +291,7 @@ const BranchNavbar = ({
       </div>
     </nav>
 
-    {showCourierModal && (
+    {canQuickCourier && showCourierModal && (
       <CourierShipmentModal
         onClose={() => setShowCourierModal(false)}
         onSave={async (data) => {

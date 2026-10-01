@@ -74,24 +74,30 @@ const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
     setError('');
     try {
       const response = await fetchData({
-        endpoint: `/inventory/branch/${branchId}`,
+        // `/inventory/branch/:id` never existed on the backend (404), so the
+        // product list was always empty. This is the branch stock endpoint.
+        endpoint: `/inventory/location/${branchId}`,
         method: 'GET',
         silent: true
       });
 
       if (response?.data) {
-        const inventoryData = Array.isArray(response.data) ? response.data : [];
+        const payload: any = response.data;
+        const inventoryData: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.products) ? payload.products : [];
         
-        // Map inventory to product inventory format
+        // Map inventory to product inventory format (rows are flat: productId,
+        // name, sku, availableQuantity, unitPrice, costPrice, averageCost).
         const mappedInventory: ProductInventory[] = inventoryData
-          .filter((inv: any) => inv.availableQuantity > 0)
+          .filter((inv: any) => Number(inv.availableQuantity) > 0 && inv.isActive !== false)
           .map((inv: any) => ({
-            id: inv.product?.id || inv.productId,
-            name: inv.product?.name || 'Unknown Product',
-            sku: inv.product?.sku || inv.product?.productCode || 'N/A',
-            productCode: inv.product?.productCode || inv.product?.sku || 'N/A',
-            availableQuantity: inv.availableQuantity || 0,
-            unitPrice: inv.product?.unitPrice || inv.averageCost || 0
+            id: inv.productId || inv.product?.id,
+            name: inv.name || inv.product?.name || 'Unknown Product',
+            sku: inv.sku || inv.productCode || inv.product?.sku || inv.product?.productCode || 'N/A',
+            productCode: inv.productCode || inv.sku || inv.product?.productCode || inv.product?.sku || 'N/A',
+            availableQuantity: Number(inv.availableQuantity) || 0,
+            unitPrice: Number(inv.unitPrice ?? inv.product?.unitPrice ?? inv.averageCost ?? 0)
           }));
 
         setBranchInventory(mappedInventory);

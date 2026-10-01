@@ -1,12 +1,14 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Search, Plus, Minus, X, Building2, Briefcase, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useFetch from '../../hooks/useFetch';
+import { useAuth } from '../../context/AuthContext';
 import AddFinancialDetailsModal from '../../components/common/AddFinancialDetailsModal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { MAX_DOCUMENT_IMAGES, prepareDocumentImages, formatKB } from '../../utils/documentImages';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
@@ -61,7 +63,28 @@ interface CartItem {
     name: string;
     price: number;
     quantity: number;
+    /** Serial / IMEI numbers, comma separated (required for serial-tracked products). */
+    serials?: string;
 }
+
+interface BranchOption {
+    id: string;
+    name: string;
+    locationCode?: string;
+}
+
+const PAYMENT_METHODS = [
+    { value: 'CASH', label: 'Cash' },
+    { value: 'CARD', label: 'Card' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+    { value: 'MOBILE_PAYMENT', label: 'Mobile Payment' },
+    { value: 'CHECK', label: 'Cheque' },
+];
+
+/** Plan length in years — same rule as the backend (annual flat interest). */
+const termInYears = (n: number, frequency: string) =>
+    frequency === 'WEEKLY' ? (n * 7) / 365 : frequency === 'BIWEEKLY' ? (n * 14) / 365 : n / 12;
+const round2 = (v: number) => Math.round((Number(v) || 0) * 100) / 100;
 
 interface FormData {
     customerId: string;
@@ -75,10 +98,15 @@ interface FormData {
     lateFeeFixed: string;
     startDate: string;
     notes: string;
+    downPaymentMethod: string;
+    locationId: string;
 }
 
 export default function CreateInstallmentPlanPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const userLocationId: string = (user as any)?.locationId || (user as any)?.branchId || '';
+    const [branches, setBranches] = useState<BranchOption[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -105,12 +133,47 @@ export default function CreateInstallmentPlanPage() {
         lateFeeFixed: '0',
         startDate: new Date().toISOString().split('T')[0],
         notes: '',
+        downPaymentMethod: 'CASH',
+        locationId: userLocationId,
     });
 
     const { fetchData: searchCustomers } = useFetch('/customers/search');
     const { fetchData: getFinancialDetails } = useFetch('/installments/financial-details');
     const { fetchData: searchProducts } = useFetch('/products');
     const { fetchData: createPlan } = useFetch('/installments/plans');
+    const { fetchData: uploadPlanDocuments } = useFetch('');
+    // Document images picked before the plan exists; uploaded right after it is created.
+    const [docFiles, setDocFiles] = useState<File[]>([]);
+    const [preparingDocs, setPreparingDocs] = useState(false);
+    const docInputRef = useRef<HTMLInputElement>(null);
+    const handleDocFiles = async (list: FileList | null) => {
+        if (!list || list.length === 0) return;
+        setPreparingDocs(true);
+        try {
+            const { files, errors } = await prepareDocumentImages(Array.from(list), docFiles.length);
+            errors.forEach((e) => toast.error(e));
+            if (files.length) setDocFiles((prev) => [...prev, ...files].slice(0, MAX_DOCUMENT_IMAGES));
+        } finally {
+            setPreparingDocs(false);
+            if (docInputRef.current) docInputRef.current.value = '';
+        }
+    };
+    const { fetchData: fetchBranches } = useFetch('/locations');
+
+    // Org admins are not tied to a branch: let them pick the branch the goods leave from.
+    useEffect(() => {
+        if (userLocationId) return;
+        (async () => {
+            try {
+                const response: any = await fetchBranches({ method: 'GET', silent: true, endpoint: '/locations?branch=branch' });
+                const list = response?.data?.locations || response?.locations || [];
+                setBranches(list.map((b: any) => ({ id: b.id, name: b.name, locationCode: b.locationCode })));
+                if (list.length === 1) setFormData(prev => ({ ...prev, locationId: list[0].id }));
+            } catch (error) {
+                console.error('Failed to load branches:', error);
+            }
+        })();
+    }, [userLocationId]);
 
     useEffect(() => {
         const delaySearch = setTimeout(() => {
@@ -303,18 +366,20 @@ export default function CreateInstallmentPlanPage() {
         return total - down;
     };
 
-    const calculateInstallmentAmount = () => {
+    /** Annual flat interest for the length of the plan (matches the backend). */
+    const calculateInterest = () => {
         const financed = calculateFinancedAmount();
         const installments = parseInt(formData.numberOfInstallments) || 1;
-        const interest = parseFloat(formData.interestRate) || 0;
+        const rate = parseFloat(formData.interestRate) || 0;
+        if (rate <= 0 || financed <= 0) return 0;
+        return round2(financed * (rate / 100) * termInYears(installments, formData.frequency));
+    };
 
-        if (interest > 0) {
-            const monthlyRate = interest / 100 / 12;
-            const months = installments;
-            return (financed * (1 + monthlyRate * months)) / months;
-        }
+    const calculateTotalPayable = () => round2(calculateFinancedAmount() + calculateInterest());
 
-        return financed / installments;
+    const calculateInstallmentAmount = () => {
+        const installments = parseInt(formData.numberOfInstallments) || 1;
+        return round2(calculateTotalPayable() / installments);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -332,6 +397,17 @@ export default function CreateInstallmentPlanPage() {
 
         if (cartItems.length === 0) {
             toast.error('Please add at least one product');
+            return;
+        }
+
+        if (!formData.locationId) {
+            toast.error('Please select the branch the goods are sold from');
+            return;
+        }
+
+        const installmentsCount = parseInt(formData.numberOfInstallments);
+        if (!Number.isInteger(installmentsCount) || installmentsCount < 1) {
+            toast.error('Number of installments must be at least 1');
             return;
         }
 
@@ -359,10 +435,23 @@ export default function CreateInstallmentPlanPage() {
                 method: 'POST',
                 data: {
                     customerId: formData.customerId,
+                    locationId: formData.locationId,
+                    // A real sale is created from these items: stock is deducted
+                    // and the down payment is recorded on the sale.
+                    items: cartItems.map(item => {
+                        const serials = (item.serials || '').split(/[,\n]/).map(x => x.trim()).filter(Boolean);
+                        return {
+                            productId: item.productId,
+                            quantity: item.quantity,
+                            unitPrice: item.price,
+                            ...(serials.length ? { serialNumbers: serials } : {}),
+                        };
+                    }),
+                    downPaymentMethod: formData.downPaymentMethod,
                     productDescription: formData.productDescription,
                     totalAmount,
                     downPayment,
-                    numberOfInstallments: parseInt(formData.numberOfInstallments),
+                    numberOfInstallments: installmentsCount,
                     frequency: formData.frequency,
                     interestRate: parseFloat(formData.interestRate) || 0,
                     lateFeePercentage: parseFloat(formData.lateFeePercentage) || 0,
@@ -373,8 +462,26 @@ export default function CreateInstallmentPlanPage() {
             });
 
             if (response?.success && response?.data) {
-                toast.success('Installment plan created successfully');
-                navigate(`../installments/${response.data.id}`);
+                const created: any = response.data;
+                toast.success(created.sale?.saleNumber
+                    ? `Installment plan created (sale ${created.sale.saleNumber})`
+                    : 'Installment plan created successfully');
+                if (docFiles.length > 0) {
+                    // The plan already exists; a failed upload must not look like a failed plan.
+                    const form = new FormData();
+                    docFiles.forEach((f) => form.append('documents', f));
+                    const up = await uploadPlanDocuments({
+                        endpoint: `/installments/plans/${created.id}/documents`,
+                        method: 'POST',
+                        data: form,
+                        contentType: 'multipart/form-data',
+                        silent: true,
+                    });
+                    if (!up?.success) {
+                        toast.error('Plan created, but the documents could not be uploaded. Add them from the plan page.');
+                    }
+                }
+                navigate(`../installments/${created.id}`);
             }
         } catch (error) {
             toast.error('Failed to create installment plan');
@@ -632,6 +739,15 @@ export default function CreateInstallmentPlanPage() {
                                     <div className="flex-1">
                                         <p className="font-medium text-gray-900">{item.name}</p>
                                         <p className="text-sm text-gray-600">Rs. {item.price.toLocaleString()} each</p>
+                                        <input
+                                            type="text"
+                                            value={item.serials || ''}
+                                            onChange={(e) => setCartItems(cartItems.map(ci =>
+                                                ci.productId === item.productId ? { ...ci, serials: e.target.value } : ci
+                                            ))}
+                                            placeholder="Serial / IMEI (comma separated, if tracked)"
+                                            className="mt-2 w-full max-w-sm px-2 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                                        />
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <div className="flex items-center gap-2">
@@ -679,6 +795,28 @@ export default function CreateInstallmentPlanPage() {
                     <h2 className="text-lg font-bold text-gray-900 mb-4">Payment Terms</h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {!userLocationId && (
+                            <div className="md:col-span-2">
+                                <Label className="mb-1">
+                                    Branch (stock is taken from here) *
+                                </Label>
+                                <select
+                                    name="locationId"
+                                    value={formData.locationId}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                                >
+                                    <option value="">Select branch...</option>
+                                    {branches.map(b => (
+                                        <option key={b.id} value={b.id}>
+                                            {b.name}{b.locationCode ? ` (${b.locationCode})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         <div>
                             <Label className="mb-1">
                                 Down Payment *
@@ -693,6 +831,22 @@ export default function CreateInstallmentPlanPage() {
                                 step="0.01"
                                 placeholder="20000"
                             />
+                        </div>
+
+                        <div>
+                            <Label className="mb-1">
+                                Down Payment Method
+                            </Label>
+                            <select
+                                name="downPaymentMethod"
+                                value={formData.downPaymentMethod}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                            >
+                                {PAYMENT_METHODS.map(m => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div>
@@ -728,7 +882,7 @@ export default function CreateInstallmentPlanPage() {
 
                         <div>
                             <Label className="mb-1">
-                                Interest Rate (%)
+                                Interest Rate (% per year, flat)
                             </Label>
                             <Input
                                 type="number"
@@ -765,6 +919,22 @@ export default function CreateInstallmentPlanPage() {
                                 min="0"
                                 step="0.1"
                             />
+                            <p className="text-xs text-gray-500 mt-1">Charged once per overdue installment</p>
+                        </div>
+
+                        <div>
+                            <Label className="mb-1">
+                                Late Fee Fixed (Rs.)
+                            </Label>
+                            <Input
+                                type="number"
+                                name="lateFeeFixed"
+                                value={formData.lateFeeFixed}
+                                onChange={handleChange}
+                                min="0"
+                                step="1"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">If set, used instead of the percentage</p>
                         </div>
                     </div>
                 </Card>
@@ -773,6 +943,18 @@ export default function CreateInstallmentPlanPage() {
                 <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
                     <h3 className="text-lg font-bold text-gray-900 mb-4">Plan Summary</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <p className="text-sm text-gray-600">Interest</p>
+                            <p className="text-xl font-bold text-gray-900">
+                                Rs. {calculateInterest().toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-600">Total Payable (after down payment)</p>
+                            <p className="text-xl font-bold text-gray-900">
+                                Rs. {calculateTotalPayable().toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
                         <div>
                             <p className="text-sm text-gray-600">Financed Amount</p>
                             <p className="text-xl font-bold text-gray-900">
@@ -807,6 +989,52 @@ export default function CreateInstallmentPlanPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                         placeholder="Additional notes or terms..."
                     />
+                </Card>
+
+                {/* Documents (optional, max 5 images) */}
+                <Card className="p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <Label className="mb-1">Documents (optional)</Label>
+                            <p className="text-xs text-gray-500">
+                                NIC, agreement, bills… up to {MAX_DOCUMENT_IMAGES} images, max 5 MB each. Saved compressed (WebP/AVIF).
+                            </p>
+                        </div>
+                        {docFiles.length < MAX_DOCUMENT_IMAGES && (
+                            <>
+                                <input
+                                    ref={docInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={(e) => handleDocFiles(e.target.files)}
+                                />
+                                <Button type="button" variant="outline" disabled={preparingDocs} onClick={() => docInputRef.current?.click()}>
+                                    {preparingDocs ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                                    Add images
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                    {docFiles.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
+                            {docFiles.map((f, i) => (
+                                <div key={`${f.name}-${i}`} className="relative rounded-lg overflow-hidden border border-gray-200">
+                                    <img src={URL.createObjectURL(f)} alt={f.name} className="w-full h-24 object-cover" />
+                                    <p className="px-2 py-1 text-[11px] text-gray-500 truncate">{formatKB(f.size)}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDocFiles((prev) => prev.filter((_, j) => j !== i))}
+                                        className="absolute top-1 right-1 p-1 rounded-full bg-white/90 text-red-600 shadow"
+                                        title="Remove"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </Card>
 
                 {/* Actions */}

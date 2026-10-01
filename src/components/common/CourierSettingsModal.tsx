@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { CourierMode, CourierServiceProvider, type CourierService, type BusinessCourierPreference, type CourierLabelSettings } from '../../hooks/useCourier';
 import useCourier from '../../hooks/useCourier';
 import { toast } from 'react-hot-toast';
+import useFetch from '../../hooks/useFetch';
 
 interface CourierSettingsModalProps {
   businessId: string;
@@ -45,6 +46,29 @@ const CourierSettingsModal = ({
     currentSettings?.defaultCourierServiceId || ''
   );
   const [saving, setSaving] = useState(false);
+
+  // Per-organization courier webhook tokens. Each org pastes ITS OWN URL
+  // (with ?token=) into the courier portal; the backend checks the token
+  // against the shipment's organization.
+  const [webhookTokens, setWebhookTokens] = useState<{ curfox?: string | null; koombiyo?: string | null; fardar?: string | null }>({});
+  const { fetchData: fetchWebhookTokens } = useFetch<{ curfox: string | null; koombiyo: string | null; fardar: string | null }>('/courier/webhook-tokens');
+  useEffect(() => {
+    let cancelled = false;
+    fetchWebhookTokens({ silent: true, showToastOnError: false, noRedirect: true })
+      .then((res) => {
+        if (!cancelled && res?.data) setWebhookTokens(res.data);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const webhookUrl = (provider: 'curfox' | 'koombiyo' | 'fardar') => {
+    const base = `${(import.meta.env.VITE_BASE_URL || 'https://api.sellmate.lk/api').replace(/\/$/, '')}/courier/webhooks/${provider}`;
+    const token = webhookTokens[provider];
+    return token ? `${base}?token=${token}` : base;
+  };
 
   // Label print settings
   const [hideSenderSection, setHideSenderSection] = useState<boolean>(
@@ -508,7 +532,7 @@ const CourierSettingsModal = ({
                   In the Royal Express merchant portal go to <strong>Webhook Settings → Add Webhook</strong> and use:
                 </p>
                 <code className="block text-[11px] bg-orange-50 border border-orange-200 rounded px-2 py-1.5 break-all text-gray-800">
-                  {`${(import.meta.env.VITE_BASE_URL || 'https://api.sellmate.lk/api').replace(/\/$/, '')}/courier/webhooks/curfox`}
+                  {webhookUrl('curfox')}
                 </code>
                 <ul className="text-xs text-orange-800 list-disc pl-4 space-y-1">
                   <li>Request Type: <strong>POST</strong>, Active: on, Max Retries: 3</li>
@@ -553,7 +577,7 @@ const CourierSettingsModal = ({
                   Give this URL to Koombiyo IT as the reverse API / webhook endpoint (POST):
                 </p>
                 <code className="block text-[11px] bg-orange-50 border border-orange-200 rounded px-2 py-1.5 break-all text-gray-800">
-                  {`${(import.meta.env.VITE_BASE_URL || 'https://api.sellmate.lk/api').replace(/\/$/, '')}/courier/webhooks/koombiyo`}
+                  {webhookUrl('koombiyo')}
                 </code>
                 <ul className="text-xs text-orange-800 list-disc pl-4 space-y-1">
                   <li>Method: <strong>POST</strong></li>

@@ -21,14 +21,19 @@ export const AI_PROVIDER_COLORS: Record<AIProvider, { bg: string; text: string; 
 
 export const AI_PROVIDER_MODELS: Record<AIProvider, string[]> = {
   openrouter: [
-    'nex-agi/nex-n2-pro:free',
+    'openrouter/free',
+    'nex-agi/nex-n2.5-mini:free',
+    'nex-agi/nex-n2.5-pro:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'google/gemma-4-31b-it:free',
+    'qwen/qwen3.8-27b:free',
+    'nvidia/nemotron-3-super-120b-a12b:free',
+    'z-ai/glm-5.2:free',
     'openai/gpt-4o-mini',
     'openai/gpt-4o',
+    'google/gemini-2.0-flash-001',
     'anthropic/claude-3.5-sonnet',
     'anthropic/claude-3-haiku',
-    'google/gemini-2.0-flash-001',
-    'google/gemini-pro',
-    'x-ai/grok-2',
     'meta-llama/llama-3.3-70b-instruct',
     'mistralai/mistral-7b-instruct',
   ],
@@ -43,11 +48,26 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, string[]> = {
   grok: ['grok-2-latest', 'grok-beta', 'grok-vision-beta'],
 };
 
+export const AI_VISION_MODELS: Record<AIProvider, string[]> = {
+  openrouter: [
+    'inclusionai/ling-3.0-flash-vl:free',
+    'google/gemini-2.0-flash-001',
+    'openai/gpt-4o-mini',
+    'openai/gpt-4o',
+    'anthropic/claude-3.5-sonnet',
+  ],
+  openai: ['gpt-4o-mini', 'gpt-4o'],
+  gemini: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+  anthropic: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
+  grok: ['grok-vision-beta', 'grok-2-latest'],
+};
+
 export interface AISettings {
   id: string;
   businessId: string;
   provider: AIProvider;
   model: string;
+  visionModel?: string | null;
   isActive: boolean;
   hasApiKey: boolean;
   createdAt: string;
@@ -85,14 +105,19 @@ export default function useAISettings() {
   }, [fetchData]);
 
   const saveSettings = useCallback(
-    async (provider: AIProvider, model: string, apiKey: string) => {
+    async (provider: AIProvider, model: string, apiKey: string, visionModel?: string | null) => {
       setSaving(true);
       setError(null);
       try {
         const res = await fetchData({
           method: 'POST',
           endpoint: '/ai-settings',
-          data: { provider, model, apiKey },
+          data: {
+            provider,
+            model,
+            apiKey: apiKey?.trim() || undefined,
+            visionModel: visionModel ?? null,
+          },
         });
         setSettings((res?.data?.settings as AISettings) ?? null);
         return true;

@@ -1187,6 +1187,40 @@ const useSales = () => {
     [posFetch],
   );
 
+  /**
+   * Mint (or fetch) the sale's public bill link. Idempotent   a sale that was
+   * already shared keeps the exact URL the customer was given.
+   */
+  const getBillShareLink = useCallback(
+    async (saleId: string) => {
+      return posFetch.fetchData({
+        endpoint: `/sales/pos/${saleId}/share-link`,
+        method: "POST",
+        silent: true,
+      });
+    },
+    [posFetch],
+  );
+
+  /**
+   * Send the bill link. EMAIL and SMS go out server-side; WHATSAPP comes back
+   * as a wa.me deep link for the caller to open in the cashier's own WhatsApp.
+   */
+  const sendBillLink = useCallback(
+    async (
+      saleId: string,
+      payload: { channel: "EMAIL" | "SMS" | "WHATSAPP"; to?: string },
+    ) => {
+      return posFetch.fetchData({
+        endpoint: `/sales/pos/${saleId}/send-bill`,
+        method: "POST",
+        data: payload,
+        silent: true,
+      });
+    },
+    [posFetch],
+  );
+
   return {
     // Dashboard & Analytics
     getDashboardData,
@@ -1214,6 +1248,8 @@ const useSales = () => {
     printInvoice,
     silentPrintInvoice,
     getESCPOSData,
+    getBillShareLink,
+    sendBillLink,
     getSales,
     getSaleById,
     getPosSaleById,

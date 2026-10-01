@@ -100,6 +100,7 @@ const BranchSidebar = ({
     { id: 'towing', name: 'Towing / Roadside', path: `/${branchCode}/towing`, icon: Truck },
     { id: 'accounting', name: 'Accounting', path: `/${branchCode}/accounting`, icon: BookOpen },
     { id: 'website', name: 'Website / CMS', path: `/${branchCode}/website`, icon: Globe },
+    { id: 'website-orders', name: 'Website Orders', path: `/${branchCode}/website-orders`, icon: ShoppingBag },
     { id: 'crm-tasks', name: 'CRM Tasks', path: `/${branchCode}/crm-tasks`, icon: ListChecks },
     { id: 'leads', name: 'Leads', path: `/${branchCode}/leads`, icon: Users },
     { id: 'my-activity', name: 'My Activity', path: `/${branchCode}/my-activity`, icon: Activity },

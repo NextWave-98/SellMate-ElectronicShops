@@ -40,6 +40,10 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredModule: 'users',
   },
   {
+    id: 'staff-skills',
+    requiredModule: 'staff',
+  },
+  {
     id: 'roles',
     requiredModule: 'roles',
   },
@@ -58,12 +62,20 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredModule: 'goodsreceipts',
   },
   {
+    id: 'transfers',
+    requiredModule: 'stock-transfers',
+  },
+  {
     id: 'addon-requests',
     requiredPermission: PERMISSIONS.PRODUCTS_READ,
   },
   {
     id: 'quick-pos',
     requiredPermission: PERMISSIONS.SALES_CREATE,
+  },
+  {
+    id: 'cash-drawer',
+    requiredPermission: PERMISSIONS.SALES_READ,
   },
   {
     id: 'advance-payments',
@@ -74,84 +86,12 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredModule: 'sales',
   },
   {
-    id: 'staff-skills',
-    requiredModule: 'staff',
-  },
-  {
     id: 'product-usage',
     requiredModule: 'inventory',
   },
   {
-    id: 'rental',
-    requiredModule: 'rental',
-    children: [
-      { id: 'rental-dashboard', requiredModule: 'rental' },
-      { id: 'rental-fleet', requiredModule: 'rental' },
-      { id: 'rental-bookings', requiredModule: 'rental' },
-      { id: 'rental-maintenance', requiredModule: 'rental' },
-      { id: 'rental-fuel', requiredModule: 'rental' },
-      { id: 'rental-claims', requiredModule: 'rental' },
-      { id: 'rental-pricing', requiredModule: 'rental' },
-    ],
-  },
-  {
-    id: 'carwash',
-    requiredModule: 'carwash',
-    children: [
-      { id: 'carwash-queue', requiredModule: 'carwash' },
-      { id: 'carwash-services', requiredModule: 'carwash' },
-      { id: 'carwash-memberships', requiredModule: 'carwash' },
-      { id: 'carwash-performance', requiredModule: 'carwash' },
-    ],
-  },
-  {
-    id: 'garage',
-    requiredModule: 'garage',
-    children: [
-      { id: 'garage-estimates', requiredModule: 'garage' },
-      { id: 'garage-vehicles', requiredModule: 'garage' },
-      { id: 'garage-reminders', requiredModule: 'garage' },
-    ],
-  },
-  {
-    id: 'trade-ins',
-    requiredModule: 'tradein',
-    children: [
-      { id: 'trade-ins-list', requiredModule: 'tradein' },
-      { id: 'trade-ins-rules', requiredModule: 'tradein' },
-    ],
-  },
-  {
-    id: 'appointments',
-    requiredModule: 'appointment',
-  },
-  {
-    id: 'towing',
-    requiredModule: 'towing',
-  },
-  {
-    id: 'accounting',
-    requiredModule: 'accounting',
-    children: [
-      { id: 'accounting-accounts', requiredModule: 'accounting' },
-      { id: 'accounting-journals', requiredModule: 'accounting' },
-      { id: 'accounting-reports', requiredModule: 'accounting' },
-    ],
-  },
-  {
-    id: 'website',
-    requiredModule: 'cms',
-    children: [
-      { id: 'website-settings', requiredModule: 'cms' },
-      { id: 'website-pages', requiredModule: 'cms' },
-      { id: 'website-blog', requiredModule: 'cms' },
-      { id: 'website-testimonials', requiredModule: 'cms' },
-      { id: 'website-payments', requiredModule: 'cms' },
-    ],
-  },
-  {
-    id: 'crm-tasks',
-    requiredModule: 'crm',
+    id: 'serials',
+    requiredModule: 'inventory',
   },
   {
     id: 'stock',
@@ -181,6 +121,12 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
         id: 'discounts',
         requiredModule: 'products',
       },
+      {
+        // Visible whenever Products/Discounts are (same stock admin surface).
+        // freeoffers.* still exists for org grants; UI gate matches discounts.
+        id: 'free-offers',
+        requiredModule: 'products',
+      },
     ],
   },
   {
@@ -204,8 +150,24 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredModule: 'payments',
   },
   {
+    id: 'invoices',
+    requiredModule: 'invoices',
+  },
+  {
     id: 'customer',
     requiredModule: 'customers',
+  },
+  {
+    id: 'crm-tasks',
+    requiredModule: 'crm',
+  },
+  {
+    id: 'trade-ins',
+    requiredModule: 'tradein',
+    children: [
+      { id: 'trade-ins-list', requiredModule: 'tradein' },
+      { id: 'trade-ins-rules', requiredModule: 'tradein' },
+    ],
   },
   {
     id: 'warranty',
@@ -228,6 +190,20 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     ],
   },
   {
+    id: 'website-orders',
+    requiredModule: 'sales',
+  },
+  {
+    id: 'website',
+    requiredModule: 'cms',
+    children: [
+      { id: 'website-settings', requiredModule: 'cms' },
+      { id: 'website-pages', requiredModule: 'cms' },
+      { id: 'website-blog', requiredModule: 'cms' },
+      { id: 'website-testimonials', requiredModule: 'cms' },
+    ],
+  },
+  {
     // Hidden when courier access is missing (same gate as Courier sidebar)
     id: 'woocommerce',
     requiredModule: 'couriers',
@@ -242,25 +218,26 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requireAnyPermission: true,
   },
   {
+    id: 'accounting',
+    requiredModule: 'accounting',
+    children: [
+      {
+        id: 'accounting-accounts',
+        requiredModule: 'accounting',
+      },
+      {
+        id: 'accounting-journals',
+        requiredModule: 'accounting',
+      },
+      {
+        id: 'accounting-reports',
+        requiredModule: 'accounting',
+      },
+    ],
+  },
+  {
     id: 'activity-logs',
     requiredPermission: PERMISSIONS.ACTIVITYLOGS_READ,
-  },
-  {
-    id: 'activity-monitoring',
-    requiredPermissions: [
-      PERMISSIONS.ACTIVITY_MONITORING_VIEW_TEAM,
-      PERMISSIONS.ACTIVITY_MONITORING_MANAGE,
-    ],
-    requireAnyPermission: true,
-  },
-  {
-    id: 'scorecard',
-    requiredPermissions: [
-      PERMISSIONS.SCORECARD_VIEW_OWN,
-      PERMISSIONS.SCORECARD_VIEW_TEAM,
-      PERMISSIONS.SCORECARD_MANAGE,
-    ],
-    requireAnyPermission: true,
   },
   {
     id: 'notifications',
@@ -270,11 +247,12 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     id: 'communication',
     children: [
       { id: 'communication-settings', requiredModule: 'communication' },
-      {
-        id: 'sms-automation',
-        requiredPermissions: [PERMISSIONS.SMS_AUTOMATION_VIEW, PERMISSIONS.SMS_AUTOMATION_MANAGE],
-        requireAnyPermission: true,
-      },
+      { id: 'notification-settings', requiredPermission: PERMISSIONS.NOTIFICATIONS_MANAGE },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    children: [
       {
         id: 'whatsapp-settings',
         requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
@@ -295,8 +273,20 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
         requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
         requireAnyPermission: true,
       },
+    ],
+  },
+  {
+    id: 'lead-forms-group',
+    requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+    requireAnyPermission: true,
+    children: [
       {
         id: 'facebook-leads',
+        requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'lead-forms',
         requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
         requireAnyPermission: true,
       },
@@ -305,12 +295,6 @@ export const SUPERADMIN_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
         requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
         requireAnyPermission: true,
       },
-      {
-        id: 'lead-forms',
-        requiredPermissions: [PERMISSIONS.LEAD_FORMS_VIEW, PERMISSIONS.LEAD_FORMS_MANAGE],
-        requireAnyPermission: true,
-      },
-      { id: 'notification-settings', requiredPermission: PERMISSIONS.NOTIFICATIONS_MANAGE },
     ],
   },
   {
@@ -384,6 +368,10 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredModule: 'inventory',
   },
   {
+    id: 'serials',
+    requiredModule: 'inventory',
+  },
+  {
     id: 'addon-requests',
     requiredPermission: PERMISSIONS.PRODUCTS_READ,
   },
@@ -394,6 +382,14 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
   {
     id: 'customers',
     requiredModule: 'customers',
+  },
+  {
+    id: 'crm-tasks',
+    requiredModule: 'crm',
+  },
+  {
+    id: 'trade-ins',
+    requiredModule: 'tradein',
   },
   {
     id: 'jobsheets',
@@ -429,58 +425,42 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
     requiredModule: 'couriers',
   },
   {
-    id: 'attendance',
-    // Accessible to all authenticated branch staff
-  },
-  {
-    id: 'rental',
-    requiredModule: 'rental',
-  },
-  {
-    id: 'carwash',
-    requiredModule: 'carwash',
-  },
-  {
-    id: 'garage',
-    requiredModule: 'garage',
-  },
-  {
-    id: 'trade-ins',
-    requiredModule: 'tradein',
-  },
-  {
-    id: 'appointments',
-    requiredModule: 'appointment',
-  },
-  {
-    id: 'towing',
-    requiredModule: 'towing',
-  },
-  {
-    id: 'accounting',
-    requiredModule: 'accounting',
-  },
-  {
     id: 'website',
     requiredModule: 'cms',
   },
   {
-    id: 'crm-tasks',
-    requiredModule: 'crm',
+    id: 'website-orders',
+    requiredModule: 'sales',
   },
   {
-    id: 'leads',
+    id: 'lead-forms-group',
     requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
     requireAnyPermission: true,
+    children: [
+      {
+        id: 'facebook-leads',
+        requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'lead-forms',
+        requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+        requireAnyPermission: true,
+      },
+      {
+        id: 'facebook-leads-settings',
+        requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+        requireAnyPermission: true,
+      },
+    ],
   },
   {
-    id: 'my-activity',
-    requiredPermission: PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN,
+    id: 'attendance',
+    // Accessible to all authenticated branch staff
   },
   {
-    id: 'my-scorecard',
-    requiredPermissions: [PERMISSIONS.SCORECARD_VIEW_OWN, PERMISSIONS.SCORECARD_VIEW_TEAM],
-    requireAnyPermission: true,
+    id: 'staff-reports',
+    // Branch-scoped staff / product success report   all branch users
   },
   {
     id: 'suppliers',
@@ -491,6 +471,10 @@ export const BRANCH_SIDEBAR_PERMISSIONS: SidebarPermissionConfig[] = [
       PERMISSIONS.PURCHASEORDERS_CREATE,
     ],
     requireAnyPermission: true,
+  },
+  {
+    id: 'accounting',
+    requiredModule: 'accounting',
   },
 ];
 
@@ -528,41 +512,23 @@ export const SUPERADMIN_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   { path: '/superadmin/stock/dashboard', requiredPermission: PERMISSIONS.INVENTORY_READ },
   { path: '/superadmin/inventory/monitor', requiredModule: 'inventory' },
   { path: '/superadmin/categories/management', requiredModule: 'categories' },
+  { path: '/superadmin/discounts', requiredModule: 'products' },
+  { path: '/superadmin/free-offers', requiredModule: 'products' },
   { path: '/superadmin/sales/monitor', requiredModule: 'sales' },
+  { path: '/superadmin/cash-drawer', requiredPermission: PERMISSIONS.SALES_READ },
   { path: '/superadmin/job-sheets/monitor', requiredModule: 'jobsheets' },
   { path: '/superadmin/parts/management', requiredModule: 'parts' },
   { path: '/superadmin/payments/management', requiredModule: 'payments' },
+  { path: '/superadmin/invoices', requiredModule: 'invoices' },
   { path: '/superadmin/customers/management', requiredModule: 'customers' },
   { path: '/superadmin/warranty/management', requiredModule: 'warranty' },
   { path: '/superadmin/returns', requiredModule: 'returns' },
   { path: '/superadmin/courier/management', requiredModule: 'courier' },
   { path: '/superadmin/reports', requiredPermissions: [PERMISSIONS.REPORTS_VIEW], requireAnyPermission: true },
   { path: '/superadmin/ai-analytics', requiredModule: 'aianalytics' },
-  {
-    path: '/superadmin/activity-monitoring',
-    requiredPermissions: [
-      PERMISSIONS.ACTIVITY_MONITORING_VIEW_TEAM,
-      PERMISSIONS.ACTIVITY_MONITORING_MANAGE,
-    ],
-    requireAnyPermission: true,
-  },
-  {
-    path: '/superadmin/scorecard',
-    requiredPermissions: [
-      PERMISSIONS.SCORECARD_VIEW_OWN,
-      PERMISSIONS.SCORECARD_VIEW_TEAM,
-      PERMISSIONS.SCORECARD_MANAGE,
-    ],
-    requireAnyPermission: true,
-  },
   { path: '/superadmin/notifications/dashboard', requiredModule: 'notifications' },
   { path: '/superadmin/notifications/settings', requiredPermission: PERMISSIONS.NOTIFICATIONS_MANAGE },
   { path: '/superadmin/communication/settings', requiredModule: 'communication' },
-  {
-    path: '/superadmin/communication/sms-automation',
-    requiredPermissions: [PERMISSIONS.SMS_AUTOMATION_VIEW, PERMISSIONS.SMS_AUTOMATION_MANAGE],
-    requireAnyPermission: true,
-  },
   {
     path: '/superadmin/communication/whatsapp',
     requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
@@ -579,6 +545,11 @@ export const SUPERADMIN_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
     requireAnyPermission: true,
   },
   {
+    path: '/superadmin/communication/whatsapp/orders',
+    requiredPermissions: [PERMISSIONS.WHATSAPP_VIEW, PERMISSIONS.COMMUNICATION_VIEW],
+    requireAnyPermission: true,
+  },
+  {
     path: '/superadmin/facebook-leads',
     requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
     requireAnyPermission: true,
@@ -590,7 +561,7 @@ export const SUPERADMIN_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   },
   {
     path: '/superadmin/facebook-leads/forms',
-    requiredPermissions: [PERMISSIONS.LEAD_FORMS_VIEW, PERMISSIONS.LEAD_FORMS_MANAGE],
+    requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
     requireAnyPermission: true,
   },
   { path: '/superadmin/installments', requiredModule: 'installments' },
@@ -621,18 +592,20 @@ export const BRANCH_ROUTE_PERMISSIONS: RoutePermissionConfig[] = [
   { path: '/:branchCode/installments', requiredPermission: PERMISSIONS.INSTALLMENTS_READ },
   { path: '/:branchCode/installments/create', requiredPermission: PERMISSIONS.INSTALLMENTS_CREATE },
   { path: '/:branchCode/installments/:id', requiredPermission: PERMISSIONS.INSTALLMENTS_READ },
+  { path: '/:branchCode/staff-reports' }, // Branch-scoped product success / staff report
   {
-    path: '/:branchCode/leads',
+    path: '/:branchCode/facebook-leads',
     requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
     requireAnyPermission: true,
   },
   {
-    path: '/:branchCode/my-activity',
-    requiredPermission: PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN,
+    path: '/:branchCode/facebook-leads/settings',
+    requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
+    requireAnyPermission: true,
   },
   {
-    path: '/:branchCode/my-scorecard',
-    requiredPermissions: [PERMISSIONS.SCORECARD_VIEW_OWN, PERMISSIONS.SCORECARD_VIEW_TEAM],
+    path: '/:branchCode/facebook-leads/forms',
+    requiredPermissions: [PERMISSIONS.FACEBOOK_LEADS_VIEW, PERMISSIONS.FACEBOOK_LEADS_MANAGE],
     requireAnyPermission: true,
   },
   {

@@ -19,6 +19,7 @@ import type { Customer } from '../../../hooks/useCustomer';
 import useCustomer from '../../../hooks/useCustomer';
 import useDevice, { type Device } from '../../../hooks/useDevice';
 import useCourier, { type CourierService } from '../../../hooks/useCourier';
+import { usePermissions } from '../../../hooks/usePermissions';
 import toast from 'react-hot-toast';
 import AddCustomerModal from '../../superadmin/customers/AddCustomerModal';
 import { formatCurrency } from '../../../utils/currency';
@@ -214,6 +215,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const { searchCustomers, createCustomer } = useCustomer();
   const { getCustomerDevices } = useDevice();
   const { user } = useAuth();
+  const { hasCourierAccess } = usePermissions();
+  const canUseCourier = hasCourierAccess();
   const { businessData, loadBusinessProfile } = useBusinessProfile();
   const staffDiscountHidden = businessData?.posStaffDiscountHidden ?? false;
   const orgDefaultDiscountType =
@@ -348,14 +351,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     return () => clearTimeout(searchTimer);
   }, [searchQuery, selectedCustomer]);
 
-  // Load courier services when modal opens
+  // Load courier services when modal opens (only if org has courier module)
   useEffect(() => {
     if (isOpen && user?.businessId) {
-      fetchCourierServices({ isActive: true });
-      fetchBusinessCourierPreferences(user.businessId);
       loadBusinessProfile();
+      if (canUseCourier) {
+        fetchCourierServices({ isActive: true });
+        fetchBusinessCourierPreferences(user.businessId);
+      }
     }
-  }, [isOpen, user?.businessId]);
+  }, [isOpen, user?.businessId, canUseCourier]);
 
   useEffect(() => {
     if (!staffDiscountHidden) return;
@@ -813,7 +818,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         quantity: item.quantity,
         stock: item.stock,
         category: item.category,
-        image: item.image
+        image: item.image,
+        ...((item as any).isFreeItem
+          ? {
+              isFreeItem: true,
+              freeOfferId: (item as any).freeOfferId,
+              freeOfferName: (item as any).freeOfferName,
+              freeOfferBuyQty: (item as any).freeOfferBuyQty,
+              freeOfferFreeQty: (item as any).freeOfferFreeQty,
+            }
+          : {}),
       })),
       payment: {
         method: selectedPaymentMethod,
@@ -1516,7 +1530,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             {/* STEP 2: Courier Details */}
             {currentStep === 'courier_details' && (
               <div className="space-y-6">
-                {/* Courier Option Toggle */}
+                {/* Courier Option Toggle — hidden when org has no courier module */}
+                {canUseCourier && (
                 <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
                   <div className="flex items-start gap-3">
                     <input
@@ -1548,6 +1563,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                   </div>
                 </div>
+                )}
 
                 {courierEnabled && (
                   <div className="space-y-4">

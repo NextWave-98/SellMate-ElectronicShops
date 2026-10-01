@@ -60,9 +60,10 @@ export default function StockTable({ items, onEdit, onDelete, onView, onRestock,
     }
   }, [expandedRows, variantData, productHook]);
 
-  const formatCurrency = (amount: number) => {
-    console.log('Formatting amount:', amount);
-    return `LKR ${amount}`;
+  // Cost / price can be NULL on a product: show a dash, never "LKR null".
+  const formatCurrency = (amount: number | string | null | undefined) => {
+    if (amount === null || amount === undefined || amount === '' || Number.isNaN(Number(amount))) return 'LKR —';
+    return `LKR ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const toggleMenu = (itemId: string) => {

@@ -2055,7 +2055,23 @@ export default function SalesPage() {
                                   <TableRow key={item.id || i}>
                                     <TableCell className="text-xs text-gray-400">{i + 1}</TableCell>
                                     <TableCell className="text-sm">
-                                      <div className="font-medium">{String(productName)}</div>
+                                      <div className="font-medium">
+                                        {(item.isFreeItem || item.is_free_item) && (
+                                          <span className="mr-1 inline-flex items-center rounded bg-emerald-100 text-emerald-800 px-1 py-0.5 text-[10px] font-bold">
+                                            FREE
+                                          </span>
+                                        )}
+                                        {String(productName)}
+                                      </div>
+                                      {(item.isFreeItem || item.is_free_item) && (
+                                        <div className="text-xs text-emerald-700">
+                                          {item.freeOffer?.name || item.free_offer?.name || 'Free offer'}
+                                          {item.freeOffer?.buyQuantity != null &&
+                                          item.freeOffer?.freeQuantity != null
+                                            ? ` · Buy ${item.freeOffer.buyQuantity} Get ${item.freeOffer.freeQuantity}`
+                                            : ''}
+                                        </div>
+                                      )}
                                       {item.reloadPhone && (
                                         <div className="text-xs text-emerald-700">
                                           Reload · {String(item.reloadPhone)}
@@ -2088,6 +2104,45 @@ export default function SalesPage() {
                         </div>
                       )}
                     </div>
+
+                    {items.some((item: any) => item.isFreeItem || item.is_free_item) ? (
+                      <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/60 space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                          Free Offer
+                        </p>
+                        {Array.from(
+                          items
+                            .filter((item: any) => item.isFreeItem || item.is_free_item)
+                            .reduce((map: Map<string, { name: string; buyQty?: number; freeQty?: number; lines: string[] }>, item: any) => {
+                              const offer = item.freeOffer || item.free_offer;
+                              const key = String(item.freeOfferId || item.free_offer_id || offer?.id || 'free');
+                              if (!map.has(key)) {
+                                map.set(key, {
+                                  name: offer?.name || 'Free Offer',
+                                  buyQty: offer?.buyQuantity != null ? Number(offer.buyQuantity) : undefined,
+                                  freeQty: offer?.freeQuantity != null ? Number(offer.freeQuantity) : undefined,
+                                  lines: [],
+                                });
+                              }
+                              const bucket = map.get(key)!;
+                              const pname =
+                                item.product?.name || item.productName || item.name || 'Item';
+                              bucket.lines.push(`${pname} x${Number(item.quantity || 0)}`);
+                              return map;
+                            }, new Map()),
+                        ).map(([key, bucket]) => (
+                          <div key={key} className="text-xs text-emerald-800">
+                            <p className="font-medium">
+                              {bucket.name}
+                              {bucket.buyQty != null && bucket.freeQty != null
+                                ? ` (Buy ${bucket.buyQty} Get ${bucket.freeQty})`
+                                : ''}
+                            </p>
+                            <p>Free: {bucket.lines.join(', ')}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
 
                     <div className="flex justify-end">
                       <div className="w-64 space-y-1 text-sm">

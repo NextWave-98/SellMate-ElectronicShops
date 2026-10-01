@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Plus, Search, Loader2, Eye, DollarSign, AlertCircle, Calendar } from 'lucide-react';
+import { RefreshCw, Plus, Search, Loader2, Eye, DollarSign, AlertCircle, Calendar, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,8 @@ interface InstallmentPlan {
     frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
     status: 'ACTIVE' | 'COMPLETED' | 'DEFAULTED' | 'CANCELLED';
     totalPaid: number;
+    /** Down payment + installment receipts (backend). */
+    amountPaidTotal?: number;
     totalOutstanding: number;
     paymentsCompleted: number;
     paymentsMissed: number;
@@ -47,6 +49,8 @@ interface InstallmentStats {
 export default function InstallmentsPage() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    // Branch staff see their branch's plans (plus old plans with no branch); org admins see all.
+    const branchLocationId: string = (user as any)?.locationId || (user as any)?.branchId || '';
     const [plans, setPlans] = useState<InstallmentPlan[]>([]);
     const [stats, setStats] = useState<InstallmentStats | null>(null);
     const [loading, setLoading] = useState(true);
@@ -67,6 +71,8 @@ export default function InstallmentsPage() {
                 data: {
                     page: currentPage,
                     limit: itemsPerPage,
+                    ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
+                    ...(branchLocationId ? { locationId: branchLocationId } : {}),
                 },
                 silent: true,
             });
@@ -89,6 +95,7 @@ export default function InstallmentsPage() {
             const response = await getStats({
                 method: 'GET',
                 silent: true,
+                ...(branchLocationId ? { data: { locationId: branchLocationId } } : {}),
             });
 
             if (response?.success && response?.data) {
@@ -103,6 +110,17 @@ export default function InstallmentsPage() {
         loadPlans();
         loadStats();
     }, [currentPage, itemsPerPage]);
+
+    // Search on the server (plan no., product, customer name / phone), debounced.
+    const [searchReady, setSearchReady] = useState(false);
+    useEffect(() => {
+        if (!searchReady) { setSearchReady(true); return; }
+        const t = setTimeout(() => {
+            if (currentPage !== 1) setCurrentPage(1);
+            else loadPlans();
+        }, 400);
+        return () => clearTimeout(t);
+    }, [searchQuery]);
 
     const handleRefresh = async () => {
         setRefreshing(true);
@@ -281,8 +299,9 @@ export default function InstallmentsPage() {
                                         Rs. {plan.totalAmount.toLocaleString()}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-green-600">
-                                            Rs. {plan.totalPaid.toLocaleString()}
+                                        {/* Paid includes the down payment (it used to show Rs. 0 on new plans). */}
+                                        <div className="text-sm font-medium text-green-600" title={`Down payment Rs. ${Number(plan.downPayment || 0).toLocaleString()} + installments Rs. ${Number(plan.totalPaid || 0).toLocaleString()}`}>
+                                            Rs. {Number(plan.amountPaidTotal ?? (Number(plan.downPayment || 0) + Number(plan.totalPaid || 0))).toLocaleString()}
                                         </div>
                                         <div className="text-sm text-red-600">
                                             Rs. {plan.totalOutstanding.toLocaleString()}
@@ -317,6 +336,14 @@ export default function InstallmentsPage() {
                                         >
                                             <Eye className="w-4 h-4 inline" /> View
                                         </button>
+                                        {(plan.status === 'ACTIVE' || plan.status === 'DEFAULTED') && (
+                                            <button
+                                                onClick={() => navigate(`${plan.id}/edit`)}
+                                                className="text-gray-600 hover:text-gray-900"
+                                            >
+                                                <Pencil className="w-4 h-4 inline" /> Edit
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

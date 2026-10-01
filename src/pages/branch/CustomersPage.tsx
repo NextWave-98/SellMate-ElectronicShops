@@ -178,7 +178,7 @@ export default function BranchCustomersPage() {
         // Filter by location/branch on frontend
         const locationId = user.locationId || user.branchId;
         const filteredCustomers = apiCustomers.filter(
-          (customer) => customer.locationId === locationId
+          (customer) => !customer.locationId || customer.locationId === locationId
         );
         const mappedCustomers = mapApiCustomersToLocal(filteredCustomers);
         setFilteredCustomers(mappedCustomers);

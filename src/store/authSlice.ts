@@ -189,9 +189,16 @@ export const superAdminLoginAsync = createAsyncThunk(
         // Store tokens in sessionStorage
         setAccessToken(accessToken);
         setRefreshToken(refreshToken);
-        
 
-        
+        // Keep the secret the super admin just typed for this tab only, so the
+        // Organizations pages can send X-Super-Admin-Secret without it ever
+        // being baked into the frontend build.
+        try {
+          sessionStorage.setItem('superAdminSecret', credentials.secretKey);
+        } catch {
+          /* storage blocked   Organizations page will prompt instead */
+        }
+
         // Store user in localStorage for persistence
         localStorage.setItem('user', JSON.stringify(user));
         
@@ -452,6 +459,10 @@ const authSlice = createSlice({
         state.error = null;
         state.initialized = true;
         state.requiresBranchSelection = false;
+        // Keep list so navbar switcher still works after re-scope
+        if (action.payload.user?.assignedBranches) {
+          state.assignedBranches = action.payload.user.assignedBranches;
+        }
       })
       .addCase(selectBranchAsync.rejected, (state, action) => {
         state.loading = false;

@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Truck,
   Monitor,
+  Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useFetch from "../../hooks/useFetch";
@@ -166,6 +167,11 @@ const DEFAULT_SETTINGS: POSSettings = {
   autoCashDrawer: true,
   autoPrintOnSale: true,
   courierStockAdjustmentOnly: false,
+  billShareEnabled: false,
+  billShareEmailEnabled: true,
+  billShareSmsEnabled: false,
+  billShareWhatsappEnabled: true,
+  billShareMessage: null,
 };
 
 interface Branch {
@@ -359,6 +365,11 @@ const POSSettingsPage: React.FC = () => {
           barcodeReaderType?: string;
           autoCashDrawer?: boolean;
           autoPrintOnSale?: boolean;
+          billShareEnabled?: boolean;
+          billShareEmailEnabled?: boolean;
+          billShareSmsEnabled?: boolean;
+          billShareWhatsappEnabled?: boolean;
+          billShareMessage?: string | null;
         } | null;
         if (d) {
           setSettings({
@@ -373,6 +384,19 @@ const POSSettingsPage: React.FC = () => {
             autoCashDrawer: d.autoCashDrawer ?? DEFAULT_SETTINGS.autoCashDrawer,
             autoPrintOnSale:
               d.autoPrintOnSale ?? DEFAULT_SETTINGS.autoPrintOnSale,
+            courierStockAdjustmentOnly:
+              DEFAULT_SETTINGS.courierStockAdjustmentOnly,
+            billShareEnabled:
+              d.billShareEnabled ?? DEFAULT_SETTINGS.billShareEnabled,
+            billShareEmailEnabled:
+              d.billShareEmailEnabled ?? DEFAULT_SETTINGS.billShareEmailEnabled,
+            billShareSmsEnabled:
+              d.billShareSmsEnabled ?? DEFAULT_SETTINGS.billShareSmsEnabled,
+            billShareWhatsappEnabled:
+              d.billShareWhatsappEnabled ??
+              DEFAULT_SETTINGS.billShareWhatsappEnabled,
+            billShareMessage:
+              d.billShareMessage ?? DEFAULT_SETTINGS.billShareMessage,
           });
         }
       })
@@ -394,6 +418,12 @@ const POSSettingsPage: React.FC = () => {
         defaultFormat: settings.defaultFormat,
         barcodeReaderType: settings.barcodeReaderType,
         autoCashDrawer: settings.autoCashDrawer,
+        // Organization-wide, saved from this page only.
+        billShareEnabled: settings.billShareEnabled,
+        billShareEmailEnabled: settings.billShareEmailEnabled,
+        billShareSmsEnabled: settings.billShareSmsEnabled,
+        billShareWhatsappEnabled: settings.billShareWhatsappEnabled,
+        billShareMessage: settings.billShareMessage,
       },
       silent: true,
       showToastOnError: false,
@@ -1211,6 +1241,139 @@ const POSSettingsPage: React.FC = () => {
                 </p>
               </div>
             </label>
+          </SectionCard>
+
+          {/* ── Section: Bill share link ── */}
+          <SectionCard
+            icon={<Send className="w-5 h-5 text-emerald-600" />}
+            title="Bill Share Link"
+            subtitle="Send customers a link to their bill from Quick POS"
+            iconBg="bg-emerald-50"
+          >
+            <label className="flex items-center gap-4 cursor-pointer select-none">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={settings.billShareEnabled}
+                  onChange={(e) =>
+                    setSettings((s) => ({
+                      ...s,
+                      billShareEnabled: e.target.checked,
+                    }))
+                  }
+                />
+                <div
+                  className={`w-12 h-6 rounded-full transition-colors ${
+                    settings.billShareEnabled ? "bg-emerald-500" : "bg-gray-300"
+                  }`}
+                />
+                <div
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    settings.billShareEnabled ? "translate-x-6" : "translate-x-0"
+                  }`}
+                />
+              </div>
+              <div>
+                <p
+                  className={`text-sm font-semibold ${settings.billShareEnabled ? "text-emerald-700" : "text-gray-700"}`}
+                >
+                  {settings.billShareEnabled ? "Enabled" : "Disabled"}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Every bill gets its own private link. A "Send Bill Link" button
+                  appears on the Quick POS success screen.
+                </p>
+              </div>
+            </label>
+
+            {settings.billShareEnabled && (
+              <div className="mt-5 space-y-4 border-t border-white/30 pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Channels the cashier can use
+                </p>
+
+                {(
+                  [
+                    {
+                      key: "billShareWhatsappEnabled" as const,
+                      label: "WhatsApp",
+                      hint: "Opens the cashier's own WhatsApp with the message ready. No API key, no cost.",
+                    },
+                    {
+                      key: "billShareSmsEnabled" as const,
+                      label: "SMS",
+                      hint: "Uses this organization's SMS credentials and spends SMS credits.",
+                    },
+                    {
+                      key: "billShareEmailEnabled" as const,
+                      label: "Email",
+                      hint: "Sent from the platform mail account, or this organization's SMTP if configured.",
+                    },
+                  ]
+                ).map((row) => (
+                  <label
+                    key={row.key}
+                    className="flex items-center gap-4 cursor-pointer select-none"
+                  >
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={settings[row.key]}
+                        onChange={(e) =>
+                          setSettings((s) => ({
+                            ...s,
+                            [row.key]: e.target.checked,
+                          }))
+                        }
+                      />
+                      <div
+                        className={`w-12 h-6 rounded-full transition-colors ${
+                          settings[row.key] ? "bg-emerald-500" : "bg-gray-300"
+                        }`}
+                      />
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                          settings[row.key] ? "translate-x-6" : "translate-x-0"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <p
+                        className={`text-sm font-semibold ${settings[row.key] ? "text-emerald-700" : "text-gray-700"}`}
+                      >
+                        {row.label}
+                      </p>
+                      <p className="text-xs text-gray-500">{row.hint}</p>
+                    </div>
+                  </label>
+                ))}
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Message template
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={settings.billShareMessage ?? ""}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        billShareMessage: e.target.value || null,
+                      }))
+                    }
+                    placeholder="{{shop}} - Bill {{invoice}} Rs {{total}}. View: {{link}}"
+                    className="mt-2 w-full px-3 py-2.5 rounded-xl border border-white/40 bg-white/70 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                  <p className="mt-1.5 text-[11px] text-gray-500">
+                    Placeholders: {"{{customer}}"} {"{{shop}}"} {"{{invoice}}"}{" "}
+                    {"{{total}}"} {"{{link}}"}. Leave blank for the default. Keep
+                    it short — SMS is billed per 160 characters.
+                  </p>
+                </div>
+              </div>
+            )}
           </SectionCard>
 
           {/* ── Section: QZ Tray Direct Printer (ESC/POS) ── */}

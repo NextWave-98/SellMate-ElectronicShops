@@ -32,6 +32,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<User>;
   loginWithQrToken: (qrToken: string) => Promise<User>;
   superAdminLogin: (email: string, password: string, secretKey: string) => Promise<void>;
+  /** Keep AuthContext in sync after mid-session branch switch (Redux + localStorage already updated). */
+  applySessionUser: (nextUser: User | Record<string, unknown>) => void;
   logout: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
   loading: boolean;
@@ -346,11 +348,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const applySessionUser = (nextUser: User | Record<string, unknown>) => {
+    setIsAuthenticated(true);
+    setUser(nextUser as User);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+  };
+
   const logout = async () => {
     // Call logout API first while token is still available
     try {
       await logoutFetch({
         method: 'POST',
+        // Only this device's session is ended (per-device refresh tokens).
+        data: { refreshToken: getRefreshToken() || undefined },
         silent: true,
         showToastOnError: false,
       });
@@ -367,7 +377,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, loginWithQrToken, superAdminLogin, logout, refreshToken, loading }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        user,
+        login,
+        loginWithQrToken,
+        superAdminLogin,
+        applySessionUser,
+        logout,
+        refreshToken,
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -434,9 +434,23 @@ export default function ReportsPage() {
                       {formatCurrency(data.summary?.netProfitAfterLoss)}
                     </p>
                     <p className="text-[11px] text-gray-500 mt-0.5">
-                      matches the Profit &amp; Loss report
+                      {Number(data.summary?.installmentIncome ?? 0) > 0
+                        ? "P&L also adds installment interest & fees"
+                        : "matches the Profit & Loss report"}
                     </p>
                   </div>
+                  {Number(data.summary?.installmentIncome ?? 0) > 0 && (
+                    <div className="bg-teal-50 p-4 rounded-lg">
+                      <p className="text-sm text-gray-600">Installment Interest &amp; Fees</p>
+                      <p className="text-2xl font-bold text-teal-700">
+                        {formatCurrency(data.summary?.installmentIncome)}
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Interest {formatCurrency(data.summary?.installmentInterestIncome ?? 0)} + late fees{" "}
+                        {formatCurrency(data.summary?.installmentLateFeeIncome ?? 0)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2807,7 +2821,7 @@ export default function ReportsPage() {
                 <h4 className="text-md font-semibold text-gray-900 mb-3">
                   Income Breakdown
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className={`grid grid-cols-1 gap-4 ${data.incomeBreakdown?.installments ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
                   {/* POS Sales */}
                   <div className="bg-white p-4 rounded-lg border border-gray-200">
                     <h5 className="text-sm font-medium text-gray-900 mb-2">
@@ -2860,6 +2874,32 @@ export default function ReportsPage() {
                       </p>
                     </div>
                   </div>
+                  {/* Installments: interest + late fees (principal is already in sales) */}
+                  {data.incomeBreakdown?.installments && (
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <h5 className="text-sm font-medium text-gray-900 mb-2">
+                        Installment Interest &amp; Fees
+                      </h5>
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-600">
+                          Interest:{" "}
+                          {formatCurrency(data.incomeBreakdown.installments.interest)}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Late fees:{" "}
+                          {formatCurrency(data.incomeBreakdown.installments.lateFees)}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Profit:{" "}
+                          {formatCurrency(data.incomeBreakdown.installments.profit)}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Plans: {data.incomeBreakdown.installments.count} ·
+                          Receipts: {data.incomeBreakdown.installments.receipts}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {/* Other Sales */}
                   <div className="bg-white p-4 rounded-lg border border-gray-200">
                     <h5 className="text-sm font-medium text-gray-900 mb-2">
