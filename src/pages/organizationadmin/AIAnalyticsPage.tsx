@@ -36,14 +36,28 @@ import useAISettings, {
   AI_PROVIDER_LABELS,
   AI_PROVIDER_COLORS,
   AI_PROVIDER_MODELS,
+  AI_VISION_MODELS,
 } from '../../hooks/useAISettings';
 import { formatCurrency } from '@/utils/currency';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../store/types';
 
 // ─── Markdown-like renderer (no external lib needed) ─────────────────────────
+// AI replies quote product / customer / staff names straight from the
+// database, so the text must be HTML-escaped BEFORE the markdown tags are
+// added. Without this a product named `<img src=x onerror=...>` ran script in
+// the admin's session (tokens live in localStorage).
+function escapeHtml(text: string): string {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderMarkdown(text: string): string {
-  return text
+  return escapeHtml(text)
     .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold text-gray-800 mt-4 mb-1">$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="text-lg font-bold text-indigo-700 mt-5 mb-2 border-b border-indigo-100 pb-1">$1</h2>')
     .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold text-gray-900 mt-4 mb-2">$1</h1>')
@@ -188,7 +202,7 @@ const QUICK_ACTIONS: { type: QuickAnalysisType; label: string; icon: React.Eleme
 
 const PERIOD_OPTIONS: { value: AnalysisPeriod; label: string }[] = [
   { value: 'today', label: 'Today' },
-  { value: 'week', label: 'Last 7 Days' },
+  { value: 'week', label: 'This Week' },
   { value: 'month', label: 'This Month' },
   { value: 'quarter', label: 'This Quarter' },
   { value: 'year', label: 'This Year' },
@@ -258,6 +272,7 @@ const AIAnalyticsPage: React.FC = () => {
   // Settings form state
   const [selectedProvider, setSelectedProvider] = useState<AIProvider>('openrouter');
   const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-4o-mini');
+  const [selectedVisionModel, setSelectedVisionModel] = useState<string>('google/gemini-2.0-flash-001');
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
 
@@ -286,13 +301,26 @@ const AIAnalyticsPage: React.FC = () => {
     if (aiSettings) {
       setSelectedProvider(aiSettings.provider);
       setSelectedModel(aiSettings.model);
+      if (aiSettings.visionModel) setSelectedVisionModel(aiSettings.visionModel);
     }
   }, [aiSettings]);
 
   // Reset model to first of list when provider changes
+  useEffect(() => {
+    const models = AI_PROVIDER_MODELS[selectedProvider];
+    if (models?.length && !models.includes(selectedModel)) {
+      setSelectedModel(models[0]);
+    }
+    const visions = AI_VISION_MODELS[selectedProvider];
+    if (visions?.length && !visions.includes(selectedVisionModel)) {
+      setSelectedVisionModel(visions[0]);
+    }
+  }, [selectedProvider, selectedModel, selectedVisionModel]);
+
   const handleProviderChange = (p: AIProvider) => {
     setSelectedProvider(p);
     setSelectedModel(AI_PROVIDER_MODELS[p][0] ?? '');
+    setSelectedVisionModel(AI_VISION_MODELS[p][0] ?? '');
   };
 
   // Scroll chat to bottom on new messages
@@ -859,6 +887,20 @@ const AIAnalyticsPage: React.FC = () => {
                   </select>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Vision model</label>
+                  <select
+                    value={selectedVisionModel}
+                    onChange={(e) => setSelectedVisionModel(e.target.value)}
+                    className="w-full border border-gray-200 bg-white text-sm rounded-xl px-3 py-2.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  >
+                    {(AI_VISION_MODELS[selectedProvider] || []).map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400">Used for bill/list scan and Add Product photo analysis.</p>
+                </div>
+
                 {/* API key input */}
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">API Key</label>
@@ -885,7 +927,8 @@ const AIAnalyticsPage: React.FC = () => {
                   )}
                   {selectedProvider === 'openrouter' && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      OpenRouter keys start with <code className="font-mono">sk-or-v1-</code>. Do not use Google/Gemini (<code className="font-mono">AIza</code> / <code className="font-mono">AQ.</code>) or OpenAI keys here.
+                      This organization&apos;s own OpenRouter key (starts with <code className="font-mono">sk-or-v1-</code>).
+                      Each org can use a different key. Free models may rate-limit (429) — switch model or wait.
                     </p>
                   )}
                 </div>
@@ -925,14 +968,22 @@ const AIAnalyticsPage: React.FC = () => {
                     type="button"
                     disabled={settingsSaving || (!apiKeyInput.trim() && !aiSettings?.hasApiKey)}
                     onClick={async () => {
-                      const keyToSave = apiKeyInput.trim() || (aiSettings?.hasApiKey ? '___keep___' : '');
-                      if (!keyToSave || keyToSave === '___keep___') {
-                        toast.error('Please enter an API key.');
+                      if (!apiKeyInput.trim() && !aiSettings?.hasApiKey) {
+                        toast.error('Please enter an API key for this organization.');
                         return;
                       }
-                      const ok = await saveSettings(selectedProvider, selectedModel, keyToSave);
+                      const ok = await saveSettings(
+                        selectedProvider,
+                        selectedModel,
+                        apiKeyInput.trim(),
+                        selectedVisionModel,
+                      );
                       if (ok) {
-                        toast.success('AI settings saved!');
+                        toast.success(
+                          apiKeyInput.trim()
+                            ? 'Organization AI key saved!'
+                            : 'Model updated (existing org key kept).',
+                        );
                         setApiKeyInput('');
                       } else {
                         toast.error('Failed to save settings.');
@@ -966,11 +1017,10 @@ const AIAnalyticsPage: React.FC = () => {
               <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-700 space-y-1">
                 <p className="font-semibold text-amber-800">About AI Providers</p>
                 <ul className="list-disc list-inside space-y-0.5 text-xs text-amber-700">
-                  <li><strong>OpenRouter</strong>   Access many models with one key. <span className="text-amber-600">openrouter.ai</span></li>
-                  <li><strong>OpenAI / ChatGPT</strong>   GPT-4o and more. <span className="text-amber-600">platform.openai.com</span></li>
-                  <li><strong>Google Gemini</strong>   Gemini 1.5 Pro, Flash. <span className="text-amber-600">aistudio.google.com</span></li>
-                  <li><strong>Anthropic Claude</strong>   Claude 3.5 Sonnet &amp; Haiku. <span className="text-amber-600">console.anthropic.com</span></li>
-                  <li><strong>Grok (xAI)</strong>   xAI's Grok models. <span className="text-amber-600">console.x.ai</span></li>
+                  <li><strong>Per organization</strong> — each org can save its own OpenRouter (or other) API key. System/platform key is only the fallback.</li>
+                  <li><strong>OpenRouter</strong> — free + paid models with one key. <span className="text-amber-600">openrouter.ai/keys</span></li>
+                  <li><strong>Rate limits</strong> — chat ~12/min, full/quick analysis ~6/min. Free OpenRouter models may also return 429.</li>
+                  <li><strong>Currency</strong> — analytics answers use LKR (not USD).</li>
                 </ul>
                 <p className="text-xs text-amber-600 mt-2">Your API key is encrypted at rest using AES-256-GCM and never exposed in the UI.</p>
               </div>

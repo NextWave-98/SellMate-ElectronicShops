@@ -4,8 +4,6 @@ import Sidebar from './Sidebar';
 import TopNavbar from './TopNavbar';
 import { usePermissions } from '@/hooks/usePermissions';
 import SubscriptionDueBanner from '../../components/billing/SubscriptionDueBanner';
-import { useActivityHeartbeat } from '@/hooks/useActivityHeartbeat';
-import { PERMISSIONS } from '@/store/types';
 
 const isPosPath = (pathname: string) =>
   pathname.endsWith('/pos') || pathname.endsWith('/quick-pos');
@@ -15,8 +13,7 @@ export default function SuperadminLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isPosFullscreen, setIsPosFullscreen] = useState(false);
   const location = useLocation();
-  const { isOrganizationAdmin, isSuperAdmin, hasPermission } = usePermissions();
-  useActivityHeartbeat(hasPermission(PERMISSIONS.ACTIVITY_MONITORING_VIEW_OWN));
+  const { isOrganizationAdmin, isSuperAdmin } = usePermissions();
 
   const isPosRoute = isPosPath(location.pathname);
   const hideChrome = isPosRoute && isPosFullscreen;
@@ -61,6 +58,14 @@ export default function SuperadminLayout() {
 
     if (path === '/superadmin' || path === '/superadmin/') {
       return 'Dashboard Overview';
+    } else if (path.startsWith('/superadmin/crm-tasks')) {
+      return 'CRM Tasks';
+    } else if (path.startsWith('/superadmin/staff-skills')) {
+      return 'Technician Skills';
+    } else if (path.startsWith('/superadmin/trade-ins')) {
+      return 'Trade-In / Buyback';
+    } else if (path.startsWith('/superadmin/system-usage')) {
+      return 'System Usage';
     } else if (path.startsWith('/superadmin/shops')) {
       return 'Shops Management';
     } else if (path.startsWith('/superadmin/staff')) {
@@ -69,12 +74,16 @@ export default function SuperadminLayout() {
       return 'Stock Management';
     } else if (path.startsWith('/superadmin/transfers')) {
       return 'Stock Transfers';
+    } else if (path.startsWith('/superadmin/accounting')) {
+      return 'Accounting';
     } else if (path.startsWith('/superadmin/sales')) {
       return 'Sales Monitor';
-    } else if (path.startsWith('/superadmin/jobsheets')) {
+    } else if (path.startsWith('/superadmin/jobsheets') || path.startsWith('/superadmin/job-sheets')) {
       return 'Job Sheets Monitor';
     } else if (path.startsWith('/superadmin/inventory')) {
       return 'Inventory Monitor';
+    } else if (path.startsWith('/superadmin/cash-drawer')) {
+      return 'Cash Drawer Overview';
     } else if (path.startsWith('/superadmin/notifications/dashboard')) {
       return 'Notification Dashboard';
     } else if (path.startsWith('/superadmin/notifications/settings')) {

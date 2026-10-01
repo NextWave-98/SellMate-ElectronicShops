@@ -11,6 +11,15 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import { getAccessToken } from '../utils/tokenStorage';
+
+// /qz/sign now validates the SellMate access token when one is sent (and can
+// require it via QZ_SIGN_REQUIRE_AUTH on the server).
+const qzAuthHeader = (): Record<string, string> => {
+  const token = getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 
 // QZ Tray is loaded via dynamic import so Vite's ESM bundler doesn't fail
 // at compile time. The resolved module is cached after the first successful load.
@@ -53,7 +62,7 @@ function setupQZSecurity(): void {
     return (resolve: (sig: string) => void, reject: (err: any) => void) => {
       fetch(`${BACKEND_URL}/qz/sign`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...qzAuthHeader() },
         body: JSON.stringify({ toSign }),
       })
         .then(res => res.text())

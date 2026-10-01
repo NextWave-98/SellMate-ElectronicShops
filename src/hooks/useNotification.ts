@@ -11,6 +11,7 @@ export interface Notification {
   recipientUserId?: string;
   recipientRole?: string;
   subject?: string;
+  title?: string;
   message: string;
   status: string;
   priority?: string;
@@ -25,6 +26,9 @@ export interface Notification {
   retryCount?: number;
   failureReason?: string;
   metadata?: any;
+  /** In-app read flag — header alerts use this, not channel status alone */
+  read?: boolean;
+  readAt?: string;
   createdAt: string;
   updatedAt: string;
 }

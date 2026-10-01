@@ -70,8 +70,6 @@ const BranchDashboardPage = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [downloadingReport, setDownloadingReport] = useState(false);
-  // Electronics focus: courier details collapsed by default
-  const [showCourierDetails, setShowCourierDetails] = useState(false);
 
   // State
   const [loading, setLoading] = useState(true);
@@ -115,7 +113,11 @@ const BranchDashboardPage = () => {
   } | null>(null);
   const [courierStats, setCourierStats] = useState<{
     total: number;
+    countable?: number;
     pending: number;
+    pendingApproval?: number;
+    processing?: number;
+    waitingCourierPickup?: number;
     pendingPickup: number;
     pickedUp: number;
     inTransit: number;
@@ -190,7 +192,9 @@ const BranchDashboardPage = () => {
         getCustomerStats(userLocationId || undefined),
         getBranchDashboard(salesPeriodFilters),
         getBranchEnhancedDashboard(salesPeriodFilters),
-        getBranchCourierStats(periodFilters),
+        canViewCourier
+          ? getBranchCourierStats(periodFilters)
+          : Promise.resolve(null),
         getLowStockItems(),
       ]);
 
@@ -209,9 +213,8 @@ const BranchDashboardPage = () => {
 
       const posSales = posPeriodStats.summary?.totalRevenue || 0;
       const posOrders = posPeriodStats.summary?.totalSales || 0;
-      // Electronics shop focus: POS figures are primary; courier COD is only a fallback
-      const totalOrders = posOrders || (courierData?.total ?? 0);
-      const totalSales = posSales || ((courierData as any)?.cod?.totalAmount ?? 0);
+      const totalOrders = courierData?.total ?? posOrders;
+      const totalSales = (courierData as any)?.cod?.totalAmount ?? posSales;
 
       setDashboardData({
         sales: { total: totalSales, change: '+0%' },
@@ -298,10 +301,10 @@ const BranchDashboardPage = () => {
     }
   };
 
-  // Electronics shop focus: POS / total sales first, courier COD as fallback
   const periodSalesTotal =
+    (courierStats as any)?.cod?.totalAmount ??
     enhancedDashboardData?.todaySales?.totalSales ??
-    (dashboardData.todaySales || (courierStats as any)?.cod?.totalAmount || 0);
+    dashboardData.todaySales;
 
   const stats = [
     {
@@ -320,9 +323,9 @@ const BranchDashboardPage = () => {
       change: dashboardData.orders.change,
       trend: dashboardData.orders.change.startsWith('+') ? 'up' : 'down',
       icon: ShoppingBag,
-      bgColor: 'bg-blue-50',
-      iconColor: 'text-blue-600',
-      changeColor: dashboardData.orders.change.startsWith('+') ? 'text-blue-600' : 'text-red-600',
+      bgColor: 'bg-orange-50',
+      iconColor: 'text-orange-600',
+      changeColor: dashboardData.orders.change.startsWith('+') ? 'text-orange-600' : 'text-red-600',
     },
     {
       name: 'Customers',
@@ -416,27 +419,8 @@ const BranchDashboardPage = () => {
         })}
       </div>
 
-       {/* Courier summary (collapsed by default   electronics shop focus) */}
+       {/* Courier Shipments */}
       {canViewCourier && courierStats && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="bg-gray-100 p-2 rounded-lg"><Truck className="w-4 h-4 text-gray-500" /></div>
-              <div>
-                <p className="text-sm font-semibold text-gray-800">Courier Shipments</p>
-                <p className="text-xs text-gray-400">
-                  {courierStats.total} shipments · {(courierStats.successRate ?? 0).toFixed(1)}% success ({periodLabel})
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setShowCourierDetails(!showCourierDetails)}>
-              {showCourierDetails ? 'Hide details' : 'Show details'}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {canViewCourier && courierStats && showCourierDetails && (
         <Card className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
             <div className="flex items-center gap-3">
@@ -445,7 +429,7 @@ const BranchDashboardPage = () => {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Courier Shipments</h2>
-                <p className="text-xs text-gray-500">{periodLabel}   success rate & parcel metrics</p>
+                <p className="text-xs text-gray-500">{periodLabel}   shipments created or updated in period</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -488,7 +472,7 @@ const BranchDashboardPage = () => {
             <>
               {(() => {
                 const dispatched = courierStats.pickedUp + courierStats.inTransit + courierStats.outForDelivery;
-                const countable = courierStats.total - courierStats.cancelled;
+                const countable = courierStats.countable ?? (courierStats.total - courierStats.cancelled);
                 const successRate = courierStats.successRate ?? 0;
                 const returnRate = courierStats.returnRate ?? 0;
                 const successBg = successRate >= 80 ? 'from-green-500 to-emerald-600' : successRate >= 50 ? 'from-yellow-500 to-amber-600' : 'from-red-500 to-rose-600';
@@ -560,19 +544,24 @@ const BranchDashboardPage = () => {
                   <Truck className="w-4 h-4 text-indigo-600" />
                 </div>
                 <div className="mt-3">
-                  <p className="text-sm font-bold text-gray-800 leading-tight">Forwarder Status</p>
-                  <p className="text-[11px] text-gray-400">Shipment count by status</p>
+                  <p className="text-sm font-bold text-gray-800 leading-tight">Status Breakdown</p>
+                  <p className="text-[11px] text-gray-400">Shipment count by status in selected period</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2 mb-5">
                 {[
+                  { label: 'Pending Approval', value: courierStats.pendingApproval ?? 0, color: 'text-orange-700', bg: 'bg-orange-50', dot: 'bg-orange-400' },
+                  { label: 'Processing', value: courierStats.processing ?? 0, color: 'text-slate-700', bg: 'bg-slate-50', dot: 'bg-slate-400' },
+                  { label: 'Waiting Pickup', value: courierStats.waitingCourierPickup ?? 0, color: 'text-teal-700', bg: 'bg-teal-50', dot: 'bg-teal-400' },
                   { label: 'Pending', value: courierStats.pending, color: 'text-yellow-700', bg: 'bg-yellow-50', dot: 'bg-yellow-400' },
                   { label: 'Pending Pickup', value: courierStats.pendingPickup, color: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-400' },
                   { label: 'Picked Up', value: courierStats.pickedUp, color: 'text-sky-700', bg: 'bg-sky-50', dot: 'bg-sky-400' },
                   { label: 'In Transit', value: courierStats.inTransit, color: 'text-blue-700', bg: 'bg-blue-50', dot: 'bg-blue-400' },
                   { label: 'Out for Del.', value: courierStats.outForDelivery, color: 'text-indigo-700', bg: 'bg-indigo-50', dot: 'bg-indigo-400' },
+                  { label: 'Rescheduled', value: courierStats.rescheduled ?? 0, color: 'text-fuchsia-700', bg: 'bg-fuchsia-50', dot: 'bg-fuchsia-400' },
                   { label: 'On Hold', value: courierStats.onHold, color: 'text-purple-700', bg: 'bg-purple-50', dot: 'bg-purple-400' },
                   { label: 'Failed', value: courierStats.failedDelivery, color: 'text-red-700', bg: 'bg-red-50', dot: 'bg-red-400' },
+                  { label: 'Returned', value: courierStats.returned ?? courierStats.returnedToSender ?? 0, color: 'text-rose-700', bg: 'bg-rose-50', dot: 'bg-rose-400' },
                 ].map(({ label, value, color, bg, dot }) => (
                   <div key={label} className={`${bg} rounded-xl px-3 py-2 flex items-center gap-2`}>
                     <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
@@ -592,7 +581,7 @@ const BranchDashboardPage = () => {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-gray-800 leading-tight">Success Rate by Staff</p>
-                      <p className="text-[11px] text-gray-400">Delivery performance per staff member</p>
+                      <p className="text-[11px] text-gray-400">Courier shipments created or updated in period</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -740,7 +729,7 @@ const BranchDashboardPage = () => {
                 <Button 
                   variant="outline"
                   onClick={() => navigate(`/${branchCode}/products`)}
-                  className="w-full mt-4 text-[#1e3a8a] border-[#1e3a8a] hover:bg-blue-50"
+                  className="w-full mt-4 text-[#1e3a8a] border-[#1e3a8a] hover:bg-orange-50"
                 >
                   View All Inventory
                 </Button>
@@ -799,26 +788,26 @@ const BranchDashboardPage = () => {
       )}
 
       {/* Branch Performance */}
-      <div className="bg-gradient-to-r from-[#1e3a8a] to-blue-700 rounded-lg shadow-sm border border-gray-200 p-6 text-white">
+      <div className="bg-gradient-to-r from-[#1e3a8a] to-orange-700 rounded-lg shadow-sm border border-gray-200 p-6 text-white">
         <h2 className="text-xl font-bold mb-4">Branch Performance</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div>
-            <p className="text-blue-200 text-sm mb-1">{periodLabel}</p>
+            <p className="text-orange-200 text-sm mb-1">{periodLabel}</p>
             <p className="text-2xl font-bold">{formatCurrency(periodSalesTotal)}</p>
             <p className="text-sm text-green-300 mt-1">{dashboardData.sales.change} from last month</p>
           </div>
           <div>
-            <p className="text-blue-200 text-sm mb-1">Average Order Value</p>
+            <p className="text-orange-200 text-sm mb-1">Average Order Value</p>
             <p className="text-2xl font-bold">{formatCurrency(dashboardData.avgOrderValue)}</p>
             <p className="text-sm text-green-300 mt-1">Per transaction</p>
           </div>
           <div>
-            <p className="text-blue-200 text-sm mb-1">Total Transactions</p>
+            <p className="text-orange-200 text-sm mb-1">Total Transactions</p>
             <p className="text-2xl font-bold">{dashboardData.totalTransactions}</p>
             <p className="text-sm text-green-300 mt-1">{dashboardData.orders.change} from last month</p>
           </div>
           <div>
-            <p className="text-blue-200 text-sm mb-1">Active Customers</p>
+            <p className="text-orange-200 text-sm mb-1">Active Customers</p>
             <p className="text-2xl font-bold">{dashboardData.customers.total}</p>
             <p className="text-sm text-green-300 mt-1">{dashboardData.customers.change} active</p>
           </div>

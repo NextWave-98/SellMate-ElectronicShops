@@ -9,9 +9,18 @@ import type {
   CreateOrganizationResponse,
 } from '../types/organization.types';
 
-// Get the super admin secret from environment or config
+// The super admin secret is typed by the super admin (at /admin/login or in
+// the Organizations page prompt) and kept only in this browser's session.
+// It must NEVER come from import.meta.env: Vite inlines env values into the
+// public JS bundle, which published the secret to every visitor.
 const getSuperAdminSecret = () => {
-  return import.meta.env.VITE_SUPER_ADMIN_SECRET || Cookies.get('superAdminSecret') || '';
+  try {
+    const fromSession = sessionStorage.getItem('superAdminSecret');
+    if (fromSession) return fromSession;
+  } catch {
+    /* storage blocked */
+  }
+  return Cookies.get('superAdminSecret') || '';
 };
 
 export const useOrganization = () => {
@@ -158,7 +167,13 @@ export const useOrganization = () => {
    * Set super admin secret in cookies
    */
   const setSuperAdminSecret = useCallback((secret: string) => {
-    Cookies.set('superAdminSecret', secret, { expires: 1 }); // Expires in 1 day
+    // Tab-scoped only; drop the old 1-day cookie copy if one exists.
+    try {
+      sessionStorage.setItem('superAdminSecret', secret);
+    } catch {
+      /* storage blocked */
+    }
+    Cookies.remove('superAdminSecret');
   }, []);
 
   return {

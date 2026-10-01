@@ -16,6 +16,8 @@ interface CartSummaryProps {
   total: number;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdatePrice: (id: string, price: number) => void;
+  /** Warranty months for this sale line only (product default is the starting value). */
+  onUpdateWarranty?: (id: string, months: number) => void;
   onRemoveItem: (id: string) => void;
   onClearCart: () => void;
   onCheckout: () => void;
@@ -26,6 +28,7 @@ const CartSummary: React.FC<CartSummaryProps> = ({
   total,
   onUpdateQuantity,
   onUpdatePrice,
+  onUpdateWarranty,
   onRemoveItem,
   onClearCart,
   onCheckout
@@ -96,6 +99,22 @@ const CartSummary: React.FC<CartSummaryProps> = ({
                             className="w-24 rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-800"
                           />
                         </div>
+                      )}
+                      {onUpdateWarranty && Number(item.warrantyMonths || 0) > 0 && !item.isService && (
+                        <label className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-700">
+                          Warranty
+                          <select
+                            value={Number(item.warrantyMonths)}
+                            onChange={(e) => onUpdateWarranty(item.id, Number(e.target.value))}
+                            className="rounded border border-emerald-200 bg-emerald-50 px-1 py-0.5 text-xs"
+                          >
+                            {Array.from(new Set([1, 3, 6, 9, 12, 18, 24, 36, Number(item.warrantyMonths)]))
+                              .sort((a, b) => a - b)
+                              .map((m) => (
+                                <option key={m} value={m}>{m} {m === 1 ? 'month' : 'months'}</option>
+                              ))}
+                          </select>
+                        </label>
                       )}
                       {isNearLimit && (
                         <div className="flex items-center gap-1 mt-1">

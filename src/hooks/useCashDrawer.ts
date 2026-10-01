@@ -17,6 +17,46 @@ export interface CashDrawerRecord {
   notes: string | null;
 }
 
+export interface BranchDrawerOverviewItem {
+  locationId: string;
+  locationName: string;
+  locationCode: string | null;
+  locationType: string;
+  status: DrawerStatus;
+  todayOpenCount: number;
+  activeDrawer: {
+    id: string;
+    openingBalance: number;
+    expectedClosingBalance: number;
+    openedAt: string;
+    openedBy: string;
+    notes: string | null;
+  } | null;
+  todaySessions: Array<{
+    id: string;
+    status: DrawerStatus;
+    openingBalance: number;
+    closingBalance: number | null;
+    expectedClosingBalance: number;
+    variance: number | null;
+    openedAt: string;
+    closedAt: string | null;
+    openedBy: string;
+    closedBy: string | null;
+  }>;
+}
+
+export interface BranchesDrawerOverview {
+  date: string;
+  summary: {
+    totalBranches: number;
+    openNow: number;
+    closedNow: number;
+    totalOpensToday: number;
+  };
+  branches: BranchDrawerOverviewItem[];
+}
+
 export interface DayBalanceSummary {
   /** null when no drawer has been opened for the requested day */
   drawer: CashDrawerRecord | null;
@@ -43,6 +83,8 @@ export interface DayBalanceSummary {
   cashFlow: {
     openingBalance: number;
     cashSalesReceived: number;
+    cashRefunds?: number;
+    pettyCashOut?: number;
     totalExpectedCash: number;
     closingBalance: number | null;
     variance: number | null;
@@ -99,10 +141,25 @@ const useCashDrawer = () => {
   );
 
   const getDrawerHistory = useCallback(
-    async (locationId: string, page = 1, limit = 20) => {
-      const params = new URLSearchParams({ locationId, page: String(page), limit: String(limit) });
+    async (locationId?: string, page = 1, limit = 20) => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (locationId) params.append('locationId', locationId);
       return fetch.fetchData({
         endpoint: `/cash-drawer/history?${params.toString()}`,
+        method: 'GET',
+        silent: true,
+      });
+    },
+    [fetch]
+  );
+
+  const getBranchesOverview = useCallback(
+    async (date?: string) => {
+      const params = new URLSearchParams();
+      if (date) params.append('date', date);
+      const qs = params.toString();
+      return fetch.fetchData({
+        endpoint: `/cash-drawer/overview${qs ? `?${qs}` : ''}`,
         method: 'GET',
         silent: true,
       });
@@ -116,6 +173,7 @@ const useCashDrawer = () => {
     getActiveDrawer,
     getDayBalance,
     getDrawerHistory,
+    getBranchesOverview,
     loading: fetch.loading,
   };
 };

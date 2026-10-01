@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // useFetch.tsx
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import axios, { type AxiosRequestConfig, type AxiosResponse } from 'axios';
 import alert from '../utils/alert';
 import { useLocation } from 'react-router-dom';
@@ -8,6 +8,11 @@ import {
   getAccessToken,
   clearAllTokens,
 } from '../utils/tokenStorage';
+import { installAuthRefreshInterceptor } from '../utils/authRefresh';
+
+// Refresh an expired access token once and retry, instead of logging the user
+// out on the first 401 (see utils/authRefresh.ts).
+installAuthRefreshInterceptor();
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'https://gadget-chain-manager-backend.vercel.app/api';
 const DEFAULT_ERROR_MESSAGE = 'An unexpected error occurred.';
@@ -34,7 +39,8 @@ interface ApiResponse<T = unknown> {
     type: string;
     details: string;
   };
-
+  changes?: Record<string, unknown>;
+  warnings?: string[];
 }
 
 interface FetchOptions {
@@ -75,7 +81,7 @@ const useFetch = <T = unknown>(
   const [error, setError] = useState<string | null>(null);
   const [responseCode, setResponseCode] = useState<number | null>(null);
   const location = useLocation();
-  // Avoid options identity churn regenerating fetchData every render
+  // Avoid `options` identity churn (default `{}` / inline objects) regenerating fetchData every render
   const optionsRef = useRef(options);
   optionsRef.current = options;
   
@@ -92,7 +98,6 @@ const useFetch = <T = unknown>(
     // Check for deactivated account
     if ((responseData as unknown as { code?: string })?.code === 'ACCOUNT_DEACTIVATED' ||
       message?.toLowerCase().includes('account has been deactivated')) {
-      console.log('[useFetch] Account deactivated, clearing token and redirecting');
       clearAllTokens();
       localStorage.removeItem('user');
       alert.error('Your account has been deactivated. Please contact an administrator.');
@@ -114,7 +119,6 @@ const useFetch = <T = unknown>(
       
       // Don't redirect if we're already on login page or home page
       if (location.pathname === '/login' || location.pathname === '/' || location.pathname === '/admin/login') {
-        console.log('[useFetch] Already on login/home, not redirecting');
         setError(message);
         return;
       }
@@ -325,11 +329,14 @@ const useFetch = <T = unknown>(
           }
           return responseData;
         } else if (responseData.code === 403) {
-          // Permission error - show access denied modal, do NOT redirect
+          // Permission error - show access denied modal only for interactive (non-silent) calls.
+          // Silent background probes (e.g. courier stats) must not pop a modal.
           const deniedMsg = responseData.message || 'Access denied. You do not have permission to perform this action.';
-          window.dispatchEvent(
-            new CustomEvent('permission:denied', { detail: { message: deniedMsg } })
-          );
+          if (!silent) {
+            window.dispatchEvent(
+              new CustomEvent('permission:denied', { detail: { message: deniedMsg } })
+            );
+          }
           return responseData;
         } else {
           setData(responseData);
@@ -366,9 +373,12 @@ const useFetch = <T = unknown>(
         finalErrorMessage.toLowerCase().startsWith('access denied') ||
         finalErrorMessage.toLowerCase().includes('required permissions')
       ) {
-        window.dispatchEvent(
-          new CustomEvent('permission:denied', { detail: { message: finalErrorMessage } })
-        );
+        // Silent requests fail quietly — callers / UI gates should hide missing modules.
+        if (!silent) {
+          window.dispatchEvent(
+            new CustomEvent('permission:denied', { detail: { message: finalErrorMessage } })
+          );
+        }
         setError(finalErrorMessage);
         return errorResponseData || { success: false, message: finalErrorMessage };
       }
@@ -418,7 +428,38 @@ const useFetch = <T = unknown>(
     [fetchData]
   );
 
-  return { data, loading, error, responseCode, fetchData, execute, reset };
+  // Keep the returned object identity stable across loading/data updates.
+  // Hooks that depend on the whole useFetch() result (e.g. [statsFetch])
+  // otherwise recreate callbacks every render and re-trigger useEffects → API loops.
+  const dataRef = useRef(data);
+  const loadingRef = useRef(loading);
+  const errorRef = useRef(error);
+  const responseCodeRef = useRef(responseCode);
+  dataRef.current = data;
+  loadingRef.current = loading;
+  errorRef.current = error;
+  responseCodeRef.current = responseCode;
+
+  return useMemo(
+    () => ({
+      get data() {
+        return dataRef.current;
+      },
+      get loading() {
+        return loadingRef.current;
+      },
+      get error() {
+        return errorRef.current;
+      },
+      get responseCode() {
+        return responseCodeRef.current;
+      },
+      fetchData,
+      execute,
+      reset,
+    }),
+    [fetchData, execute, reset]
+  );
 };
 
 export default useFetch;

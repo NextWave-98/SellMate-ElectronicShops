@@ -22,6 +22,19 @@ export interface POSSettings {
   autoPrintOnSale: boolean;
   /** Organization-level: Quick POS can create system-only courier sales using branch details */
   courierStockAdjustmentOnly: boolean;
+  /**
+   * Organization-level: master switch for the Quick POS "Send Bill" button.
+   * Off for every organization until it is turned on in POS Settings.
+   */
+  billShareEnabled: boolean;
+  /** Organization-level: offer Email as a bill-share channel. */
+  billShareEmailEnabled: boolean;
+  /** Organization-level: offer SMS (costs credits, so off by default). */
+  billShareSmsEnabled: boolean;
+  /** Organization-level: offer WhatsApp via wa.me deep link (no API key). */
+  billShareWhatsappEnabled: boolean;
+  /** Organization-level message template; null = built-in default. */
+  billShareMessage: string | null;
 }
 
 const DEFAULT_SETTINGS: POSSettings = {
@@ -31,6 +44,11 @@ const DEFAULT_SETTINGS: POSSettings = {
   autoCashDrawer: true,
   autoPrintOnSale: true,
   courierStockAdjustmentOnly: false,
+  billShareEnabled: false,
+  billShareEmailEnabled: true,
+  billShareSmsEnabled: false,
+  billShareWhatsappEnabled: true,
+  billShareMessage: null,
 };
 
 const BASE_URL =
@@ -105,6 +123,17 @@ export function usePOSSettings() {
             courierStockAdjustmentOnly:
               d.courierStockAdjustmentOnly ??
               DEFAULT_SETTINGS.courierStockAdjustmentOnly,
+            billShareEnabled:
+              d.billShareEnabled ?? DEFAULT_SETTINGS.billShareEnabled,
+            billShareEmailEnabled:
+              d.billShareEmailEnabled ?? DEFAULT_SETTINGS.billShareEmailEnabled,
+            billShareSmsEnabled:
+              d.billShareSmsEnabled ?? DEFAULT_SETTINGS.billShareSmsEnabled,
+            billShareWhatsappEnabled:
+              d.billShareWhatsappEnabled ??
+              DEFAULT_SETTINGS.billShareWhatsappEnabled,
+            billShareMessage:
+              d.billShareMessage ?? DEFAULT_SETTINGS.billShareMessage,
           };
           if (d.defaultFormat) {
             alwaysCache.defaultFormat = d.defaultFormat as PaperFormat;
@@ -174,6 +203,24 @@ export function usePOSSettings() {
             autoCashDrawer: merged.autoCashDrawer,
             autoPrintOnSale: merged.autoPrintOnSale,
             courierStockAdjustmentOnly: merged.courierStockAdjustmentOnly,
+            // Bill share is organization-wide. Only forward the keys the caller
+            // actually changed   sending the cached copy from every branch that
+            // saves printer settings would let a stale cache flip the feature.
+            ...(partial.billShareEnabled !== undefined
+              ? { billShareEnabled: partial.billShareEnabled }
+              : {}),
+            ...(partial.billShareEmailEnabled !== undefined
+              ? { billShareEmailEnabled: partial.billShareEmailEnabled }
+              : {}),
+            ...(partial.billShareSmsEnabled !== undefined
+              ? { billShareSmsEnabled: partial.billShareSmsEnabled }
+              : {}),
+            ...(partial.billShareWhatsappEnabled !== undefined
+              ? { billShareWhatsappEnabled: partial.billShareWhatsappEnabled }
+              : {}),
+            ...(partial.billShareMessage !== undefined
+              ? { billShareMessage: partial.billShareMessage }
+              : {}),
           }),
         },
       );

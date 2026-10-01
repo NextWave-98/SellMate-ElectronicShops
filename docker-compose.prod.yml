@@ -11,7 +11,6 @@ services:
       args:
         VITE_BASE_URL: ${VITE_BASE_URL:-https://api2.sellmate.lk/api}
         VITE_CLOUDINARY_URL: ${VITE_CLOUDINARY_URL:-https://res.cloudinary.com}
-        VITE_SUPER_ADMIN_SECRET: ${VITE_SUPER_ADMIN_SECRET:-}
         VITE_SHOP_SITE_URL: ${VITE_SHOP_SITE_URL:-http://169.58.206.94:4173}
         VITE_PUBLIC_SITE_URL: ${VITE_PUBLIC_SITE_URL:-https://rental.sellmate.lk}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-}

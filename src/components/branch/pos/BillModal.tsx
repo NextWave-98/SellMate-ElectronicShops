@@ -162,18 +162,92 @@ const BillModal: React.FC<BillModalProps> = ({
                         >
                           <div className="flex-1 min-w-0 pr-2">
                             <span className="text-gray-900 font-medium truncate block">
+                              {(item as any).isFreeItem ? (
+                                <span className="mr-1 inline-flex items-center rounded bg-emerald-100 text-emerald-800 px-1 py-0.5 text-[10px] font-bold">
+                                  FREE
+                                </span>
+                              ) : null}
                               {item.name}
                             </span>
                             <span className="text-xs text-gray-500">
-                              {formatCurrency(item.price)} × {item.quantity}
+                              {(item as any).isFreeItem
+                                ? (() => {
+                                    const offerName =
+                                      (item as any).freeOfferName ||
+                                      (item as any).freeOffer?.name;
+                                    const buyQty =
+                                      (item as any).freeOfferBuyQty ??
+                                      (item as any).freeOffer?.buyQuantity;
+                                    const freeQty =
+                                      (item as any).freeOfferFreeQty ??
+                                      (item as any).freeOffer?.freeQuantity;
+                                    const ratio =
+                                      buyQty != null && freeQty != null
+                                        ? ` · Buy ${buyQty} Get ${freeQty}`
+                                        : "";
+                                    return offerName
+                                      ? `${offerName}${ratio} · Qty ${item.quantity}`
+                                      : `Free offer · Qty ${item.quantity}`;
+                                  })()
+                                : `${formatCurrency(item.price)} × ${item.quantity}`}
                             </span>
                           </div>
                           <span className="font-semibold text-gray-900 whitespace-nowrap">
-                            {formatCurrency(item.price * item.quantity)}
+                            {(item as any).isFreeItem
+                              ? formatCurrency(0)
+                              : formatCurrency(item.price * item.quantity)}
                           </span>
                         </div>
                       ))}
                     </div>
+                    {orderData.items.some((item) => (item as any).isFreeItem) ? (
+                      <div className="mt-3 pt-3 border-t border-dashed border-emerald-200 space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                          Free Offer
+                        </p>
+                        {Array.from(
+                          orderData.items
+                            .filter((item) => (item as any).isFreeItem)
+                            .reduce((map, item) => {
+                              const key =
+                                String((item as any).freeOfferId || "") ||
+                                String((item as any).freeOfferName || "free");
+                              if (!map.has(key)) {
+                                map.set(key, {
+                                  name:
+                                    (item as any).freeOfferName ||
+                                    (item as any).freeOffer?.name ||
+                                    "Free Offer",
+                                  buyQty:
+                                    (item as any).freeOfferBuyQty ??
+                                    (item as any).freeOffer?.buyQuantity,
+                                  freeQty:
+                                    (item as any).freeOfferFreeQty ??
+                                    (item as any).freeOffer?.freeQuantity,
+                                  lines: [] as string[],
+                                });
+                              }
+                              const bucket = map.get(key)!;
+                              bucket.lines.push(
+                                `${item.name} x${item.quantity}`,
+                              );
+                              return map;
+                            }, new Map<string, { name: string; buyQty?: number; freeQty?: number; lines: string[] }>()),
+                        ).map(([key, bucket]) => (
+                          <div key={key} className="text-xs text-emerald-800">
+                            <p className="font-medium">
+                              {bucket.name}
+                              {bucket.buyQty != null && bucket.freeQty != null
+                                ? ` (Buy ${bucket.buyQty} Get ${bucket.freeQty})`
+                                : ""}
+                            </p>
+                            <p className="text-emerald-700">
+                              Free: {bucket.lines.join(", ")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 )}
 

@@ -699,6 +699,12 @@ const POSPage: React.FC = () => {
     );
   };
 
+  /** Warranty months for one cart line only (e.g. product has 12, this customer gets 6). */
+  const handleUpdateWarranty = (id: string, months: number) => {
+    const m = Math.max(1, Math.min(120, Math.round(Number(months) || 0)));
+    setCartItems((prev) => prev.map((i) => (i.id === id ? { ...i, warrantyMonths: m } : i)));
+  };
+
   const handleUpdatePrice = (id: string, price: number) => {
     const item = cartItems.find((i) => i.id === id);
     if (!item?.isService) return;
@@ -1164,6 +1170,7 @@ const POSPage: React.FC = () => {
             total={total}
             onUpdateQuantity={handleUpdateQuantity}
             onUpdatePrice={handleUpdatePrice}
+            onUpdateWarranty={handleUpdateWarranty}
             onRemoveItem={handleRemoveItem}
             onClearCart={handleClearCart}
             onCheckout={handleCheckout}

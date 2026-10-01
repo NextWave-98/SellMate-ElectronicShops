@@ -25,7 +25,7 @@ import {
   Shield,
   FolderTree,
   PackagePlus,
-  // Truck,
+  Truck,
   Key,
   CreditCard,
   MessageSquare,
@@ -36,26 +36,22 @@ import {
   QrCode,
   Settings2,
   Clock,
-  CalendarDays,
-  Truck,
-  Globe,
-  ListChecks,
-  GraduationCap,
   Banknote,
   BookOpen,
-  Facebook,
-  Car,
-  Droplets,
-  Smartphone,
-  Fuel,
-  ShieldAlert,
-  Tags,
-  FileText,
-  BellRing,
   BarChart3,
+  CircleHelp,
+  ListChecks,
+  GraduationCap,
+  Smartphone,
+  Tags,
+  Facebook,
+  Globe,
+  ShoppingBag,
+  FileText,
   Newspaper,
   Star,
-  CircleHelp,
+  Inbox,
+  Wallet,
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { SUPERADMIN_SIDEBAR_PERMISSIONS, type SidebarPermissionConfig } from '../../config/permissions.config';
@@ -97,8 +93,8 @@ const menuItems: MenuItem[] = [
   // ── People ──────────────────────────────────────────
   { id: 'shops',     label: 'Shops',          path: '/superadmin/shops/management',     icon: Store,        section: 'people' },
   { id: 'staff',      label: 'Staff',           path: '/superadmin/staff/management',  icon: Users,        section: 'people' },
-  { id: 'attendance', label: 'Attendance',      path: '/superadmin/attendance',        icon: Clock,        section: 'people' },
   { id: 'staff-skills', label: 'Technician Skills', path: '/superadmin/staff-skills',   icon: GraduationCap, section: 'people' },
+  { id: 'attendance', label: 'Attendance',      path: '/superadmin/attendance',        icon: Clock,        section: 'people' },
   { id: 'payroll',    label: 'Payroll',         path: '/superadmin/payroll',           icon: Banknote,     section: 'people' },
   { id: 'roles',     label: 'Role Management', path: '/superadmin/roles/management',  icon: Shield,       section: 'people' },
   { id: 'customer',  label: 'Customers',      path: '/superadmin/customers/management', icon: Contact,      section: 'people' },
@@ -106,46 +102,8 @@ const menuItems: MenuItem[] = [
 
   // ── Operations ──────────────────────────────────────
   { id: 'quick-pos',    label: 'Quick POS',     path: '/superadmin/quick-pos',           icon: Zap,         section: 'operations' },
-  { id: 'advance-payments', label: 'Advance Payments', path: '/superadmin/advance-payments', icon: CreditCard, section: 'operations' },
-  { id: 'sales',        label: 'Sales Monitor', path: '/superadmin/sales/monitor',       icon: DollarSign,  section: 'operations' },
-  { id: 'orders',       label: 'Orders',        path: '/superadmin/orders/monitor',      icon: Package,     section: 'operations' },
-  { id: 'jobsheets',    label: 'Job Sheets',    path: '/superadmin/job-sheets/monitor',  icon: Wrench,      section: 'operations' },
-  { id: 'sale-jobs',    label: 'Sale Jobs',     path: '/superadmin/sale-jobs/monitor',   icon: ClipboardList, section: 'operations' },
-  { id: 'warranty',     label: 'Warranty',      path: '/superadmin/warranty/management', icon: Shield,      section: 'operations' },
-  { id: 'payments',     label: 'Payments',      path: '/superadmin/payments/management', icon: DollarSign,  section: 'operations' },
-  { id: 'installments', label: 'Installments',  path: '/superadmin/installments',        icon: CreditCard,  section: 'operations' },
-  { id: 'returns',      label: 'Returns',       path: '/superadmin/returns',             icon: PackageCheck,section: 'operations' },
-
-  // ── New verticals (industry-gated) ──────────────────
-  {
-    id: 'rental', label: 'Vehicle Rental', path: '/superadmin/rental', icon: Car, section: 'operations',
-    children: [
-      { id: 'rental-dashboard',   label: 'Dashboard',        path: '/superadmin/rental',             icon: LayoutDashboard },
-      { id: 'rental-fleet',       label: 'Fleet',            path: '/superadmin/rental/fleet',       icon: Car },
-      { id: 'rental-bookings',    label: 'Bookings',         path: '/superadmin/rental/bookings',    icon: CalendarDays },
-      { id: 'rental-maintenance', label: 'Maintenance',      path: '/superadmin/rental/maintenance', icon: Wrench },
-      { id: 'rental-fuel',        label: 'Fuel Logs',        path: '/superadmin/rental/fuel',        icon: Fuel },
-      { id: 'rental-claims',      label: 'Insurance Claims', path: '/superadmin/rental/claims',      icon: ShieldAlert },
-      { id: 'rental-pricing',     label: 'Pricing & Coupons', path: '/superadmin/rental/pricing',    icon: Tags },
-    ],
-  },
-  {
-    id: 'carwash', label: 'Car Wash', path: '/superadmin/carwash', icon: Droplets, section: 'operations',
-    children: [
-      { id: 'carwash-queue',       label: 'Queue',             path: '/superadmin/carwash',             icon: ListChecks },
-      { id: 'carwash-services',    label: 'Services',          path: '/superadmin/carwash/services',    icon: Droplets },
-      { id: 'carwash-memberships', label: 'Memberships',       path: '/superadmin/carwash/memberships', icon: CreditCard },
-      { id: 'carwash-performance', label: 'Staff Performance', path: '/superadmin/carwash/performance', icon: Users },
-    ],
-  },
-  {
-    id: 'garage', label: 'Garage / Workshop', path: '/superadmin/garage', icon: Wrench, section: 'operations',
-    children: [
-      { id: 'garage-estimates', label: 'Estimates',         path: '/superadmin/garage',           icon: FileText },
-      { id: 'garage-vehicles',  label: 'Customer Vehicles', path: '/superadmin/garage/vehicles',  icon: Car },
-      { id: 'garage-reminders', label: 'Reminders',         path: '/superadmin/garage/reminders', icon: BellRing },
-    ],
-  },
+  { id: 'cash-drawer',  label: 'Cash Drawer',   path: '/superadmin/cash-drawer',         icon: Wallet,      section: 'operations' },
+  { id: 'crm-tasks', label: 'CRM Tasks',      path: '/superadmin/crm-tasks',            icon: ListChecks,   section: 'operations' },
   {
     id: 'trade-ins', label: 'Trade-In / Buyback', path: '/superadmin/trade-ins', icon: Smartphone, section: 'operations',
     children: [
@@ -153,27 +111,16 @@ const menuItems: MenuItem[] = [
       { id: 'trade-ins-rules', label: 'Price Rules', path: '/superadmin/trade-ins/rules', icon: Tags },
     ],
   },
-  { id: 'appointments', label: 'Appointments', path: '/superadmin/appointments', icon: CalendarDays, section: 'operations' },
-  { id: 'towing', label: 'Towing / Roadside', path: '/superadmin/towing', icon: Truck, section: 'operations' },
-  {
-    id: 'accounting', label: 'Accounting', path: '/superadmin/accounting', icon: BookOpen, section: 'operations',
-    children: [
-      { id: 'accounting-accounts', label: 'Chart of Accounts', path: '/superadmin/accounting',          icon: FileText },
-      { id: 'accounting-journals', label: 'Journal Entries',   path: '/superadmin/accounting/journals', icon: BookOpen },
-      { id: 'accounting-reports',  label: 'Reports',           path: '/superadmin/accounting/reports',  icon: BarChart3 },
-    ],
-  },
-  {
-    id: 'website', label: 'Website / CMS', path: '/superadmin/website', icon: Globe, section: 'operations',
-    children: [
-      { id: 'website-settings',     label: 'Site Settings',      path: '/superadmin/website',              icon: Settings2 },
-      { id: 'website-pages',        label: 'Pages',              path: '/superadmin/website/pages',        icon: FileText },
-      { id: 'website-blog',         label: 'Blog / Promotions',  path: '/superadmin/website/blog',         icon: Newspaper },
-      { id: 'website-testimonials', label: 'Testimonials',       path: '/superadmin/website/testimonials', icon: Star },
-      { id: 'website-payments',     label: 'Payments',           path: '/superadmin/website/payments',     icon: CreditCard },
-    ],
-  },
-  { id: 'crm-tasks', label: 'CRM Tasks', path: '/superadmin/crm-tasks', icon: ListChecks, section: 'operations' },
+  { id: 'advance-payments', label: 'Advance Payments', path: '/superadmin/advance-payments', icon: CreditCard, section: 'operations' },
+  { id: 'sales',        label: 'Sales Monitor', path: '/superadmin/sales/monitor',       icon: DollarSign,  section: 'operations' },
+  { id: 'orders',       label: 'Orders',        path: '/superadmin/orders/monitor',      icon: Package,     section: 'operations' },
+  { id: 'jobsheets',    label: 'Job Sheets',    path: '/superadmin/job-sheets/monitor',  icon: Wrench,      section: 'operations' },
+  { id: 'sale-jobs',    label: 'Sale Jobs',     path: '/superadmin/sale-jobs/monitor',   icon: ClipboardList, section: 'operations' },
+  { id: 'warranty',     label: 'Warranty',      path: '/superadmin/warranty/management', icon: Shield,      section: 'operations' },
+  { id: 'payments',     label: 'Payments',      path: '/superadmin/payments/management', icon: DollarSign,  section: 'operations' },
+  { id: 'invoices',     label: 'Invoices & Quotes', path: '/superadmin/invoices',        icon: FileText,    section: 'operations' },
+  { id: 'installments', label: 'Installments',  path: '/superadmin/installments',        icon: CreditCard,  section: 'operations' },
+  { id: 'returns',      label: 'Returns',       path: '/superadmin/returns',             icon: PackageCheck,section: 'operations' },
 
   // ── Inventory ───────────────────────────────────────
   {
@@ -185,11 +132,14 @@ const menuItems: MenuItem[] = [
       { id: 'inventory',       label: 'Inventory Monitor', path: '/superadmin/inventory/monitor',     icon: Warehouse },
       { id: 'categories',      label: 'Categories',        path: '/superadmin/categories/management', icon: FolderTree },
       {id: 'discounts',        label: 'Discounts',         path: '/superadmin/discounts',  icon: FileCog },
+      {id: 'free-offers',      label: 'Free Offers',       path: '/superadmin/free-offers', icon: Tags },
       // {id:'brand-management', label: 'Brands',             path: '/superadmin/brands/management',     icon: Contact },
     ],
   },
   { id: 'goods-receipts', label: 'Goods Receipts',  path: '/superadmin/goods-receipts',   icon: PackageCheck, section: 'inventory' },
+  { id: 'transfers',      label: 'Stock Transfers', path: '/superadmin/transfers',        icon: Activity,     section: 'inventory' },
   { id: 'product-usage',  label: 'Product Usage',   path: '/superadmin/product-usage',    icon: BookOpen,     section: 'inventory' },
+  { id: 'serials',        label: 'Serial / IMEI',   path: '/superadmin/serials',          icon: BookOpen,     section: 'inventory' },
   { id: 'parts',          label: 'Parts & Stock',   path: '/superadmin/parts/management', icon: Wrench,       section: 'inventory' },
   { id: 'addon-requests', label: 'Addon Requests',  path: '/superadmin/addon-requests',   icon: PackagePlus,  section: 'inventory' },
 
@@ -204,6 +154,16 @@ const menuItems: MenuItem[] = [
 
   // ── E-Commerce ──────────────────────────────────────
   {
+    id: 'website', label: 'Website / CMS', path: '/superadmin/website', icon: Globe, section: 'ecommerce',
+    children: [
+      { id: 'website-settings',     label: 'Site Settings',      path: '/superadmin/website',              icon: Settings2 },
+      { id: 'website-pages',        label: 'Pages',              path: '/superadmin/website/pages',        icon: FileText },
+      { id: 'website-blog',         label: 'Blog / Promotions',  path: '/superadmin/website/blog',         icon: Newspaper },
+      { id: 'website-testimonials', label: 'Testimonials',       path: '/superadmin/website/testimonials', icon: Star },
+    ],
+  },
+  { id: 'website-orders', label: 'Website Orders', path: '/superadmin/website-orders', icon: ShoppingBag, section: 'ecommerce' },
+  {
     id: 'woocommerce', label: 'WooCommerce', path: '/superadmin/woocommerce', icon: ShoppingCart, section: 'ecommerce',
     children: [
       { id: 'woocommerce-settings', label: 'Settings', path: '/superadmin/woocommerce',        icon: ShoppingCart },
@@ -213,29 +173,53 @@ const menuItems: MenuItem[] = [
 
   // ── Admin ───────────────────────────────────────────
   { id: 'reports',       label: 'Reports',       path: '/superadmin/reports',                 icon: FileCog,      section: 'admin' },
+  {
+    id: 'accounting', label: 'Accounting', path: '/superadmin/accounting', icon: BookOpen, section: 'admin',
+    children: [
+      { id: 'accounting-accounts', label: 'Chart of Accounts', path: '/superadmin/accounting',          icon: FileText },
+      { id: 'accounting-journals', label: 'Journal Entries',   path: '/superadmin/accounting/journals', icon: BookOpen },
+      { id: 'accounting-reports',  label: 'Reports',           path: '/superadmin/accounting/reports',  icon: BarChart3 },
+    ],
+  },
   { id: 'ai-analytics',  label: 'AI Analytics',  path: '/superadmin/ai-analytics',             icon: Activity,     section: 'admin' },
   { id: 'activity-logs', label: 'Activity Logs', path: '/superadmin/activity-logs',            icon: ClipboardList,section: 'admin' },
-  { id: 'activity-monitoring', label: 'Team Activity', path: '/superadmin/activity-monitoring', icon: Activity, section: 'admin' },
-  { id: 'scorecard', label: 'Performance Scorecard', path: '/superadmin/scorecard', icon: Activity, section: 'admin' },
   { id: 'notifications', label: 'Notifications', path: '/superadmin/notifications/dashboard', icon: Bell,         section: 'admin' },
   {
-    id: 'communication', label: 'Communication', path: '/superadmin/communication', icon: MessageSquare, section: 'admin',
+    id: 'whatsapp',
+    label: 'WhatsApp',
+    path: '/superadmin/communication/whatsapp',
+    icon: MessageSquare,
+    section: 'admin',
+    children: [
+      { id: 'whatsapp-settings', label: 'WhatsApp Business',   path: '/superadmin/communication/whatsapp',        icon: MessageSquare },
+      { id: 'whatsapp-ai',       label: 'WhatsApp AI Replies', path: '/superadmin/communication/whatsapp/ai',     icon: MessageSquare },
+      { id: 'whatsapp-inbox',    label: 'WhatsApp Inbox',      path: '/superadmin/communication/whatsapp/inbox',  icon: MessageSquare },
+      { id: 'whatsapp-orders',   label: 'WhatsApp Orders',     path: '/superadmin/communication/whatsapp/orders', icon: ShoppingCart },
+    ],
+  },
+  {
+    id: 'lead-forms-group',
+    label: 'Lead Forms',
+    path: '/superadmin/facebook-leads/forms',
+    icon: ClipboardList,
+    section: 'admin',
+    children: [
+      { id: 'facebook-leads',          label: 'Leads Inbox',      path: '/superadmin/facebook-leads',          icon: Inbox },
+      { id: 'lead-forms',              label: 'Manage Forms',     path: '/superadmin/facebook-leads/forms',    icon: ClipboardList },
+      { id: 'facebook-leads-settings', label: 'Facebook Connect', path: '/superadmin/facebook-leads/settings', icon: Facebook },
+    ],
+  },
+  {
+    id: 'communication', label: 'Communication', path: '/superadmin/communication', icon: Key, section: 'admin',
     children: [
       { id: 'communication-settings', label: 'Channel Credentials',   path: '/superadmin/communication/settings', icon: Key },
-      { id: 'sms-automation',         label: 'SMS Automation',        path: '/superadmin/communication/sms-automation', icon: MessageSquare },
-      { id: 'whatsapp-settings',      label: 'WhatsApp Business',     path: '/superadmin/communication/whatsapp', icon: MessageSquare },
-      { id: 'whatsapp-ai',            label: 'WhatsApp AI Replies',   path: '/superadmin/communication/whatsapp/ai', icon: MessageSquare },
-      { id: 'whatsapp-inbox',         label: 'WhatsApp Inbox',        path: '/superadmin/communication/whatsapp/inbox', icon: MessageSquare },
-      { id: 'whatsapp-orders',        label: 'WhatsApp Orders',       path: '/superadmin/communication/whatsapp/orders', icon: ShoppingCart },
-      { id: 'facebook-leads',         label: 'Leads Inbox',           path: '/superadmin/facebook-leads', icon: Facebook },
-      { id: 'facebook-leads-settings',label: 'Facebook Connect',      path: '/superadmin/facebook-leads/settings', icon: Facebook },
-      { id: 'lead-forms',             label: 'Lead Forms',            path: '/superadmin/facebook-leads/forms', icon: Facebook },
       { id: 'notification-settings',  label: 'Notification Settings', path: '/superadmin/notifications/settings', icon: Bell },
     ],
   },
   { id: 'pos-settings', label: 'POS Settings', path: '/superadmin/pos/settings', icon: Settings2, section: 'admin' },
   { id: 'subscription-checkout', label: 'Subscription Checkout', path: '/superadmin/subscription/checkout', icon: CreditCard, section: 'admin' },
   { id: 'system-usage', label: 'System Usage', path: '/superadmin/system-usage', icon: CircleHelp, section: 'admin' },
+
 ];
 
 interface SidebarProps {
@@ -274,26 +258,12 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
         if (item.id === 'goods-receipts' && orgFeatures?.supplierOrdersEnabled === false) return null;
         if (item.id === 'jobsheets' && !industryAllowsFeature(industryType, 'jobsheets')) return null;
         if (item.id === 'parts' && !industryAllowsFeature(industryType, 'parts')) return null;
-        // Warranty is an organization setting now, not an industry trait.
-        // `=== false` is not enough: the flag defaults to OFF, so an undefined
-        // value (profile still loading, or an older API) must hide it.
-        if (item.id === 'warranty' && orgFeatures?.warrantyEnabled !== true) return null;
-        // New verticals   only for their own industry (GENERAL sees all)
-        if (item.id === 'rental' && !industryAllowsFeature(industryType, 'rental')) return null;
-        if (item.id === 'carwash' && !industryAllowsFeature(industryType, 'carwash')) return null;
-        if (item.id === 'garage' && !industryAllowsFeature(industryType, 'garage')) return null;
         if (item.id === 'trade-ins' && !industryAllowsFeature(industryType, 'tradein')) return null;
-        if (item.id === 'appointments' && !industryAllowsFeature(industryType, 'appointment')) return null;
-        if (item.id === 'towing' && !industryAllowsFeature(industryType, 'towing')) return null;
-        // Retail-only modules hidden for rental / car wash / garage orgs
-        const retailOnlyIds = [
-          'quick-pos', 'advance-payments', 'sales', 'orders', 'sale-jobs', 'installments', 'returns',
-          'addon-requests', 'woocommerce',
-        ];
-        if (retailOnlyIds.includes(item.id) && !industryAllowsFeature(industryType, 'retail')) return null;
-        // Stock screens: retail shops AND garages (spare parts issued to job sheets)
-        const inventoryIds = ['stock', 'goods-receipts', 'product-usage'];
-        if (inventoryIds.includes(item.id) && !industryAllowsFeature(industryType, 'inventory')) return null;
+        // Warranty is an organization setting now, not an industry trait.
+        // `=== false` is not enough here: the flag defaults to OFF, so an
+        // undefined value (profile still loading, or an older API) must hide it
+        // rather than show a menu the organization never enabled.
+        if (item.id === 'warranty' && orgFeatures?.warrantyEnabled !== true) return null;
 
         // Courier + WooCommerce are tied: no courier access → hide both
         if (
@@ -303,6 +273,7 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
           return null;
         }
 
+        // Inside a parent: only use that parent's child configs (no top-level fallback).
         const permConfig = parentChildConfigs
           ? parentChildConfigs.find(p => p.id === item.id)
           : SUPERADMIN_SIDEBAR_PERMISSIONS.find(p => p.id === item.id);
@@ -313,7 +284,6 @@ const useFilteredMenuItems = (items: MenuItem[], orgFeatures?: BusinessProfile |
 
           if (childConfigs !== undefined) {
             if (!filteredChildren.length) return null;
-            // Parent module must also pass (e.g. couriers for WooCommerce group)
             if (!check(permConfig)) return null;
             return { ...item, children: filteredChildren };
           }
@@ -360,16 +330,51 @@ export default function Sidebar({
     onToggleCollapse ? onToggleCollapse(next) : setInternalIsCollapsed(next);
   };
 
-  const isActiveRoute = (path: string) =>
-    path === '/superadmin'
-      ? location.pathname === '/superadmin' || location.pathname === '/superadmin/'
-      : location.pathname.startsWith(path);
+  const collectPaths = (items: MenuItem[]): string[] =>
+    items.flatMap((it) => [it.path, ...(it.children ? collectPaths(it.children) : [])]);
+
+  const allNavPaths = useMemo(
+    () => collectPaths(filteredMenuItems),
+    [filteredMenuItems],
+  );
+
+  const isActiveRoute = (path: string) => {
+    if (path === '/superadmin') {
+      return location.pathname === '/superadmin' || location.pathname === '/superadmin/';
+    }
+    const matches =
+      location.pathname === path || location.pathname.startsWith(`${path}/`);
+    if (!matches) return false;
+    // Prefer the longest matching path so /facebook-leads doesn't steal /forms active state
+    const longerMatch = allNavPaths.some(
+      (p) =>
+        p !== path &&
+        p.length > path.length &&
+        (p === path || p.startsWith(`${path}/`)) &&
+        (location.pathname === p || location.pathname.startsWith(`${p}/`)),
+    );
+    return !longerMatch;
+  };
+
+  const pathMatches = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  const itemOrChildActive = (item: MenuItem): boolean => {
+    if (pathMatches(item.path)) return true;
+    return item.children?.some((c) => itemOrChildActive(c)) ?? false;
+  };
 
   useEffect(() => {
     const init: Record<string, boolean> = {};
-    filteredMenuItems.forEach(it => {
-      if (it.children) init[it.id] = it.children.some(c => location.pathname.startsWith(c.path));
-    });
+    const walk = (items: MenuItem[]) => {
+      items.forEach((it) => {
+        if (it.children?.length) {
+          init[it.id] = itemOrChildActive(it);
+          walk(it.children);
+        }
+      });
+    };
+    walk(filteredMenuItems);
     setExpandedMenus(init);
     if (isMobileOpen && onMobileClose) onMobileClose();
   }, [location.pathname, filteredMenuItems]);
@@ -381,7 +386,7 @@ export default function Sidebar({
   const itemBase = (isActive: boolean, extra = '') =>
     `group relative flex items-center rounded-xl transition-all duration-150 ${extra} ${
       isActive
-        ? 'bg-blue-600/90 text-white shadow-[0_2px_12px_0_rgba(37,99,235,0.35)] backdrop-blur-sm'
+        ? 'bg-orange-500/90 text-white shadow-[0_2px_12px_0_rgba(249,115,22,0.35)] backdrop-blur-sm'
         : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
     }`;
 
@@ -457,9 +462,7 @@ export default function Sidebar({
         {filteredMenuItems.map((item, index) => {
           const Icon = item.icon;
           const isParent = !!item.children?.length;
-          const isActive = isParent
-            ? item.children!.some(c => isActiveRoute(c.path))
-            : isActiveRoute(item.path);
+          const isActive = isParent ? itemOrChildActive(item) : isActiveRoute(item.path);
 
           // Section header detection
           const prevItem = filteredMenuItems[index - 1];
@@ -503,27 +506,82 @@ export default function Sidebar({
                   {isCollapsed && <Tooltip label={item.label} />}
                 </button>
 
-                {/* Sub-items */}
+                {/* Sub-items (supports one nested group level, e.g. Lead Forms) */}
                 {!isCollapsed && isExpanded && (
                   <div className="mt-0.5 ml-3 pl-4 border-l border-gray-100 space-y-0.5 pb-1">
                     {item.children!.map(child => {
                       const ChildIcon = child.icon;
-                      const childActive = isActiveRoute(child.path);
+                      const isNestedGroup = Boolean(child.children?.length);
+                      const childActive = isNestedGroup
+                        ? itemOrChildActive(child)
+                        : isActiveRoute(child.path);
+                      const nestedExpanded = !!expandedMenus[child.id];
+
+                      if (isNestedGroup) {
+                        return (
+                          <div key={child.id} className="space-y-0.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(child.id)}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-150 ${
+                                childActive
+                                  ? 'bg-orange-400/20 text-orange-700 font-medium ring-1 ring-orange-300/40'
+                                  : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+                              }`}
+                            >
+                              <ChildIcon className={`w-3.5 h-3.5 shrink-0 ${childActive ? 'text-orange-500' : 'text-gray-400'}`} />
+                              <span className="truncate flex-1 text-left">{child.label}</span>
+                              <ChevronDown
+                                className={`w-3 h-3 shrink-0 transition-transform ${
+                                  nestedExpanded ? 'rotate-180' : ''
+                                } ${childActive ? 'text-orange-400' : 'text-gray-400'}`}
+                              />
+                            </button>
+                            {nestedExpanded && (
+                              <div className="ml-3 pl-3 border-l border-orange-100/80 space-y-0.5">
+                                {child.children!.map((grand) => {
+                                  const GrandIcon = grand.icon;
+                                  const grandActive = isActiveRoute(grand.path);
+                                  return (
+                                    <Link
+                                      key={grand.id}
+                                      to={grand.path}
+                                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] transition-all duration-150 ${
+                                        grandActive
+                                          ? 'bg-orange-400/25 text-orange-800 font-semibold'
+                                          : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+                                      }`}
+                                    >
+                                      <GrandIcon
+                                        className={`w-3.5 h-3.5 shrink-0 ${
+                                          grandActive ? 'text-orange-500' : 'text-gray-400'
+                                        }`}
+                                      />
+                                      <span className="truncate">{grand.label}</span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
                       return (
                         <Link
                           key={child.id}
                           to={child.path}
                           className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-150 ${
                             childActive
-                              ? 'bg-blue-400/20 text-blue-700 font-medium ring-1 ring-blue-300/40'
+                              ? 'bg-orange-400/20 text-orange-700 font-medium ring-1 ring-orange-300/40'
                               : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
                           }`}
                         >
-                          <ChildIcon className={`w-3.5 h-3.5 shrink-0 ${childActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                          <ChildIcon className={`w-3.5 h-3.5 shrink-0 ${childActive ? 'text-orange-500' : 'text-gray-400'}`} />
                           <span className="truncate">{child.label}</span>
                           {child.badge && (
                             <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                              childActive ? 'bg-blue-100 text-blue-700' : 'bg-red-50 text-red-500'
+                              childActive ? 'bg-orange-100 text-orange-700' : 'bg-red-50 text-red-500'
                             }`}>
                               {child.badge}
                             </span>

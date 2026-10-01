@@ -25,13 +25,16 @@ import {
   Loader2,
   Smartphone,
   Shield,
+  Sparkles,
 } from 'lucide-react';
 import { useProduct } from '../../hooks/useProduct';
+import { useInventory } from '../../hooks/useInventory';
 import useWarranty, { type WarrantyCoverageItem } from '../../hooks/useWarranty';
 import WarrantyCoverageFields from '../../components/organizationadmin/products/WarrantyCoverageFields';
 import useBarcode from '../../hooks/useBarcode';
 import BarcodeScannerModal from '../../components/common/BarcodeScannerModal';
 import AsyncSearchSelect from '../../components/common/AsyncSearchSelect';
+import useAiVision from '../../hooks/useAiVision';
 import { useProductCategory } from '../../hooks/useProductCategory';
 import { toCategoryOptions } from '../../utils/productListFilters';
 import { formatCurrency } from '../../utils/currency';
@@ -159,8 +162,20 @@ export const Section = ({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/** The signed-in branch's location id when on a branch page (not /superadmin). */
+function currentBranchLocationId(): string | null {
+  if (typeof window === 'undefined' || window.location.pathname.startsWith('/superadmin')) return null;
+  try {
+    const u = JSON.parse(localStorage.getItem('user') || 'null');
+    return u?.locationId || u?.branchId || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AddProductPage() {
   const { warrantyEnabled } = useOrgFeatures();
+  const { createInventory } = useInventory();
   const navigate = useNavigate();
   const productHook = useProduct();
   const { uploadProductImages } = productHook;
@@ -168,6 +183,8 @@ export default function AddProductPage() {
   const variantTypeHook = useProductVariantType();
   const locationHook = useLocation();
   const { lookupBarcodeForProduct, lookingUp: barcodeLookingUp } = useBarcode();
+  const { analyzeProduct, loading: aiAnalyzing } = useAiVision();
+  const aiAnalyzeInputRef = useRef<HTMLInputElement>(null);
 
   // ── Warranty coverage vocabulary ─────────────────────────────────────────────
   const warrantyHook = useWarranty();
@@ -261,15 +278,15 @@ export default function AddProductPage() {
 
   // ── Product type ──────────────────────────────────────────────────────────────
   const [isService, setIsService] = useState(false);
+  // Laptops / phones: one serial per unit, checked at receiving and at the till
+  const [trackSerials, setTrackSerials] = useState(false);
   const [isReload, setIsReload] = useState(false);
-  // Unit of measure. Defaults keep the product piece-priced, exactly as before.
   const [sellBy, setSellBy] = useState<SellBy>('UNIT');
   const [unitOfMeasure, setUnitOfMeasure] = useState<UnitOfMeasure>('PCS');
   const [qtyStep, setQtyStep] = useState('1');
   const [minSaleQty, setMinSaleQty] = useState('1');
   const [qtyDecimals, setQtyDecimals] = useState('0');
 
-  /** Switching mode resets the unit fields to sensible values for that mode. */
   const applySellBy = (next: SellBy) => {
     setSellBy(next);
     const d = SELL_BY_DEFAULTS[next];
@@ -304,11 +321,15 @@ export default function AddProductPage() {
           locList = (raw as any).locations as Location[];
         }
         setLocations(locList);
-        // Default initial-stock location to a warehouse, else the first location
+        // Default initial-stock location: on a BRANCH page, that branch (so the
+        // new product shows in this branch's list); otherwise a warehouse, else
+        // the first location.
         const warehouse = locList.find(
           (l) => (((l as any).locationType || (l as any).type || '') as string).toUpperCase() === 'WAREHOUSE'
         );
-        setInitialStockLocationId(warehouse?.id || locList[0]?.id || '');
+        const activeBranchId = currentBranchLocationId();
+        const activeBranch = activeBranchId ? locList.find((l) => (l as any).id === activeBranchId) : undefined;
+        setInitialStockLocationId(activeBranch?.id || warehouse?.id || locList[0]?.id || '');
       }
     };
     load();
@@ -430,6 +451,48 @@ export default function AddProductPage() {
       return next;
     });
     setImageUrlInput('');
+  };
+
+  const applyAiProductResult = (result: {
+    name: string;
+    brand: string | null;
+    model: string | null;
+    description: string | null;
+  }) => {
+    if (result.name) setName(result.name);
+    if (result.brand) setBrand(result.brand);
+    if (result.model) setModel(result.model);
+    if (result.description) setDescription(result.description);
+    setCollapsed((prev) => ({ ...prev, basic: false }));
+    toast.success('Product fields filled from AI — review before saving');
+  };
+
+  const runAiAnalyzeOnFile = async (file: File) => {
+    try {
+      const result = await analyzeProduct(file);
+      applyAiProductResult(result);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'AI analyze failed');
+    }
+  };
+
+  const handleAnalyzeWithAi = async () => {
+    const img = images.find((i) => i.id === primaryImageId) || images[0];
+    if (img?.preview || img?.url) {
+      try {
+        const src = img.url || img.preview;
+        const res = await fetch(src);
+        const blob = await res.blob();
+        const file = new File([blob], 'product-photo.jpg', {
+          type: blob.type || 'image/jpeg',
+        });
+        await runAiAnalyzeOnFile(file);
+        return;
+      } catch {
+        /* fall through to file picker */
+      }
+    }
+    aiAnalyzeInputRef.current?.click();
   };
 
   const handleFileDrop = useCallback(async (files: FileList | null) => {
@@ -603,25 +666,13 @@ export default function AddProductPage() {
     }
   }, [variantRows, uploadProductImages]);
 
-  const variantPrices = variantRows
-    .map(r => Number(r.unitPrice))
-    .filter(n => !isNaN(n) && n >= 0);
-  const derivedUnitPrice =
-    hasVariants && variantPrices.length > 0 ? Math.min(...variantPrices) : null;
-  const derivedUnitPriceMax =
-    hasVariants && variantPrices.length > 0 ? Math.max(...variantPrices) : null;
-
   // ─── Validation ───────────────────────────────────────────────────────────────
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'Product name is required';
     if (!categoryId.trim()) errs.categoryId = 'Category is required';
-    // Parent unit price is only required for simple (non-variant) products;
-    // variant products take selling price from each variant row.
-    if (!hasVariants) {
-      if (!unitPrice || isNaN(Number(unitPrice)) || Number(unitPrice) < 0)
-        errs.unitPrice = 'Valid unit price is required';
-    }
+    if (!unitPrice || isNaN(Number(unitPrice)) || Number(unitPrice) < 0)
+      errs.unitPrice = 'Valid unit price is required';
     if (hasVariants && variantRows.length === 0)
       errs.variants = 'Add at least one variant or disable the variants toggle';
     variantRows.forEach((row, i) => {
@@ -651,16 +702,10 @@ export default function AddProductPage() {
       const primaryEntry = images.find(i => i.id === primaryImageId);
       const primaryUrl = primaryEntry && !primaryEntry.isLocal ? primaryEntry.url : imageUrls[0];
 
-      // Parent selling price: from variants when enabled, otherwise the top-level field
-      const parentUnitPrice =
-        hasVariants && variantRows.length > 0
-          ? Math.min(...variantRows.map(r => Number(r.unitPrice)))
-          : Number(unitPrice);
-
       // 1. Create parent product
       const parentData: Record<string, unknown> = {
         name: name.trim(),
-        unitPrice: parentUnitPrice,
+        unitPrice: Number(unitPrice),
         ...(description && { description }),
         ...(categoryId && { categoryId }),
         ...(brand && { brand }),
@@ -699,6 +744,7 @@ export default function AddProductPage() {
         isActive: true,
         isService,
         isReload,
+        trackSerials: !isService && !isReload ? trackSerials : false,
         ...(hasVariants && selectedTypeIds.length > 0 && {
           customAttributes: { variantTypeIds: selectedTypeIds },
         }),
@@ -778,11 +824,28 @@ export default function AddProductPage() {
             console.error('Failed to add initial stock:', stockErr);
             toast.error('Product created, but adding initial stock failed');
           }
+        } else if (parentId && !isService && currentBranchLocationId()) {
+          // Created from a branch with no opening stock: give it a 0-qty row at
+          // this branch. Without one the branch's Products list (stock-based)
+          // never showed the product it had just created, so nobody could
+          // restock it from there.
+          try {
+            await createInventory({ productId: parentId, locationId: currentBranchLocationId() as string, quantity: 0 });
+          } catch (invErr) {
+            console.error('Failed to add product to branch list:', invErr);
+          }
         }
         toast.success('Product created successfully!');
       }
 
-      navigate(-1);
+      // Go to the product list, not "back": opened from a bookmark, a new tab
+      // or after other navigation, -1 landed on an unrelated page.
+      const path = window.location.pathname;
+      navigate(
+        path.startsWith('/superadmin')
+          ? '/superadmin/stock/management'
+          : path.replace(/\/products\/add.*$/, '/products'),
+      );
     } catch (err) {
       console.error(err);
       toast.error('Something went wrong. Please try again.');
@@ -1001,13 +1064,15 @@ export default function AddProductPage() {
                       Credit balance pool   inventory amount is LKR balance
                     </span>
                   )}
+                  {!isService && !isReload && (
+                    <label className="flex items-center gap-2 text-sm text-gray-700 ml-auto" title="Receiving must list one serial per unit, and the POS must name the serial sold">
+                      <input type="checkbox" checked={trackSerials} onChange={(e) => setTrackSerials(e.target.checked)} />
+                      Track serial / IMEI per unit
+                    </label>
+                  )}
                 </div>
               </div>
 
-              {/* ── How this product is measured ────────────────────────────
-                  Services and reloads have no physical quantity, so the choice
-                  only appears for real stock. Everything here defaults to pieces,
-                  which is how every existing product behaves. */}
               {!isService && !isReload && (
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1132,36 +1197,20 @@ export default function AddProductPage() {
           {/* ── Pricing & Identifiers ── */}
           <Section id="pricing" collapsed={collapsed.pricing} onToggle={() => toggle('pricing')}>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {hasVariants ? (
-                <div className="sm:col-span-2 md:col-span-3 rounded-lg border border-orange-200 bg-orange-50/60 px-3 py-2.5 text-sm text-gray-600">
-                  Unit price is set on each variant below. The parent product will use the lowest variant price.
+              <Field label={isReload ? 'Price per LKR (usually 1)' : sellBy === 'UNIT' ? 'Unit Price (Selling)' : `Price per ${unitOfMeasure.toLowerCase()} (Selling)`} required error={errors.unitPrice}>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={unitPrice}
+                    onChange={e => setUnitPrice(e.target.value)}
+                    placeholder="0.00"
+                    className={inputCls + ' pl-7' + (errors.unitPrice ? ' border-red-400' : '')}
+                  />
                 </div>
-              ) : (
-                <Field
-                  label={
-                    isReload
-                      ? 'Price per LKR (usually 1)'
-                      : sellBy === 'UNIT'
-                        ? 'Unit Price (Selling)'
-                        : `Price per ${unitOfMeasure.toLowerCase()} (Selling)`
-                  }
-                  required
-                  error={errors.unitPrice}
-                >
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={unitPrice}
-                      onChange={e => setUnitPrice(e.target.value)}
-                      placeholder="0.00"
-                      className={inputCls + ' pl-7' + (errors.unitPrice ? ' border-red-400' : '')}
-                    />
-                  </div>
-                </Field>
-              )}
+              </Field>
               <Field label="Cost Price">
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
@@ -1331,6 +1380,35 @@ export default function AddProductPage() {
           {/* ── Images ── */}
           <Section id="images" collapsed={collapsed.images} onToggle={() => toggle('images')}>
             <div className="mt-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-gray-500">
+                  Tip: add a clear product photo, then use AI to prefill name / brand / model.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleAnalyzeWithAi()}
+                  disabled={aiAnalyzing}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 disabled:opacity-50"
+                >
+                  {aiAnalyzing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  {aiAnalyzing ? 'Analyzing…' : 'Analyze with AI'}
+                </button>
+                <input
+                  ref={aiAnalyzeInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f) void runAiAnalyzeOnFile(f);
+                  }}
+                />
+              </div>
               {/* Drag & Drop area */}
               <div
                 onDragOver={images.length < 5 ? onDragOver : undefined}
@@ -1922,15 +2000,7 @@ export default function AddProductPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Unit Price</span>
                 <span className="font-medium text-gray-800">
-                  {hasVariants
-                    ? derivedUnitPrice != null
-                      ? derivedUnitPriceMax != null && derivedUnitPriceMax !== derivedUnitPrice
-                        ? `${formatCurrency(derivedUnitPrice)} – ${formatCurrency(derivedUnitPriceMax)}`
-                        : formatCurrency(derivedUnitPrice)
-                      : ' '
-                    : unitPrice
-                      ? formatCurrency(Number(unitPrice))
-                      : ' '}
+                  {unitPrice ? formatCurrency(Number(unitPrice)) : ' '}
                 </span>
               </div>
               {costPrice && (
