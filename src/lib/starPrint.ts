@@ -336,9 +336,9 @@ function applyPassPrntLayout(
   const is58mm = paperWidth === "58mm";
   const override = `<style id="sellmate-passprnt-layout">
     @page{size:auto!important;margin:0!important}
-    *{font-weight:700!important}
+    *{font-weight:700!important;color:#000!important}
     html,body{width:100%!important;max-width:100%!important;margin:0!important}
-    body{font-size:${is58mm ? "15px" : "16px"}!important;line-height:1.35!important;font-weight:700!important}
+    body{font-size:${is58mm ? "15px" : "16px"}!important;line-height:1.35!important;font-weight:700!important;color:#000!important}
     .wrap{width:100%!important;max-width:100%!important;margin:0!important;padding:${is58mm ? "8px" : "12px"}!important}
     .biz-contact,.domain-line,.item-meta,.muted,.sale-number{font-size:${is58mm ? "12px" : "13px"}!important}
     .receipt-title,.thank-you{font-size:${is58mm ? "17px" : "18px"}!important}
@@ -349,6 +349,7 @@ function applyPassPrntLayout(
     .footer-qr-img{width:${is58mm ? "150px" : "180px"}!important;height:${is58mm ? "150px" : "180px"}!important}
     @media print{
       html,body,.wrap{width:100%!important;max-width:100%!important;margin:0!important}
+      *{font-weight:700!important;color:#000!important}
     }
   </style>`;
 

@@ -13,6 +13,9 @@ interface BillLine {
   unitPrice: number;
   discount?: number;
   lineTotal: number;
+  /** Set only when the shop prints selling price vs the customer's price. */
+  sellingPrice?: number;
+  yourPrice?: number;
   serialNumbers?: string[];
   warrantyMonths?: number;
 }
@@ -37,6 +40,7 @@ interface PublicBill {
   discount: number;
   tax: number;
   total: number;
+  totalSaved?: number;
   paid: number;
   change: number;
   balanceDue: number;
@@ -44,6 +48,22 @@ interface PublicBill {
   warrantyNote?: string;
   footerNote?: string;
 }
+
+/**
+ * SellMate's own marketing block, shown under every shared bill.
+ *
+ * This page is the one surface a shop's END CUSTOMER sees, so it is where
+ * SellMate gets to introduce itself. Kept in one constant so the numbers and the
+ * wording can be changed in a single place.
+ */
+const SELLMATE = {
+  siteUrl: "https://sellmate.lk",
+  siteLabel: "sellmate.lk",
+  phones: ["0707467221", "0787514907"],
+};
+
+/** Sri Lankan local number -> tel: link. */
+const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 
 const money = (n: number | undefined) =>
   `Rs ${Number(n || 0).toLocaleString("en-LK", {
@@ -179,6 +199,12 @@ export default function PublicBillPage() {
                     <span>{line.warrantyMonths} mo warranty</span>
                   )}
                 </div>
+                {line.sellingPrice != null && line.yourPrice != null && (
+                  <div className="flex justify-between text-xs text-emerald-700 mt-0.5">
+                    <span>Selling Price: {money(line.sellingPrice)}</span>
+                    <span>Your Price: {money(line.yourPrice)}</span>
+                  </div>
+                )}
                 {!!line.serialNumbers?.length && (
                   <p className="text-[11px] text-gray-400 mt-0.5 break-all">
                     S/N: {line.serialNumbers.join(", ")}
@@ -210,6 +236,12 @@ export default function PublicBillPage() {
               <span>Total</span>
               <span>{money(bill.total)}</span>
             </div>
+            {!!bill.totalSaved && bill.totalSaved > 0 && (
+              <div className="flex justify-between font-semibold text-emerald-700">
+                <span>You saved</span>
+                <span>{money(bill.totalSaved)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-gray-600">
               <span>Paid</span>
               <span>{money(bill.paid)}</span>
@@ -242,6 +274,50 @@ export default function PublicBillPage() {
               {bill.footerNote || "Thank you for shopping with us!"}
             </p>
           </div>
+        </div>
+
+        {/* SellMate   shown under the shop's bill, visually separate from it so
+            it never reads as part of the shop's own footer. */}
+        <div className="bg-white rounded-2xl shadow-sm px-5 py-5 text-center">
+          <p className="text-[11px] uppercase tracking-widest text-gray-400">
+            Powered by
+          </p>
+          <a
+            href={SELLMATE.siteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-block text-xl font-extrabold text-[#1e3a8a] hover:text-[#1e40af]"
+          >
+            SellMate
+          </a>
+          <p className="mt-1 text-xs text-gray-600">
+            Billing, stock &amp; POS software for Sri Lankan businesses
+          </p>
+
+          <a
+            href={SELLMATE.siteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-block text-sm font-semibold text-orange-600 hover:text-orange-700"
+          >
+            {SELLMATE.siteLabel}
+          </a>
+
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {SELLMATE.phones.map((phone) => (
+              <a
+                key={phone}
+                href={telHref(phone)}
+                className="px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+              >
+                {phone}
+              </a>
+            ))}
+          </div>
+
+          <p className="mt-3 text-[11px] text-gray-400">
+            Want this for your shop? Call us.
+          </p>
         </div>
       </div>
     </div>
